@@ -59,7 +59,13 @@ export default function ActividadesPage() {
   async function deleteActivity(id: string) {
     setDeleting(id);
     await supabase.from('completions').delete().eq('activity_id', id);
-    await supabase.from('activities').delete().eq('id', id);
+    const { error } = await supabase.from('activities').delete().eq('id', id);
+    if (error) {
+      alert('Error al eliminar: ' + error.message);
+      setDeleting(null);
+      setConfirmId(null);
+      return;
+    }
     setActivities(prev => prev.filter(a => a.id !== id));
     setDeleting(null);
     setConfirmId(null);
