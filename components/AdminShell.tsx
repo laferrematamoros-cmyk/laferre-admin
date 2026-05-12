@@ -9,7 +9,7 @@ import { useCompany } from '@/lib/company-context';
 const NAV = [
   { href: '/dashboard',         label: 'Dashboard',   icon: IconHome },
   { href: '/calendario',        label: 'Calendario',  icon: IconCal },
-  { href: '/actividades/nueva', label: 'Actividades', icon: IconList },
+  { href: '/actividades',        label: 'Actividades', icon: IconList },
   { href: '/equipo',            label: 'Equipo',       icon: IconUser },
   { href: '/reportes',          label: 'Reportes',    icon: IconChart },
   { href: '/ajustes',           label: 'Ajustes',     icon: IconCog },
