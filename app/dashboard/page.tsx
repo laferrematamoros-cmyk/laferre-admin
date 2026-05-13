@@ -19,6 +19,17 @@ interface ActivityRow extends Activity {
 const STATUS_DOT: Record<Status, string> = {
   done: '#0F9D58', active: '#F2A20C', late: '#E11D2E', pending: '#A8A8AD',
 };
+const STATUS_BG: Record<Status, string>     = { done: '#E5F4EC', active: '#FFF6E0', late: '#FCE7E9', pending: '#F2F2F4' };
+const STATUS_LABEL: Record<Status, string>  = { done: 'Realizada', active: 'En curso', late: 'Atrasada', pending: 'Pendiente' };
+
+function Row({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <span className="text-[12px]" style={{ color: '#6E6E73' }}>{label}</span>
+      <span className="text-right text-[12px] font-semibold" style={{ color: accent ? '#0F9D58' : '#0F0F10' }}>{value}</span>
+    </div>
+  );
+}
 
 function initials(name: string) {
   return name.split(' ').map(s => s[0]).join('');
@@ -50,10 +61,11 @@ function nowLabel() {
 export default function DashboardPage() {
   const router = useRouter();
   const { current: company } = useCompany();
-  const [activities, setActivities] = useState<ActivityRow[]>([]);
-  const [employees, setEmployees]   = useState<Employee[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [timeLabel, setTimeLabel]   = useState(nowLabel());
+  const [activities, setActivities]         = useState<ActivityRow[]>([]);
+  const [employees, setEmployees]           = useState<Employee[]>([]);
+  const [loading, setLoading]               = useState(true);
+  const [timeLabel, setTimeLabel]           = useState(nowLabel());
+  const [selected, setSelected]             = useState<ActivityRow | null>(null);
 
   const load = useCallback(async () => {
     if (!company) return;
@@ -171,7 +183,7 @@ export default function DashboardPage() {
             ) : (
               <div className="flex flex-col">
                 {activities.map((a, i) => (
-                  <div key={a.id} className="grid items-center gap-[10px] py-[10px]"
+                  <div key={a.id} onClick={() => setSelected(a)} className="grid items-center gap-[10px] py-[10px] cursor-pointer rounded-lg px-1 hover:bg-[#FAFAFA] transition-colors"
                     style={{ gridTemplateColumns: '52px 16px 1fr auto', borderTop: i === 0 ? 'none' : '1px solid #F2F2F4' }}>
                     <span className="text-[12px] font-semibold" style={{ color: '#6E6E73', fontFamily: 'monospace' }}>{fmtTime(a.start_time)}</span>
                     <div className="mx-auto h-[10px] w-[10px] rounded-full" style={{ background: STATUS_DOT[a.status] }} />
@@ -255,6 +267,97 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Detail side panel */}
+      {selected && (() => {
+        const comp = selected.completion ?? null;
+        const performer = comp?.employee_id ? employees.find(e => e.id === comp.employee_id) : null;
+        const today = new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
+        return (
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              style={{ background: 'rgba(0,0,0,0.25)' }}
+              onClick={() => setSelected(null)}
+            />
+            <div
+              className="fixed right-0 top-0 h-full z-50 flex flex-col overflow-y-auto"
+              style={{ width: 360, background: '#fff', borderLeft: '1px solid #E4E4E7', boxShadow: '-4px 0 24px rgba(0,0,0,0.08)' }}
+            >
+              {/* Header */}
+              <div className="flex items-start justify-between gap-3 px-6 py-5 border-b" style={{ borderColor: '#E4E4E7' }}>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-[1px]" style={{ color: '#6E6E73' }}>Detalle de actividad</p>
+                  <h2 className="mt-1 text-[17px] font-extrabold leading-snug truncate" style={{ color: '#0F0F10' }}>{selected.title}</h2>
+                </div>
+                <button
+                  onClick={() => setSelected(null)}
+                  className="mt-0.5 flex-shrink-0 rounded-[8px] px-3 py-1.5 text-[12px] font-semibold"
+                  style={{ background: '#F2F2F4', color: '#3A3A3D' }}
+                >Cerrar</button>
+              </div>
+
+              <div className="flex flex-col gap-5 px-6 py-5">
+                {/* Status badge */}
+                <div className="inline-flex w-fit items-center gap-2 rounded-[8px] px-3 py-1.5"
+                  style={{ background: STATUS_BG[selected.status], border: `1px solid ${STATUS_DOT[selected.status]}` }}>
+                  <span className="h-[8px] w-[8px] rounded-full" style={{ background: STATUS_DOT[selected.status] }} />
+                  <span className="text-[12px] font-semibold" style={{ color: STATUS_DOT[selected.status] }}>
+                    {STATUS_LABEL[selected.status]}
+                  </span>
+                </div>
+
+                {/* Info rows */}
+                <div className="rounded-[10px] border p-4 flex flex-col gap-3" style={{ borderColor: '#E4E4E7' }}>
+                  <Row label="Fecha" value={today} />
+                  <Row label="Horario" value={`${fmtTime(selected.start_time)} – ${fmtTime(selected.limit_time)}`} />
+                  <Row label="Asignado a" value={selected.assigneeName} />
+                  {performer && <Row label="Completó" value={performer.name} />}
+                  {comp?.completed_at && (
+                    <Row
+                      label="Hora de registro"
+                      value={new Date(comp.completed_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+                    />
+                  )}
+                  {selected.status === 'done' && (
+                    <Row label="¿A tiempo?" value={comp?.was_late ? '⚠ Tarde' : '✓ A tiempo'} accent={!comp?.was_late} />
+                  )}
+                  {selected.status === 'late' && selected.minutesLate !== undefined && (
+                    <Row label="Retraso" value={`${selected.minutesLate} min`} />
+                  )}
+                </div>
+
+                {/* Evidence photo */}
+                <div>
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.8px]" style={{ color: '#6E6E73' }}>Evidencia fotográfica</p>
+                  {comp?.photo_url ? (
+                    <a href={comp.photo_url} target="_blank" rel="noreferrer">
+                      <img
+                        src={comp.photo_url}
+                        alt="Evidencia"
+                        className="w-full rounded-[10px] object-cover"
+                        style={{ maxHeight: 260, border: '1px solid #E4E4E7' }}
+                      />
+                    </a>
+                  ) : (
+                    <div className="flex h-[120px] items-center justify-center rounded-[10px] text-[13px]" style={{ background: '#F2F2F4', color: '#A8A8AD' }}>
+                      Sin foto de evidencia
+                    </div>
+                  )}
+                </div>
+
+                {/* Note */}
+                {comp?.note && (
+                  <div>
+                    <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.8px]" style={{ color: '#6E6E73' }}>Nota</p>
+                    <p className="rounded-[10px] p-3 text-[13px] leading-relaxed" style={{ background: '#F2F2F4', color: '#0F0F10' }}>{comp.note}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        );
+      })()}
     </AdminShell>
   );
 }

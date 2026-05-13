@@ -36,11 +36,9 @@ const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 interface EmployeeStat { name: string; done: number; missed: number; rate: number; }
 interface MissedItem   { title: string; date: string; assignee: string; }
 interface DayBar       { d: string; done: number; missed: number; }
-interface EvidenceItem { id: string; activityTitle: string; employeeName: string; completedAt: string; photoUrl: string | null; wasLate: boolean; date: string; }
-interface ReportData   {
+interface ReportData {
   done: number; missed: number; late: number; total: number;
   byEmployee: EmployeeStat[]; missed_list: MissedItem[]; daily: DayBar[];
-  evidence: EvidenceItem[];
 }
 
 // ── PDF ───────────────────────────────────────────────────────────────────────
@@ -196,26 +194,7 @@ export default function ReportesPage() {
       return { name: e.name, done: s.done, missed: s.missed, rate: tot > 0 ? Math.round(s.done / tot * 100) : 100 };
     }).sort((a, b) => b.rate - a.rate);
 
-    // Evidence: completions with photo this week
-    const evidence: EvidenceItem[] = completions
-      .filter(c => c.photo_url)
-      .map(c => {
-        const act = activities.find(a => a.id === c.activity_id);
-        const emp = employees.find(e => e.id === c.employee_id);
-        const dt  = new Date(c.completed_at);
-        return {
-          id:            c.id,
-          activityTitle: act?.title ?? 'Actividad',
-          employeeName:  emp?.name ?? '—',
-          completedAt:   `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`,
-          photoUrl:      c.photo_url,
-          wasLate:       c.was_late,
-          date:          new Date(c.scheduled_date + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' }),
-        };
-      })
-      .sort((a, b) => b.completedAt.localeCompare(a.completedAt));
-
-    setData({ done: totalDone, missed: totalScheduled - totalDone, late: totalLate, total: totalScheduled, byEmployee, missed_list: missedList, daily, evidence });
+    setData({ done: totalDone, missed: totalScheduled - totalDone, late: totalLate, total: totalScheduled, byEmployee, missed_list: missedList, daily });
     setLoading(false);
   }, []);
 
@@ -318,33 +297,6 @@ export default function ReportesPage() {
                   </div>
                 )}
               </div>
-            </div>
-
-            {/* Evidence gallery */}
-            <div className="mb-4 rounded-xl border p-5" style={{ background: '#fff', borderColor: '#E4E4E7' }}>
-              <h3 className="mb-4 text-[14px] font-bold">Evidencias fotográficas ({data.evidence.length})</h3>
-              {data.evidence.length === 0 ? (
-                <p className="py-4 text-center text-[13px]" style={{ color: '#A8A8AD' }}>No hay evidencias con foto esta semana</p>
-              ) : (
-                <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
-                  {data.evidence.map(ev => (
-                    <a key={ev.id} href={ev.photoUrl!} target="_blank" rel="noopener noreferrer" className="group block overflow-hidden rounded-xl border transition-shadow hover:shadow-md" style={{ borderColor: '#E4E4E7' }}>
-                      <div className="relative overflow-hidden" style={{ aspectRatio: '4/3', background: '#F2F2F4' }}>
-                        <img src={ev.photoUrl!} alt={ev.activityTitle} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
-                        <div className="absolute top-2 left-2">
-                          <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: ev.wasLate ? '#FCE7E9' : '#D1FAE5', color: ev.wasLate ? '#E11D2E' : '#065F46' }}>
-                            {ev.wasLate ? '↑ Tarde' : '✓ A tiempo'}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="p-3">
-                        <p className="text-[12px] font-bold truncate" style={{ color: '#0F0F10' }}>{ev.activityTitle}</p>
-                        <p className="mt-0.5 text-[11px]" style={{ color: '#6E6E73' }}>{ev.employeeName} · {ev.date} · {ev.completedAt}</p>
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              )}
             </div>
 
             {/* Bar chart */}
