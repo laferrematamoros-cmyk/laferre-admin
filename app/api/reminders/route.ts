@@ -47,24 +47,23 @@ export async function GET() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   );
 
-  const [{ data: acts }, { data: comps }, { data: emps }] = await Promise.all([
+  const [{ data: acts }, { data: comps }, { data: devices }] = await Promise.all([
     supabase.from('activities').select('*').eq('is_active', true),
     supabase.from('completions').select('activity_id').eq('scheduled_date', todayStr),
-    supabase.from('employees').select('id, push_token').not('push_token', 'is', null),
+    supabase.from('device_tokens').select('token'),
   ]);
 
-  const doneIds  = new Set((comps ?? []).map((c: any) => c.activity_id));
-  const tokenMap = new Map((emps ?? []).map((e: any) => [e.id, e.push_token as string]));
+  const doneIds   = new Set((comps ?? []).map((c: any) => c.activity_id));
+  const allTokens = (devices ?? []).map((d: any) => d.token as string);
   const sent: string[] = [];
+
+  if (allTokens.length === 0) return NextResponse.json({ ok: true, sent: [], reason: 'no devices registered' });
 
   for (const act of (acts ?? []) as any[]) {
     if (!(act.days_of_week as number[]).includes(todayDow)) continue;
     if (doneIds.has(act.id)) continue;
 
-    const tokens = ((act.assigned_employee_ids ?? []) as string[])
-      .map(id => tokenMap.get(id))
-      .filter((t): t is string => !!t);
-    if (tokens.length === 0) continue;
+    const tokens = allTokens;
 
     const startMin  = timeToMin(act.start_time);
     const limitMin  = timeToMin(act.limit_time);
