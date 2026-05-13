@@ -56,12 +56,12 @@ export default function UrgentePage() {
       .select()
       .single();
 
-    // Send push notification to all employees with a token
+    // Send push notification to all registered devices
     if (row) {
-      let empQ = supabase.from('employees').select('push_token').not('push_token', 'is', null);
-      if (current?.id) empQ = empQ.eq('company_id', current.id);
-      const { data: emps } = await empQ;
-      const tokens = (emps ?? []).map((e: any) => e.push_token).filter(Boolean);
+      let devQ = supabase.from('device_tokens').select('token');
+      if (current?.id) devQ = devQ.eq('company_id', current.id);
+      const { data: devs } = await devQ;
+      const tokens = (devs ?? []).map((d: any) => d.token).filter(Boolean);
       if (tokens.length) {
         fetch('https://exp.host/--/api/v2/push/send', {
           method: 'POST',
