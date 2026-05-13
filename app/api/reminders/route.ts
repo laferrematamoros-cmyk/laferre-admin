@@ -10,7 +10,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const ONESIGNAL_APP_ID  = 'b5918ca9-0abf-45f5-9e6d-1d798fc16ffc';
 const ONESIGNAL_API_KEY = process.env.ONESIGNAL_REST_API_KEY ?? '';
-const END_OF_DAY        = 22 * 60; // 22:00
+const END_OF_DAY        = 17 * 60; // 17:00
 const WINDOW            = 5;       // cron interval in minutes
 
 function timeToMin(t: string) {
