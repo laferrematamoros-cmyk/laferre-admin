@@ -148,6 +148,15 @@ export default function ActividadesPage() {
 
                   {/* Actions */}
                   <div className="flex items-center gap-2 shrink-0">
+                    {/* Edit */}
+                    <button
+                      onClick={() => router.push(`/actividades/${act.id}`)}
+                      className="rounded-lg px-3 py-1.5 text-[12px] font-semibold border transition-colors"
+                      style={{ borderColor: '#E4E4E7', color: '#0F0F10', background: '#fff' }}
+                    >
+                      Editar
+                    </button>
+
                     {/* Toggle active */}
                     <button
                       onClick={() => toggleActive(act)}

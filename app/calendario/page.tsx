@@ -61,15 +61,41 @@ function resolveStatus(act: Activity, dayComps: Completion[], dateStr: string): 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface CalEvent {
   id: string;
+  activityId: string;
+  dateStr: string;
   title: string;
   who: string;
+  startTime: string;
+  limitTime: string;
   status: Status;
-  dayIndex: number;   // 0=Mon … 6=Sun
-  topOffset: number;  // px from top of grid
-  height: number;     // px
+  dayIndex: number;
+  topOffset: number;
+  height: number;
+}
+
+interface EventDetail {
+  title: string;
+  who: string;
+  startTime: string;
+  limitTime: string;
+  status: Status;
+  date: string;
+  photoUrl: string | null;
+  completedAt: string | null;
+  wasLate: boolean;
+  employeeName: string | null;
 }
 
 // ── Subcomponents ─────────────────────────────────────────────────────────────
+function Row({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <span className="text-[12px]" style={{ color: '#6E6E73' }}>{label}</span>
+      <span className="text-right text-[12px] font-semibold" style={{ color: accent ? '#0F9D58' : '#0F0F10' }}>{value}</span>
+    </div>
+  );
+}
+
 function Legend({ color, label }: { color: string; label: string }) {
   return (
     <div className="inline-flex items-center gap-1.5">
@@ -83,9 +109,11 @@ function Legend({ color, label }: { color: string; label: string }) {
 export default function CalendarioPage() {
   const router = useRouter();
   const { current: company } = useCompany();
-  const [offset, setOffset]   = useState(0);
-  const [events, setEvents]   = useState<CalEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [offset, setOffset]     = useState(0);
+  const [events, setEvents]     = useState<CalEvent[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [detail, setDetail]     = useState<EventDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const mon = monOfWeek(offset);
 
@@ -138,10 +166,14 @@ export default function CalendarioPage() {
           .map(id => empMap[id] ?? '?').join(', ') || 'General';
 
         calEvents.push({
-          id:        `${act.id}-${dateStr}`,
-          title:     act.title,
-          who:       assigneeNames,
-          status:    resolveStatus(act, dayComps, dateStr),
+          id:         `${act.id}-${dateStr}`,
+          activityId: act.id,
+          dateStr,
+          title:      act.title,
+          who:        assigneeNames,
+          startTime:  act.start_time.slice(0, 5),
+          limitTime:  act.limit_time.slice(0, 5),
+          status:     resolveStatus(act, dayComps, dateStr),
           dayIndex,
           topOffset,
           height:    Math.max(height, 18),
@@ -154,6 +186,40 @@ export default function CalendarioPage() {
   }, [offset, company]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { load(); }, [load]);
+
+  const handleEventClick = useCallback(async (ev: CalEvent) => {
+    setDetail(null);
+    setDetailLoading(true);
+
+    const { data: comp } = await supabase
+      .from('completions')
+      .select('*')
+      .eq('activity_id', ev.activityId)
+      .eq('scheduled_date', ev.dateStr)
+      .maybeSingle();
+
+    const completion = comp as Completion | null;
+    let employeeName: string | null = null;
+    if (completion?.employee_id) {
+      const { data: emp } = await supabase
+        .from('employees').select('name').eq('id', completion.employee_id).single();
+      employeeName = (emp as { name: string } | null)?.name ?? null;
+    }
+
+    setDetail({
+      title:       ev.title,
+      who:         ev.who,
+      startTime:   ev.startTime,
+      limitTime:   ev.limitTime,
+      status:      ev.status,
+      date:        ev.dateStr,
+      photoUrl:    completion?.photo_url ?? null,
+      completedAt: completion?.completed_at ?? null,
+      wasLate:     completion?.was_late ?? false,
+      employeeName,
+    });
+    setDetailLoading(false);
+  }, []);
 
   // Week label for topbar
   const monthName = mon.toLocaleString('es-MX', { month: 'long' });
@@ -228,6 +294,7 @@ export default function CalendarioPage() {
                   {colEvents.map(ev => (
                     <div
                       key={ev.id}
+                      onClick={() => handleEventClick(ev)}
                       className="absolute left-1 right-1 overflow-hidden rounded-[5px] border-l-[3px] px-1.5 py-1 cursor-pointer text-[11px] leading-tight"
                       style={{ top: ev.topOffset, height: ev.height, background: EVENT_BG[ev.status], borderLeftColor: EVENT_BORDER[ev.status] }}
                     >
@@ -250,6 +317,86 @@ export default function CalendarioPage() {
           </div>
         </div>
       </div>
+
+      {/* Detail side panel */}
+      {(detail !== null || detailLoading) && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            style={{ background: 'rgba(0,0,0,0.25)' }}
+            onClick={() => { setDetail(null); setDetailLoading(false); }}
+          />
+          <div
+            className="fixed right-0 top-0 h-full z-50 flex flex-col overflow-y-auto"
+            style={{ width: 360, background: '#fff', borderLeft: '1px solid #E4E4E7', boxShadow: '-4px 0 24px rgba(0,0,0,0.08)' }}
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3 px-6 py-5 border-b" style={{ borderColor: '#E4E4E7' }}>
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-[1px]" style={{ color: '#6E6E73' }}>Detalle de actividad</p>
+                {detail && <h2 className="mt-1 text-[17px] font-extrabold leading-snug truncate" style={{ color: '#0F0F10' }}>{detail.title}</h2>}
+              </div>
+              <button
+                onClick={() => { setDetail(null); setDetailLoading(false); }}
+                className="mt-0.5 flex-shrink-0 rounded-[8px] px-3 py-1.5 text-[12px] font-semibold"
+                style={{ background: '#F2F2F4', color: '#3A3A3D' }}
+              >Cerrar</button>
+            </div>
+
+            {detailLoading ? (
+              <div className="flex flex-1 items-center justify-center">
+                <span className="text-[13px]" style={{ color: '#A8A8AD' }}>Cargando…</span>
+              </div>
+            ) : detail ? (
+              <div className="flex flex-col gap-5 px-6 py-5">
+                {/* Status badge */}
+                <div className="inline-flex w-fit items-center gap-2 rounded-[8px] px-3 py-1.5" style={{ background: EVENT_BG[detail.status], border: `1px solid ${EVENT_BORDER[detail.status]}` }}>
+                  <span className="h-[8px] w-[8px] rounded-full" style={{ background: EVENT_BORDER[detail.status] }} />
+                  <span className="text-[12px] font-semibold" style={{ color: EVENT_BORDER[detail.status] }}>
+                    {{ done: 'Realizada', active: 'En curso', late: 'Atrasada', pending: 'Pendiente' }[detail.status]}
+                  </span>
+                </div>
+
+                {/* Info rows */}
+                <div className="rounded-[10px] border p-4 flex flex-col gap-3" style={{ borderColor: '#E4E4E7' }}>
+                  <Row label="Fecha" value={new Date(detail.date + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })} />
+                  <Row label="Horario" value={`${detail.startTime} – ${detail.limitTime}`} />
+                  <Row label="Asignado a" value={detail.who} />
+                  {detail.employeeName && <Row label="Completó" value={detail.employeeName} />}
+                  {detail.completedAt && (
+                    <Row
+                      label="Hora de registro"
+                      value={new Date(detail.completedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+                    />
+                  )}
+                  {detail.status === 'done' && (
+                    <Row label="¿A tiempo?" value={detail.wasLate ? '⚠ Tarde' : '✓ A tiempo'} accent={!detail.wasLate} />
+                  )}
+                </div>
+
+                {/* Evidence photo */}
+                <div>
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.8px]" style={{ color: '#6E6E73' }}>Evidencia fotográfica</p>
+                  {detail.photoUrl ? (
+                    <a href={detail.photoUrl} target="_blank" rel="noreferrer">
+                      <img
+                        src={detail.photoUrl}
+                        alt="Evidencia"
+                        className="w-full rounded-[10px] object-cover"
+                        style={{ maxHeight: 260, border: '1px solid #E4E4E7' }}
+                      />
+                    </a>
+                  ) : (
+                    <div className="flex h-[120px] items-center justify-center rounded-[10px] text-[13px]" style={{ background: '#F2F2F4', color: '#A8A8AD' }}>
+                      Sin foto de evidencia
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </>
+      )}
     </AdminShell>
   );
 }

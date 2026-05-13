@@ -7,15 +7,14 @@ import { supabase, Employee } from '@/lib/supabase';
 import { useCompany } from '@/lib/company-context';
 
 const RECURRENCE: { label: string; days: number[] }[] = [
-  { label: 'Una vez',  days: [] },
-  { label: 'Diaria',   days: [0,1,2,3,4,5,6] },
-  { label: 'Lun-Vie',  days: [1,2,3,4,5] },
-  { label: 'Lun-Sáb',  days: [1,2,3,4,5,6] },
-  { label: 'Semanal',  days: [1] },
-  { label: 'Mensual',  days: [1,2,3,4,5] },
+  { label: 'Una vez',       days: [] },
+  { label: 'Diaria',        days: [0,1,2,3,4,5,6] },
+  { label: 'Lun-Vie',       days: [1,2,3,4,5] },
+  { label: 'Lun-Sáb',       days: [1,2,3,4,5,6] },
+  { label: 'Personalizado', days: [] },
 ];
 
-const REMINDER_MINUTES = [5, 10, 15, 30];
+const REMINDER_MINUTES = [1, 5, 10, 15, 30];
 
 const EVIDENCE_FIELDS = [
   { key: 'evidence_photo',     label: 'Foto' },
@@ -61,12 +60,18 @@ export default function NuevaActividadPage() {
   const [employees, setEmployees]   = useState<Employee[]>([]);
   const [selected, setSelected]     = useState<string[]>([]);
   const [recurrence, setRecurrence] = useState(2);
+  const [customDays, setCustomDays] = useState<number[]>([]);
   const [reminder, setReminder]     = useState(1);
   const [evidence, setEvidence]     = useState([true, true, false, false]);
   const [isUrgent, setIsUrgent]     = useState(false);
   const [saving, setSaving]         = useState(false);
 
   const isGeneral = selected.length === 0;
+  const effectiveDays = recurrence === 4 ? customDays : RECURRENCE[recurrence].days;
+
+  function toggleCustomDay(d: number) {
+    setCustomDays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]);
+  }
 
   useEffect(() => {
     if (!company) return;
@@ -93,7 +98,7 @@ export default function NuevaActividadPage() {
       start_time:            startRef.current?.value || '09:00',
       limit_time:            limitRef.current?.value || '10:00',
       recurrence:            RECURRENCE[recurrence].label.toLowerCase().replace(' ', '-'),
-      days_of_week:          RECURRENCE[recurrence].days,
+      days_of_week:          effectiveDays,
       assigned_employee_ids: selected,
       is_urgent:             isUrgent,
       reminder_minutes:      REMINDER_MINUTES[reminder],
@@ -209,6 +214,13 @@ export default function NuevaActividadPage() {
                   <button key={r.label} onClick={() => setRecurrence(i)} className="rounded-lg px-3.5 py-1.5 text-[12px] font-semibold transition-colors" style={{ background: recurrence === i ? '#0F0F10' : '#F2F2F4', color: recurrence === i ? '#fff' : '#3A3A3D' }}>{r.label}</button>
                 ))}
               </div>
+              {recurrence === 4 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map((name, d) => (
+                    <button key={d} onClick={() => toggleCustomDay(d)} className="rounded-lg px-3.5 py-1.5 text-[12px] font-semibold transition-colors" style={{ background: customDays.includes(d) ? 'var(--accent)' : '#F2F2F4', color: customDays.includes(d) ? '#fff' : '#3A3A3D' }}>{name}</button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Evidence */}
@@ -256,7 +268,7 @@ export default function NuevaActividadPage() {
                 <h3 className="text-[13px] font-bold tracking-[0.3px]">RECORDATORIOS</h3>
               </div>
               <p className="mb-3.5 text-[12px]" style={{ color: 'rgba(255,255,255,.7)' }}>Si no se completa en la hora límite, enviar notificación cada:</p>
-              <div className="grid grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-5 gap-1.5">
                 {REMINDER_MINUTES.map((min, i) => (
                   <button key={min} onClick={() => setReminder(i)} className="rounded-lg py-2.5 text-center text-[12px] font-bold transition-colors" style={{ background: reminder === i ? 'var(--accent)' : 'rgba(255,255,255,.08)' }}>{min} min</button>
                 ))}
