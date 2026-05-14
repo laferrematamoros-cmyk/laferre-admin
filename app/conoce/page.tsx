@@ -41,6 +41,7 @@ export default function ConocePage() {
   const [imageFile, setImageFile]     = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [saving, setSaving]           = useState(false);
+  const [uploadError, setUploadError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -61,6 +62,7 @@ export default function ConocePage() {
     setBody('');
     setImageFile(null);
     setImagePreview(null);
+    setUploadError(false);
     setShowForm(true);
   }
 
@@ -71,6 +73,7 @@ export default function ConocePage() {
     setBody(item.body ?? '');
     setImageFile(null);
     setImagePreview(item.image_url);
+    setUploadError(false);
     setShowForm(true);
   }
 
@@ -97,13 +100,16 @@ export default function ConocePage() {
     if (imageFile) {
       const ext = imageFile.name.split('.').pop() ?? 'jpg';
       const path = `${current?.id ?? 'general'}/${Date.now()}.${ext}`;
-      const { error: uploadError } = await supabase.storage
+      const { error: storageErr } = await supabase.storage
         .from('conoce-images')
         .upload(path, imageFile, { upsert: true });
-      if (!uploadError) {
-        const { data: urlData } = supabase.storage.from('conoce-images').getPublicUrl(path);
-        imageUrl = urlData.publicUrl;
+      if (storageErr) {
+        setUploadError(true);
+        setSaving(false);
+        return;
       }
+      const { data: urlData } = supabase.storage.from('conoce-images').getPublicUrl(path);
+      imageUrl = urlData.publicUrl;
     } else if (!imagePreview) {
       imageUrl = null;
     }
@@ -243,6 +249,12 @@ export default function ConocePage() {
                 </label>
               )}
             </div>
+
+            {uploadError && (
+              <p className="text-[13px] font-semibold rounded-xl px-4 py-3" style={{ background: '#FEF2F2', color: '#E11D2E', border: '1px solid #FECACA' }}>
+                ⚠️ No se pudo subir la imagen. Asegúrate de haber creado la política de Storage en Supabase.
+              </p>
+            )}
 
             <div className="flex gap-3 justify-end">
               <button
