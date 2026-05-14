@@ -56,26 +56,17 @@ export default function UrgentePage() {
       .select()
       .single();
 
-    // Send push notification to all registered devices
+    // Send push notification via server-side API
     if (row) {
-      let devQ = supabase.from('device_tokens').select('token');
-      if (current?.id) devQ = devQ.eq('company_id', current.id);
-      const { data: devs } = await devQ;
-      const tokens = (devs ?? []).map((d: any) => d.token).filter(Boolean);
-      if (tokens.length) {
-        fetch('https://exp.host/--/api/v2/push/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify(tokens.map((to: string) => ({
-            to,
-            title: '🚨 Actividad Urgente',
-            body: title.trim(),
-            sound: 'default',
-            channelId: 'actividades',
-            priority: 'high',
-          }))),
-        });
-      }
+      await fetch('/api/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: '🚨 Actividad Urgente',
+          body: title.trim(),
+          companyId: current?.id ?? null,
+        }),
+      });
     }
 
     setTitle('');
