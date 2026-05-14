@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import AdminShell from '@/components/AdminShell';
 import { supabase } from '@/lib/supabase';
 import { useCompany } from '@/lib/company-context';
@@ -12,6 +12,7 @@ interface ConoceItem {
   type: ItemType;
   title: string;
   body: string | null;
+  image_url: string | null;
   sort_order: number;
   is_active: boolean;
   created_at: string;
@@ -34,10 +35,13 @@ export default function ConocePage() {
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState<ConoceItem | null>(null);
 
-  const [type, setType]   = useState<ItemType>('instruccion');
-  const [title, setTitle] = useState('');
-  const [body, setBody]   = useState('');
-  const [saving, setSaving] = useState(false);
+  const [type, setType]               = useState<ItemType>('instruccion');
+  const [title, setTitle]             = useState('');
+  const [body, setBody]               = useState('');
+  const [imageFile, setImageFile]     = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [saving, setSaving]           = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -55,6 +59,8 @@ export default function ConocePage() {
     setType('instruccion');
     setTitle('');
     setBody('');
+    setImageFile(null);
+    setImagePreview(null);
     setShowForm(true);
   }
 
@@ -63,17 +69,57 @@ export default function ConocePage() {
     setType(item.type);
     setTitle(item.title);
     setBody(item.body ?? '');
+    setImageFile(null);
+    setImagePreview(item.image_url);
     setShowForm(true);
+  }
+
+  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    setImageFile(file);
+    if (file) {
+      setImagePreview(URL.createObjectURL(file));
+    }
+  }
+
+  function removeImage() {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   async function handleSave() {
     if (!title.trim()) return;
     setSaving(true);
-    if (editItem) {
-      await supabase.from('conoce_items').update({ type, title: title.trim(), body: body.trim() || null }).eq('id', editItem.id);
-    } else {
-      await supabase.from('conoce_items').insert({ type, title: title.trim(), body: body.trim() || null, company_id: current?.id ?? null });
+
+    let imageUrl: string | null = editItem?.image_url ?? null;
+
+    if (imageFile) {
+      const ext = imageFile.name.split('.').pop() ?? 'jpg';
+      const path = `${current?.id ?? 'general'}/${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('conoce-images')
+        .upload(path, imageFile, { upsert: true });
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage.from('conoce-images').getPublicUrl(path);
+        imageUrl = urlData.publicUrl;
+      }
+    } else if (!imagePreview) {
+      imageUrl = null;
     }
+
+    if (editItem) {
+      await supabase.from('conoce_items').update({
+        type, title: title.trim(), body: body.trim() || null, image_url: imageUrl,
+      }).eq('id', editItem.id);
+    } else {
+      await supabase.from('conoce_items').insert({
+        type, title: title.trim(), body: body.trim() || null,
+        image_url: imageUrl,
+        company_id: current?.id ?? null,
+      });
+    }
+
     setSaving(false);
     setShowForm(false);
     load();
@@ -155,6 +201,49 @@ export default function ConocePage() {
               style={{ border: '1.5px solid #E5E5EA', color: '#0F0F10', background: '#FAFAFA' }}
             />
 
+            {/* Image upload */}
+            <div className="flex flex-col gap-2">
+              <p className="text-[12px] font-semibold" style={{ color: '#6E6E73' }}>Imagen (opcional)</p>
+              {imagePreview ? (
+                <div className="relative w-full max-w-sm">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    className="rounded-xl object-contain w-full"
+                    style={{ maxHeight: 220, border: '1.5px solid #E5E5EA', background: '#F5F5F7' }}
+                  />
+                  <button
+                    onClick={removeImage}
+                    className="absolute top-2 right-2 rounded-full w-7 h-7 flex items-center justify-center text-[13px] font-bold"
+                    style={{ background: 'rgba(0,0,0,0.55)', color: '#fff' }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <label
+                  className="flex flex-col items-center justify-center rounded-xl cursor-pointer transition-colors"
+                  style={{ border: '1.5px dashed #D1D1D6', background: '#FAFAFA', padding: '28px 20px' }}
+                >
+                  <span style={{ fontSize: 28 }}>🖼️</span>
+                  <span className="text-[13px] font-semibold mt-2" style={{ color: '#6E6E73' }}>
+                    Subir imagen
+                  </span>
+                  <span className="text-[11px] mt-1" style={{ color: '#A8A8AD' }}>
+                    JPG, PNG, WEBP — máx. 5 MB
+                  </span>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageChange}
+                  />
+                </label>
+              )}
+            </div>
+
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setShowForm(false)}
@@ -208,9 +297,18 @@ function ItemSection({ title, items, type, onEdit, onDelete, onToggle }: {
             style={{ background: item.is_active ? c.bg : '#F5F5F7', border: `1.5px solid ${item.is_active ? c.border : '#E5E5EA'}`, opacity: item.is_active ? 1 : 0.6 }}
           >
             <div className="flex items-start justify-between gap-4">
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <p className="text-[15px] font-bold" style={{ color: '#0F0F10' }}>{item.title}</p>
                 {item.body && <p className="text-[13px] mt-1" style={{ color: '#6E6E73' }}>{item.body}</p>}
+                {item.image_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={item.image_url}
+                    alt={item.title}
+                    className="rounded-xl mt-3 object-contain"
+                    style={{ maxHeight: 160, maxWidth: 260, border: '1px solid rgba(0,0,0,.06)' }}
+                  />
+                )}
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <span className="rounded-full px-3 py-1 text-[11px] font-bold" style={{ background: item.is_active ? c.bg : '#E5E5EA', color: item.is_active ? c.text : '#6E6E73', border: `1px solid ${item.is_active ? c.border : '#E5E5EA'}` }}>
