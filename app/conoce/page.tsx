@@ -98,18 +98,28 @@ export default function ConocePage() {
     let imageUrl: string | null = editItem?.image_url ?? null;
 
     if (imageFile) {
-      const ext = imageFile.name.split('.').pop() ?? 'jpg';
-      const path = `${current?.id ?? 'general'}/${Date.now()}.${ext}`;
-      const { error: storageErr } = await supabase.storage
-        .from('conoce-images')
-        .upload(path, imageFile);
-      if (storageErr) {
+      try {
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            resolve(result.split(',')[1]);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(imageFile);
+        });
+        const form = new FormData();
+        form.append('key', process.env.NEXT_PUBLIC_IMGBB_KEY ?? '');
+        form.append('image', base64);
+        const res = await fetch('https://api.imgbb.com/1/upload', { method: 'POST', body: form });
+        const json = await res.json();
+        if (!json.success) throw new Error('imgbb error');
+        imageUrl = json.data.url as string;
+      } catch {
         setUploadError(true);
         setSaving(false);
         return;
       }
-      const { data: urlData } = supabase.storage.from('conoce-images').getPublicUrl(path);
-      imageUrl = urlData.publicUrl;
     } else if (!imagePreview) {
       imageUrl = null;
     }
