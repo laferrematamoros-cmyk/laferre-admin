@@ -12,6 +12,7 @@ const NAV = [
   { href: '/actividades', label: 'Actividades', icon: IconList },
   { href: '/equipo',      label: 'Equipo',      icon: IconUser },
   { href: '/urgente',     label: 'Urgente',     icon: IconAlert },
+  { href: '/conoce',      label: 'Conoce',      icon: IconBook },
   { href: '/reportes',    label: 'Reportes',    icon: IconChart },
   { href: '/ajustes',     label: 'Ajustes',     icon: IconCog },
 ];
@@ -166,6 +167,9 @@ function IconUser({ size = 16 }: { size?: number }) {
 }
 function IconChart({ size = 16 }: { size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>;
+}
+function IconBook({ size = 16 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>;
 }
 function IconAlert({ size = 16 }: { size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>;
