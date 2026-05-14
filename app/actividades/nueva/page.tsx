@@ -110,7 +110,19 @@ export default function NuevaActividadPage() {
     });
 
     setSaving(false);
-    if (!error) router.push('/dashboard');
+    if (!error) {
+      const startTime = startRef.current?.value || '09:00';
+      fetch('/api/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: '📋 Nueva actividad',
+          body: `${title} · ${startTime}`,
+          companyId: company?.id ?? null,
+        }),
+      });
+      router.push('/dashboard');
+    }
   }
 
   return (
