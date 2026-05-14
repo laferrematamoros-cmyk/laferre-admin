@@ -79,6 +79,12 @@ export default function UrgentePage() {
     load();
   }
 
+  async function handleDelete(id: string) {
+    await supabase.from('urgent_alert_acks').delete().eq('alert_id', id);
+    await supabase.from('urgent_alerts').delete().eq('id', id);
+    load();
+  }
+
   const active  = alerts.filter(a => a.is_active);
   const history = alerts.filter(a => !a.is_active);
 
@@ -123,7 +129,7 @@ export default function UrgentePage() {
           <div className="flex flex-col gap-3">
             <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: '#6E6E73' }}>Alarmas activas</p>
             {active.map(a => (
-              <AlertCard key={a.id} alert={a} onDeactivate={() => handleDeactivate(a.id)} />
+              <AlertCard key={a.id} alert={a} onDeactivate={() => handleDeactivate(a.id)} onDelete={() => handleDelete(a.id)} />
             ))}
           </div>
         )}
@@ -133,7 +139,7 @@ export default function UrgentePage() {
           <div className="flex flex-col gap-3">
             <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: '#6E6E73' }}>Historial</p>
             {history.map(a => (
-              <AlertCard key={a.id} alert={a} />
+              <AlertCard key={a.id} alert={a} onDelete={() => handleDelete(a.id)} />
             ))}
           </div>
         )}
@@ -148,7 +154,7 @@ export default function UrgentePage() {
   );
 }
 
-function AlertCard({ alert, onDeactivate }: { alert: UrgentAlert; onDeactivate?: () => void }) {
+function AlertCard({ alert, onDeactivate, onDelete }: { alert: UrgentAlert; onDeactivate?: () => void; onDelete?: () => void }) {
   const time = new Date(alert.created_at).toLocaleString('es-MX', {
     hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short',
   });
@@ -183,6 +189,15 @@ function AlertCard({ alert, onDeactivate }: { alert: UrgentAlert; onDeactivate?:
               style={{ background: '#fff', border: '1px solid #E5E5EA', color: '#6E6E73' }}
             >
               Desactivar
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={() => { if (confirm('¿Eliminar esta alarma?')) onDelete(); }}
+              className="rounded-full px-3 py-1 text-[11px] font-bold transition-colors"
+              style={{ background: '#fff', border: '1px solid #FECACA', color: '#E11D2E' }}
+            >
+              Eliminar
             </button>
           )}
         </div>
