@@ -102,7 +102,7 @@ export default function ConocePage() {
       const path = `${current?.id ?? 'general'}/${Date.now()}.${ext}`;
       const { error: storageErr } = await supabase.storage
         .from('conoce-images')
-        .upload(path, imageFile, { upsert: true });
+        .upload(path, imageFile);
       if (storageErr) {
         setUploadError(true);
         setSaving(false);
