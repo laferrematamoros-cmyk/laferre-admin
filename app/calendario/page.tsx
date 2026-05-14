@@ -26,7 +26,7 @@ function monOfWeek(offset = 0): Date {
   return mon;
 }
 
-function toDateStr(d: Date) { return d.toISOString().split('T')[0]; }
+function toDateStr(d: Date) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 
 function timeToH(t: string): number {
   const [h, m] = t.split(':').map(Number);

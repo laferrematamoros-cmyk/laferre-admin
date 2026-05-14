@@ -15,7 +15,7 @@ function startOfWeek() {
   return mon;
 }
 
-function toDateStr(d: Date) { return d.toISOString().split('T')[0]; }
+function toDateStr(d: Date) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 
 function weekLabel(mon: Date) {
   const sun = new Date(mon);

@@ -69,7 +69,8 @@ export default function DashboardPage() {
 
   const load = useCallback(async () => {
     if (!company) return;
-    const today      = new Date().toISOString().split('T')[0];
+    const _now       = new Date();
+    const today      = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`;
     const dayOfWeek  = new Date().getDay();
     const nowMin     = new Date().getHours() * 60 + new Date().getMinutes();
 
