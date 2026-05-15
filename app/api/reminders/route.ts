@@ -22,7 +22,7 @@ function inWindow(now: number, trigger: number) {
 
 async function push(tokens: string[], title: string, body: string) {
   if (tokens.length === 0) return;
-  const messages = tokens.map(to => ({ to, title, body, sound: 'default', channelId: 'actividades' }));
+  const messages = tokens.map(to => ({ to, title, body, sound: 'default', channelId: 'actividades', priority: 'high' }));
   await fetch('https://exp.host/--/api/v2/push/send', {
     method: 'POST',
     headers: {
