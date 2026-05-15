@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import AdminShell from '@/components/AdminShell';
 import { supabase, Activity, Completion, Employee } from '@/lib/supabase';
+import { useCompany } from '@/lib/company-context';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -123,21 +124,23 @@ async function downloadPDF(data: ReportData, label: string) {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ReportesPage() {
+  const { current: company } = useCompany();
   const [data, setData]           = useState<ReportData | null>(null);
   const [loading, setLoading]     = useState(true);
   const [generating, setGenerating] = useState(false);
   const [weekStart]               = useState(startOfWeek);
 
   const load = useCallback(async () => {
+    if (!company) return;
     const mon  = startOfWeek();
     const days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date(mon); d.setDate(mon.getDate() + i); return toDateStr(d);
     });
 
     const [{ data: acts }, { data: comps }, { data: emps }] = await Promise.all([
-      supabase.from('activities').select('*').eq('is_active', true),
+      supabase.from('activities').select('*').eq('is_active', true).eq('company_id', company.id),
       supabase.from('completions').select('*').gte('scheduled_date', days[0]).lte('scheduled_date', days[6]),
-      supabase.from('employees').select('*').eq('is_active', true),
+      supabase.from('employees').select('*').eq('is_active', true).eq('company_id', company.id),
     ]);
 
     const activities  = (acts  ?? []) as Activity[];
@@ -196,7 +199,7 @@ export default function ReportesPage() {
 
     setData({ done: totalDone, missed: totalScheduled - totalDone, late: totalLate, total: totalScheduled, byEmployee, missed_list: missedList, daily });
     setLoading(false);
-  }, []);
+  }, [company]);
 
   useEffect(() => { load(); }, [load]);
 
