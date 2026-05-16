@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import AdminShell from '@/components/AdminShell';
 import { supabase, Employee } from '@/lib/supabase';
@@ -52,10 +52,10 @@ export default function EditActividadPage() {
   const { id } = useParams<{ id: string }>();
   const { current: company } = useCompany();
 
-  const titleRef = useRef<HTMLInputElement>(null);
-  const descRef  = useRef<HTMLTextAreaElement>(null);
-  const startRef = useRef<HTMLInputElement>(null);
-  const limitRef = useRef<HTMLInputElement>(null);
+  const [title, setTitle]           = useState('');
+  const [description, setDescription] = useState('');
+  const [startTime, setStartTime]   = useState('');
+  const [limitTime, setLimitTime]   = useState('');
 
   const [employees, setEmployees]   = useState<Employee[]>([]);
   const [selected, setSelected]     = useState<string[]>([]);
@@ -77,10 +77,10 @@ export default function EditActividadPage() {
       if (emps) setEmployees(emps);
       if (!act) return;
 
-      if (titleRef.current) titleRef.current.value = act.title;
-      if (descRef.current)  descRef.current.value  = act.description ?? '';
-      if (startRef.current) startRef.current.value = act.start_time.slice(0, 5);
-      if (limitRef.current) limitRef.current.value = act.limit_time.slice(0, 5);
+      setTitle(act.title);
+      setDescription(act.description ?? '');
+      setStartTime(act.start_time.slice(0, 5));
+      setLimitTime(act.limit_time.slice(0, 5));
 
       setSelected(act.assigned_employee_ids ?? []);
       setIsUrgent(act.is_urgent ?? false);
@@ -116,15 +116,14 @@ export default function EditActividadPage() {
     : employees.filter(e => selected.includes(e.id)).map(e => e.name.split(' ')[0]).join(', ');
 
   async function handleSave() {
-    const title = titleRef.current?.value.trim();
-    if (!title) return;
+    if (!title.trim()) return;
     setSaving(true);
 
     await supabase.from('activities').update({
-      title,
-      description:           descRef.current?.value.trim() || null,
-      start_time:            startRef.current?.value || '09:00',
-      limit_time:            limitRef.current?.value || '10:00',
+      title:                 title.trim(),
+      description:           description.trim() || null,
+      start_time:            startTime || '09:00',
+      limit_time:            limitTime || '10:00',
       recurrence:            RECURRENCE[recurrence].label.toLowerCase().replace(' ', '-'),
       days_of_week:          effectiveDays,
       assigned_employee_ids: selected,
@@ -174,24 +173,24 @@ export default function EditActividadPage() {
           {/* Title */}
           <div className="mb-[18px]">
             <FieldLabel>Título de la actividad</FieldLabel>
-            <input ref={titleRef} className="w-full rounded-lg border px-3 py-2.5 text-[14px] outline-none focus:border-gray-400" style={{ borderColor: '#E4E4E7', color: '#0F0F10' }} />
+            <input value={title} onChange={e => setTitle(e.target.value)} className="w-full rounded-lg border px-3 py-2.5 text-[14px] outline-none focus:border-gray-400" style={{ borderColor: '#E4E4E7', color: '#0F0F10' }} />
           </div>
 
           {/* Description */}
           <div className="mb-[18px]">
             <FieldLabel optional>Descripción</FieldLabel>
-            <textarea ref={descRef} rows={3} className="w-full resize-none rounded-lg border px-3 py-2.5 text-[14px] leading-relaxed outline-none focus:border-gray-400" style={{ borderColor: '#E4E4E7', color: '#0F0F10' }} />
+            <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} className="w-full resize-none rounded-lg border px-3 py-2.5 text-[14px] leading-relaxed outline-none focus:border-gray-400" style={{ borderColor: '#E4E4E7', color: '#0F0F10' }} />
           </div>
 
           {/* Times */}
           <div className="mb-[18px] grid grid-cols-2 gap-4">
             <div>
               <FieldLabel>Hora de inicio</FieldLabel>
-              <input ref={startRef} type="time" className="w-full rounded-lg border px-3 py-2.5 text-[16px] font-semibold outline-none" style={{ borderColor: '#E4E4E7', fontFamily: 'monospace' }} />
+              <input value={startTime} onChange={e => setStartTime(e.target.value)} type="time" className="w-full rounded-lg border px-3 py-2.5 text-[16px] font-semibold outline-none" style={{ borderColor: '#E4E4E7', fontFamily: 'monospace' }} />
             </div>
             <div>
               <FieldLabel>Hora límite</FieldLabel>
-              <input ref={limitRef} type="time" className="w-full rounded-lg border px-3 py-2.5 text-[16px] font-semibold outline-none" style={{ borderColor: '#E4E4E7', fontFamily: 'monospace' }} />
+              <input value={limitTime} onChange={e => setLimitTime(e.target.value)} type="time" className="w-full rounded-lg border px-3 py-2.5 text-[16px] font-semibold outline-none" style={{ borderColor: '#E4E4E7', fontFamily: 'monospace' }} />
             </div>
           </div>
 
