@@ -66,6 +66,7 @@ export default function DashboardPage() {
   const [loading, setLoading]               = useState(true);
   const [timeLabel, setTimeLabel]           = useState(nowLabel());
   const [selected, setSelected]             = useState<ActivityRow | null>(null);
+  const [sending, setSending]               = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!company) return;
@@ -115,6 +116,21 @@ export default function DashboardPage() {
     const interval = setInterval(load, 60_000);
     return () => clearInterval(interval);
   }, [load]);
+
+  async function handleSendReminder(a: ActivityRow) {
+    if (!company || sending === a.id) return;
+    setSending(a.id);
+    await fetch('/api/push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: `🔔 ${a.title}`,
+        body: `El administrador solicita que se complete · límite ${fmtTime(a.limit_time)}`,
+        companyId: company.id,
+      }),
+    });
+    setTimeout(() => setSending(null), 2000);
+  }
 
   const total   = activities.length;
   const done    = activities.filter(a => a.status === 'done').length;
@@ -197,7 +213,7 @@ export default function DashboardPage() {
                         {a.assigneeName} · límite {fmtTime(a.limit_time)}
                       </p>
                     </div>
-                    <div className="shrink-0">
+                    <div className="shrink-0 flex items-center gap-2">
                       {a.status === 'done' && a.completion?.photo_url &&
                         <span className="rounded-full px-[7px] py-[3px] text-[10px] font-bold" style={{ background: '#E5F4EC', color: '#0F9D58' }}>EVIDENCIA</span>}
                       {a.status === 'late' &&
@@ -206,6 +222,21 @@ export default function DashboardPage() {
                         <span className="rounded-full px-[7px] py-[3px] text-[10px] font-bold" style={{ background: '#FFF6E0', color: '#A67200' }}>EN CURSO</span>}
                       {a.status === 'pending' &&
                         <span className="text-[10px] font-semibold" style={{ color: '#6E6E73' }}>—</span>}
+                      {a.status !== 'done' && (
+                        <button
+                          onClick={e => { e.stopPropagation(); handleSendReminder(a); }}
+                          title="Enviar recordatorio"
+                          className="flex items-center justify-center rounded-lg w-[28px] h-[28px] transition-colors"
+                          style={{ background: sending === a.id ? '#E5F4EC' : '#F2F2F4' }}
+                        >
+                          {sending === a.id
+                            ? <span style={{ fontSize: 13 }}>✓</span>
+                            : <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: '#6E6E73' }}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                              </svg>
+                          }
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
