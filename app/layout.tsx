@@ -8,6 +8,11 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 export const metadata: Metadata = {
   title: 'Admin · Actividades',
   description: 'Panel de administración de actividades',
+  appleWebApp: {
+    capable: true,
+    title: 'Actividades',
+    statusBarStyle: 'default',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
