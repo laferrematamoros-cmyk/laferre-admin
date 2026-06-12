@@ -38,6 +38,10 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const { companies, current, setCurrent } = useCompany();
   const [admin, setAdmin]     = useState({ name: 'Administrador', initials: 'AD' });
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
+
+  // Cierra el menú lateral al cambiar de página (en móvil)
+  useEffect(() => { setNavOpen(false); }, [path]);
 
   useEffect(() => {
     setAdmin(getAdminInfo());
@@ -55,8 +59,16 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
   return (
     <div className="flex h-screen w-full overflow-hidden" style={{ background: '#FAFAFA' }}>
-      {/* Sidebar */}
-      <aside className="flex flex-col gap-1 shrink-0 p-[14px]" style={{ width: 224, background: '#0F0F10' }}>
+      {/* Backdrop (solo móvil, cuando el menú está abierto) */}
+      {navOpen && (
+        <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={() => setNavOpen(false)} />
+      )}
+
+      {/* Sidebar — cajón deslizable en móvil, fijo en escritorio */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex flex-col gap-1 shrink-0 overflow-y-auto p-[14px] transition-transform duration-300 md:static md:z-auto md:translate-x-0 ${navOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        style={{ width: 224, background: '#0F0F10' }}
+      >
 
         {/* Company selector */}
         <div className="relative mb-2">
@@ -118,6 +130,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             <Link
               key={href}
               href={href}
+              onClick={() => setNavOpen(false)}
               className="flex items-center gap-[10px] rounded-lg px-[10px] py-[9px] text-[13px] font-medium transition-colors"
               style={{
                 background: active ? accent : 'transparent',
@@ -146,6 +159,20 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
       {/* Main */}
       <main className="flex flex-1 flex-col overflow-hidden">
+        {/* Barra superior móvil con botón de menú */}
+        <div className="flex items-center gap-3 border-b px-4 py-2.5 md:hidden" style={{ borderColor: '#E4E4E7', background: '#fff' }}>
+          <button
+            onClick={() => setNavOpen(true)}
+            aria-label="Abrir menú"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+            style={{ background: '#F2F2F4' }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0F0F10" strokeWidth="2" strokeLinecap="round">
+              <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
+          <span className="text-[14px] font-extrabold tracking-tight" style={{ color: '#0F0F10' }}>{current?.name ?? 'Actividades'}</span>
+        </div>
         {children}
       </main>
     </div>

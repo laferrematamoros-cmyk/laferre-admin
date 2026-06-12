@@ -6,9 +6,9 @@ import { createClient } from '@supabase/supabase-js';
 //   1. At start_time              → "Empieza ahora"
 //   2. At start_time + 15 min    → "En curso · 15 min"
 //   3. At limit_time              → "Hora límite alcanzada"
-//   4. Every 15 min after limit   → "X min de retraso" until 17:00
+//   4. Every 15 min after limit   → "X min de retraso" until 20:00
 
-const END_OF_DAY = 17 * 60; // 17:00
+const END_OF_DAY = 20 * 60; // 20:00 (fin de jornada)
 const WINDOW     = 5;       // cron interval in minutes
 
 function timeToMin(t: string) {

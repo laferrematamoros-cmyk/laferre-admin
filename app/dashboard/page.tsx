@@ -150,33 +150,34 @@ export default function DashboardPage() {
   return (
     <AdminShell>
       {/* Topbar */}
-      <div className="flex items-center justify-between gap-5 border-b px-7 py-5" style={{ borderColor: '#E4E4E7', background: '#fff' }}>
-        <div>
-          <h1 className="text-[22px] font-extrabold tracking-tight">Dashboard</h1>
-          <p className="mt-0.5 text-[12px] capitalize" style={{ color: '#6E6E73' }}>{timeLabel}</p>
+      <div className="flex items-center justify-between gap-3 border-b px-4 py-4 md:px-7 md:py-5" style={{ borderColor: '#E4E4E7', background: '#fff' }}>
+        <div className="min-w-0">
+          <h1 className="text-[18px] md:text-[22px] font-extrabold tracking-tight">Dashboard</h1>
+          <p className="mt-0.5 text-[11px] md:text-[12px] capitalize truncate" style={{ color: '#6E6E73' }}>{timeLabel}</p>
         </div>
-        <div className="flex items-center gap-[10px]">
-          <button className="flex items-center gap-[7px] rounded-[9px] border px-[14px] py-[9px] text-[13px] font-semibold" style={{ borderColor: '#E4E4E7', background: '#fff' }}>
+        <div className="flex shrink-0 items-center gap-[10px]">
+          <button onClick={() => router.push('/reportes')} className="hidden md:flex items-center gap-[7px] rounded-[9px] border px-[14px] py-[9px] text-[13px] font-semibold" style={{ borderColor: '#E4E4E7', background: '#fff' }}>
             ↓ Exportar
           </button>
           <button
             onClick={() => router.push('/actividades/nueva')}
-            className="flex items-center gap-[7px] rounded-[9px] px-[14px] py-[9px] text-[13px] font-semibold text-white"
+            className="flex shrink-0 items-center gap-[7px] whitespace-nowrap rounded-[9px] px-3 py-2 md:px-[14px] md:py-[9px] text-[13px] font-semibold text-white"
             style={{ background: 'var(--accent)' }}
           >
-            + Nueva actividad
+            <span className="md:hidden">+ Nueva</span>
+            <span className="hidden md:inline">+ Nueva actividad</span>
           </button>
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-7">
+      <div className="flex-1 overflow-auto p-4 md:p-7">
         {/* Stats */}
-        <div className="mb-[22px] grid grid-cols-4 gap-[14px]">
+        <div className="mb-5 grid grid-cols-2 gap-3 md:mb-[22px] md:grid-cols-4 md:gap-[14px]">
           {STATS.map(s => (
-            <div key={s.label} className="rounded-xl border p-[18px]" style={{ background: '#fff', borderColor: '#E4E4E7' }}>
-              <p className="text-[11px] font-semibold uppercase tracking-[1px]" style={{ color: '#6E6E73' }}>{s.label}</p>
-              <p className="mt-1.5 text-[32px] font-extrabold leading-none tracking-[-1px]" style={{ color: s.color }}>
+            <div key={s.label} className="rounded-xl border p-4 md:p-[18px]" style={{ background: '#fff', borderColor: '#E4E4E7' }}>
+              <p className="text-[10px] md:text-[11px] font-semibold uppercase tracking-[1px]" style={{ color: '#6E6E73' }}>{s.label}</p>
+              <p className="mt-1.5 text-[26px] md:text-[32px] font-extrabold leading-none tracking-[-1px]" style={{ color: s.color }}>
                 {loading ? '—' : s.value}
               </p>
               <p className="mt-1.5 text-[11px]" style={{ color: '#6E6E73' }}>{s.delta}</p>
@@ -185,7 +186,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Two columns */}
-        <div className="grid gap-4" style={{ gridTemplateColumns: '1.5fr 1fr' }}>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.5fr_1fr]">
           {/* Today timeline */}
           <div className="rounded-xl border p-[18px]" style={{ background: '#fff', borderColor: '#E4E4E7' }}>
             <div className="mb-3.5 flex items-center justify-between">
@@ -313,8 +314,8 @@ export default function DashboardPage() {
               onClick={() => setSelected(null)}
             />
             <div
-              className="fixed right-0 top-0 h-full z-50 flex flex-col overflow-y-auto"
-              style={{ width: 360, background: '#fff', borderLeft: '1px solid #E4E4E7', boxShadow: '-4px 0 24px rgba(0,0,0,0.08)' }}
+              className="fixed right-0 top-0 h-full z-50 flex w-full max-w-[400px] flex-col overflow-y-auto"
+              style={{ background: '#fff', borderLeft: '1px solid #E4E4E7', boxShadow: '-4px 0 24px rgba(0,0,0,0.08)' }}
             >
               {/* Header */}
               <div className="flex items-start justify-between gap-3 px-6 py-5 border-b" style={{ borderColor: '#E4E4E7' }}>

@@ -217,22 +217,22 @@ export default function ReportesPage() {
   return (
     <AdminShell>
       {/* Topbar */}
-      <div className="flex items-center justify-between gap-5 border-b px-7 py-5" style={{ borderColor: '#E4E4E7', background: '#fff' }}>
-        <div>
-          <h1 className="text-[22px] font-extrabold tracking-tight">Reporte semanal</h1>
-          <p className="mt-0.5 text-[12px]" style={{ color: '#6E6E73' }}>Semana del {label} · resumen automático</p>
+      <div className="flex items-center justify-between gap-3 border-b px-4 py-4 md:px-7 md:py-5" style={{ borderColor: '#E4E4E7', background: '#fff' }}>
+        <div className="min-w-0">
+          <h1 className="text-[18px] md:text-[22px] font-extrabold tracking-tight">Reporte semanal</h1>
+          <p className="mt-0.5 text-[11px] md:text-[12px]" style={{ color: '#6E6E73' }}>Semana del {label} · resumen automático</p>
         </div>
         <button
           onClick={handleDownload}
           disabled={loading || generating}
-          className="rounded-[9px] border px-[14px] py-[9px] text-[13px] font-semibold transition-opacity"
+          className="shrink-0 whitespace-nowrap rounded-[9px] border px-3 py-2 md:px-[14px] md:py-[9px] text-[12px] md:text-[13px] font-semibold transition-opacity"
           style={{ borderColor: '#E4E4E7', background: '#fff', opacity: loading || generating ? 0.5 : 1 }}
         >
           {generating ? 'Generando...' : '↓ Descargar PDF'}
         </button>
       </div>
 
-      <div className="flex-1 overflow-auto p-7">
+      <div className="flex-1 overflow-auto p-4 md:p-7">
         {loading ? (
           <div className="flex h-40 items-center justify-center">
             <p className="text-[13px]" style={{ color: '#A8A8AD' }}>Cargando reporte...</p>
@@ -240,10 +240,10 @@ export default function ReportesPage() {
         ) : data && (
           <>
             {/* Hero */}
-            <div className="mb-[22px] grid grid-cols-4 gap-6 rounded-[14px] p-[26px] text-white" style={{ background: '#0F0F10' }}>
+            <div className="mb-5 md:mb-[22px] grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 rounded-[14px] p-5 md:p-[26px] text-white" style={{ background: '#0F0F10' }}>
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: 'rgba(255,255,255,.5)' }}>Cumplimiento</p>
-                <p className="mt-1.5 text-[48px] font-extrabold leading-none tracking-[-2px]">{pct}<span className="text-[22px]">%</span></p>
+                <p className="mt-1.5 text-[40px] md:text-[48px] font-extrabold leading-none tracking-[-2px]">{pct}<span className="text-[20px] md:text-[22px]">%</span></p>
                 <p className="mt-1 text-[11px]" style={{ color: 'rgba(255,255,255,.6)' }}>{data.done} de {data.total} actividades</p>
               </div>
               {[
@@ -253,13 +253,13 @@ export default function ReportesPage() {
               ].map(s => (
                 <div key={s.label}>
                   <p className="text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: 'rgba(255,255,255,.5)' }}>{s.label}</p>
-                  <p className="mt-1.5 text-[38px] font-extrabold leading-none tracking-[-1.5px]" style={{ color: s.color }}>{s.value}</p>
+                  <p className="mt-1.5 text-[30px] md:text-[38px] font-extrabold leading-none tracking-[-1.5px]" style={{ color: s.color }}>{s.value}</p>
                 </div>
               ))}
             </div>
 
             {/* Two columns */}
-            <div className="mb-4 grid grid-cols-2 gap-4">
+            <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
               {/* By employee */}
               <div className="rounded-xl border p-5" style={{ background: '#fff', borderColor: '#E4E4E7' }}>
                 <h3 className="mb-3.5 text-[14px] font-bold">Cumplimiento por empleado</h3>
@@ -289,8 +289,8 @@ export default function ReportesPage() {
                 ) : (
                   <div className="flex flex-col">
                     {data.missed_list.map((m, i) => (
-                      <div key={i} className="flex items-start justify-between py-2.5" style={{ borderTop: i === 0 ? 'none' : '1px solid #F2F2F4' }}>
-                        <div>
+                      <div key={i} className="flex items-start justify-between gap-3 py-2.5" style={{ borderTop: i === 0 ? 'none' : '1px solid #F2F2F4' }}>
+                        <div className="min-w-0">
                           <p className="text-[13px] font-semibold">{m.title}</p>
                           <p className="mt-0.5 text-[11px]" style={{ color: '#6E6E73' }}>{m.date} · {m.assignee}</p>
                         </div>

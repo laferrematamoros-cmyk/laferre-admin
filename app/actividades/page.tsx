@@ -33,6 +33,7 @@ export default function ActividadesPage() {
   const router = useRouter();
   const { current: company } = useCompany();
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [empMap, setEmpMap] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -40,12 +41,12 @@ export default function ActividadesPage() {
   const load = useCallback(async () => {
     if (!company) return;
     setLoading(true);
-    const { data } = await supabase
-      .from('activities')
-      .select('*')
-      .eq('company_id', company.id)
-      .order('start_time');
+    const [{ data }, { data: emps }] = await Promise.all([
+      supabase.from('activities').select('*').eq('company_id', company.id).order('start_time'),
+      supabase.from('employees').select('id, name').eq('company_id', company.id),
+    ]);
     if (data) setActivities(data);
+    setEmpMap(new Map((emps ?? []).map((e: { id: string; name: string }) => [e.id, e.name.split(' ')[0]])));
     setLoading(false);
   }, [company]);
 
@@ -116,7 +117,9 @@ export default function ActividadesPage() {
                 className="rounded-xl border p-5"
                 style={{ background: '#fff', borderColor: act.is_active ? '#E4E4E7' : '#F2F2F4', opacity: act.is_active ? 1 : 0.6 }}
               >
-                <div className="flex items-start gap-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:gap-4">
+                  {/* Tiempo + info (agrupados) */}
+                  <div className="flex items-start gap-4 min-w-0 md:flex-1">
                   {/* Time block */}
                   <div className="shrink-0 rounded-lg px-3 py-2 text-center" style={{ background: '#F2F2F4', minWidth: 72 }}>
                     <p className="text-[11px] font-semibold" style={{ color: '#6E6E73' }}>Inicio</p>
@@ -140,14 +143,19 @@ export default function ActividadesPage() {
                           {DAY_NAMES[d]}
                         </span>
                       ))}
-                      {act.assigned_employee_ids.length === 0 && (
+                      {act.assigned_employee_ids.length === 0 ? (
                         <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: '#F0FDF4', color: '#16A34A' }}>General</span>
+                      ) : (
+                        <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: '#FFF6F7', color: 'var(--accent)' }}>
+                          👤 {act.assigned_employee_ids.map(id => empMap.get(id) ?? '?').join(', ')}
+                        </span>
                       )}
                     </div>
                   </div>
+                  </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex flex-wrap items-center gap-2 md:shrink-0">
                     {/* Edit */}
                     <button
                       onClick={() => router.push(`/actividades/${act.id}`)}

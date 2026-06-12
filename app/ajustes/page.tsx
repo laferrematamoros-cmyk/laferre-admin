@@ -41,7 +41,7 @@ function save(s: Settings) {
 // ── Components ────────────────────────────────────────────────────────────────
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border p-[22px]" style={{ background: '#fff', borderColor: '#E4E4E7' }}>
+    <div className="rounded-xl border p-4 md:p-[22px]" style={{ background: '#fff', borderColor: '#E4E4E7' }}>
       <h2 className="mb-4 text-[13px] font-bold">{title}</h2>
       <div className="flex flex-col gap-4">{children}</div>
     </div>
@@ -50,7 +50,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div className="grid items-start gap-2" style={{ gridTemplateColumns: '200px 1fr' }}>
+    <div className="grid items-start gap-1.5 sm:grid-cols-[200px_1fr] sm:gap-2">
       <div>
         <p className="text-[13px] font-semibold">{label}</p>
         {hint && <p className="mt-0.5 text-[11px]" style={{ color: '#6E6E73' }}>{hint}</p>}
@@ -112,25 +112,30 @@ export default function AjustesPage() {
     setSaved(false);
   }
 
+  // Secciones que se guardan pero todavía NO afectan nada (negocio, horario,
+  // minutos de gracia, zona horaria). Ocultas hasta conectarlas de verdad.
+  // Cambiar a true para volver a mostrarlas.
+  const SHOW_WIP_SETTINGS = false;
+
   if (!hydrated) return <AdminShell><div /></AdminShell>;
 
   return (
     <AdminShell>
       {/* Topbar */}
-      <div className="flex items-center justify-between gap-5 border-b px-7 py-5" style={{ borderColor: '#E4E4E7', background: '#fff' }}>
-        <div>
-          <h1 className="text-[22px] font-extrabold tracking-tight">Ajustes</h1>
-          <p className="mt-0.5 text-[12px]" style={{ color: '#6E6E73' }}>Configuración general del panel</p>
+      <div className="flex items-center justify-between gap-3 border-b px-4 py-4 md:px-7 md:py-5" style={{ borderColor: '#E4E4E7', background: '#fff' }}>
+        <div className="min-w-0">
+          <h1 className="text-[18px] md:text-[22px] font-extrabold tracking-tight">Ajustes</h1>
+          <p className="mt-0.5 text-[11px] md:text-[12px]" style={{ color: '#6E6E73' }}>Configuración general del panel</p>
         </div>
-        <div className="flex items-center gap-[10px]">
+        <div className="flex shrink-0 items-center gap-[10px]">
           {saved && (
-            <span className="rounded-full px-3 py-1 text-[12px] font-semibold" style={{ background: '#E5F4EC', color: '#0F9D58' }}>
+            <span className="rounded-full px-2.5 py-1 text-[11px] md:text-[12px] font-semibold" style={{ background: '#E5F4EC', color: '#0F9D58' }}>
               ✓ Guardado
             </span>
           )}
           <button
             onClick={handleSave}
-            className="rounded-[9px] px-[14px] py-[9px] text-[13px] font-semibold text-white"
+            className="shrink-0 whitespace-nowrap rounded-[9px] px-3 py-2 md:px-[14px] md:py-[9px] text-[12px] md:text-[13px] font-semibold text-white"
             style={{ background: 'var(--accent)' }}
           >
             Guardar cambios
@@ -138,15 +143,17 @@ export default function AjustesPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-7">
+      <div className="flex-1 overflow-auto p-4 md:p-7">
         <div className="mx-auto flex max-w-2xl flex-col gap-5">
 
-          {/* Negocio */}
+          {/* Negocio — oculto: aún no afecta el PDF (usa "LA FERRE" fijo) */}
+          {SHOW_WIP_SETTINGS && (
           <Section title="Negocio">
             <Field label="Nombre del negocio" hint="Se muestra en reportes PDF">
               <TextInput value={settings.storeName} onChange={v => set('storeName', v)} placeholder="La Ferre" />
             </Field>
           </Section>
+          )}
 
           {/* Administrador */}
           <Section title="Administrador">
@@ -164,7 +171,8 @@ export default function AjustesPage() {
             </Field>
           </Section>
 
-          {/* Horario */}
+          {/* Horario — oculto: no se usa en ningún cálculo todavía */}
+          {SHOW_WIP_SETTINGS && (
           <Section title="Horario de operación">
             <Field label="Inicio de jornada">
               <TimeInput value={settings.workStart} onChange={v => set('workStart', v)} />
@@ -187,12 +195,14 @@ export default function AjustesPage() {
               </div>
             </Field>
           </Section>
+          )}
 
-          {/* Zona horaria */}
+          {/* Zona horaria — oculto: no se aplica (recordatorios usan zona fija) */}
+          {SHOW_WIP_SETTINGS && (
           <Section title="Región">
             <Field label="Zona horaria">
               <select
-                className="rounded-[9px] border px-3 py-2 text-[13px] outline-none"
+                className="w-full max-w-full rounded-[9px] border px-3 py-2 text-[13px] outline-none"
                 style={{ borderColor: '#E4E4E7' }}
                 value={settings.timezone}
                 onChange={e => set('timezone', e.target.value)}
@@ -206,9 +216,10 @@ export default function AjustesPage() {
               </select>
             </Field>
           </Section>
+          )}
 
           {/* Danger zone */}
-          <div className="rounded-xl border p-[22px]" style={{ borderColor: '#FCE7E9', background: '#FFFAFA' }}>
+          <div className="rounded-xl border p-4 md:p-[22px]" style={{ borderColor: '#FCE7E9', background: '#FFFAFA' }}>
             <h2 className="mb-1 text-[13px] font-bold" style={{ color: 'var(--accent)' }}>Restablecer ajustes</h2>
             <p className="mb-4 text-[12px]" style={{ color: '#6E6E73' }}>Regresa todos los ajustes a sus valores predeterminados. No afecta datos de empleados ni actividades.</p>
             <button

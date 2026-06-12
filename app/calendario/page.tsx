@@ -231,22 +231,22 @@ export default function CalendarioPage() {
   return (
     <AdminShell>
       {/* Topbar */}
-      <div className="flex items-center justify-between gap-5 border-b px-7 py-5" style={{ borderColor: '#E4E4E7', background: '#fff' }}>
-        <div>
-          <h1 className="text-[22px] font-extrabold tracking-tight">Calendario</h1>
-          <p className="mt-0.5 text-[12px]" style={{ color: '#6E6E73' }}>Semana del {weekLabel} · vista semanal</p>
+      <div className="flex flex-col gap-3 border-b px-4 py-4 md:flex-row md:items-center md:justify-between md:gap-5 md:px-7 md:py-5" style={{ borderColor: '#E4E4E7', background: '#fff' }}>
+        <div className="min-w-0">
+          <h1 className="text-[18px] md:text-[22px] font-extrabold tracking-tight">Calendario</h1>
+          <p className="mt-0.5 text-[11px] md:text-[12px]" style={{ color: '#6E6E73' }}>Semana del {weekLabel} · vista semanal</p>
         </div>
-        <div className="flex items-center gap-[10px]">
-          <button onClick={() => setOffset(o => o - 1)} className="rounded-[9px] border px-[14px] py-[9px] text-[13px] font-semibold" style={{ borderColor: '#E4E4E7', background: '#fff' }}>← Anterior</button>
-          <button onClick={() => setOffset(0)} className="rounded-[9px] border px-[14px] py-[9px] text-[13px] font-semibold" style={{ borderColor: offset === 0 ? '#0F0F10' : '#E4E4E7', background: offset === 0 ? '#0F0F10' : '#fff', color: offset === 0 ? '#fff' : '#0F0F10' }}>Hoy</button>
-          <button onClick={() => setOffset(o => o + 1)} className="rounded-[9px] border px-[14px] py-[9px] text-[13px] font-semibold" style={{ borderColor: '#E4E4E7', background: '#fff' }}>Siguiente →</button>
-          <button onClick={() => router.push('/actividades/nueva')} className="rounded-[9px] px-[14px] py-[9px] text-[13px] font-semibold text-white" style={{ background: 'var(--accent)' }}>+ Nueva</button>
+        <div className="flex flex-wrap items-center gap-2 md:gap-[10px]">
+          <button onClick={() => setOffset(o => o - 1)} className="whitespace-nowrap rounded-[9px] border px-3 py-2 text-[12px] md:px-[14px] md:py-[9px] md:text-[13px] font-semibold" style={{ borderColor: '#E4E4E7', background: '#fff' }}>← Anterior</button>
+          <button onClick={() => setOffset(0)} className="whitespace-nowrap rounded-[9px] border px-3 py-2 text-[12px] md:px-[14px] md:py-[9px] md:text-[13px] font-semibold" style={{ borderColor: offset === 0 ? '#0F0F10' : '#E4E4E7', background: offset === 0 ? '#0F0F10' : '#fff', color: offset === 0 ? '#fff' : '#0F0F10' }}>Hoy</button>
+          <button onClick={() => setOffset(o => o + 1)} className="whitespace-nowrap rounded-[9px] border px-3 py-2 text-[12px] md:px-[14px] md:py-[9px] md:text-[13px] font-semibold" style={{ borderColor: '#E4E4E7', background: '#fff' }}>Siguiente →</button>
+          <button onClick={() => router.push('/actividades/nueva')} className="whitespace-nowrap rounded-[9px] px-3 py-2 text-[12px] md:px-[14px] md:py-[9px] md:text-[13px] font-semibold text-white" style={{ background: 'var(--accent)' }}>+ Nueva</button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto px-7 pb-7">
+      <div className="flex-1 overflow-auto px-4 pb-4 md:px-7 md:pb-7">
         {/* Legend */}
-        <div className="flex gap-[18px] py-4">
+        <div className="flex flex-wrap gap-x-4 gap-y-2 py-4">
           <Legend color="#0F9D58" label="Realizadas" />
           <Legend color="#F2A20C" label="En curso" />
           <Legend color="#E11D2E" label="Atrasadas" />
@@ -254,8 +254,9 @@ export default function CalendarioPage() {
           {loading && <span className="text-[11px]" style={{ color: '#A8A8AD' }}>Cargando...</span>}
         </div>
 
-        {/* Grid */}
-        <div className="rounded-xl border overflow-hidden" style={{ background: '#fff', borderColor: '#E4E4E7' }}>
+        {/* Grid — scroll horizontal en móvil para que cada día sea legible */}
+        <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+        <div className="rounded-xl border overflow-hidden min-w-[720px] lg:min-w-0" style={{ background: '#fff', borderColor: '#E4E4E7' }}>
           {/* Day headers */}
           <div className="grid border-b" style={{ gridTemplateColumns: '56px repeat(7, 1fr)', borderColor: '#E4E4E7' }}>
             <div />
@@ -316,6 +317,7 @@ export default function CalendarioPage() {
             })}
           </div>
         </div>
+        </div>
       </div>
 
       {/* Detail side panel */}
@@ -327,8 +329,8 @@ export default function CalendarioPage() {
             onClick={() => { setDetail(null); setDetailLoading(false); }}
           />
           <div
-            className="fixed right-0 top-0 h-full z-50 flex flex-col overflow-y-auto"
-            style={{ width: 360, background: '#fff', borderLeft: '1px solid #E4E4E7', boxShadow: '-4px 0 24px rgba(0,0,0,0.08)' }}
+            className="fixed right-0 top-0 h-full z-50 flex w-full max-w-[400px] flex-col overflow-y-auto"
+            style={{ background: '#fff', borderLeft: '1px solid #E4E4E7', boxShadow: '-4px 0 24px rgba(0,0,0,0.08)' }}
           >
             {/* Header */}
             <div className="flex items-start justify-between gap-3 px-6 py-5 border-b" style={{ borderColor: '#E4E4E7' }}>
