@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import AdminShell from '@/components/AdminShell';
 import { supabase, Employee } from '@/lib/supabase';
 import { useCompany } from '@/lib/company-context';
+import { updateActivity } from '../actions';
 
 const RECURRENCE: { label: string; days: number[] }[] = [
   { label: 'Una vez',       days: [] },
@@ -119,21 +120,26 @@ export default function EditActividadPage() {
     if (!title.trim()) return;
     setSaving(true);
 
-    await supabase.from('activities').update({
-      title:                 title.trim(),
-      description:           description.trim() || null,
-      start_time:            startTime || '09:00',
-      limit_time:            limitTime || '10:00',
-      recurrence:            RECURRENCE[recurrence].label.toLowerCase().replace(' ', '-'),
-      days_of_week:          effectiveDays,
-      assigned_employee_ids: selected,
-      is_urgent:             isUrgent,
-      reminder_minutes:      REMINDER_MINUTES[reminder],
-      evidence_photo:        evidence[0],
-      evidence_name:         evidence[1],
-      evidence_note:         evidence[2],
-      evidence_signature:    evidence[3],
-    }).eq('id', id);
+    try {
+      await updateActivity(id, {
+        title:                 title.trim(),
+        description:           description.trim() || null,
+        start_time:            startTime || '09:00',
+        limit_time:            limitTime || '10:00',
+        recurrence:            RECURRENCE[recurrence].label.toLowerCase().replace(' ', '-'),
+        days_of_week:          effectiveDays,
+        assigned_employee_ids: selected,
+        is_urgent:             isUrgent,
+        reminder_minutes:      REMINDER_MINUTES[reminder],
+        evidence_photo:        evidence[0],
+        evidence_name:         evidence[1],
+        evidence_note:         evidence[2],
+        evidence_signature:    evidence[3],
+      });
+    } catch {
+      setSaving(false);
+      return;
+    }
 
     setSaving(false);
     router.push('/actividades');

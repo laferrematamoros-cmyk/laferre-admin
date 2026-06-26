@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import AdminShell from '@/components/AdminShell';
 import { supabase, Employee } from '@/lib/supabase';
 import { useCompany } from '@/lib/company-context';
+import { createActivity } from '../actions';
 
 const RECURRENCE: { label: string; days: number[] }[] = [
   { label: 'Una vez',       days: [] },
@@ -92,37 +93,40 @@ export default function NuevaActividadPage() {
     if (!title) return;
     setSaving(true);
 
-    const { error } = await supabase.from('activities').insert({
-      title,
-      description:           descRef.current?.value.trim() || null,
-      start_time:            startRef.current?.value || '09:00',
-      limit_time:            limitRef.current?.value || '10:00',
-      recurrence:            RECURRENCE[recurrence].label.toLowerCase().replace(' ', '-'),
-      days_of_week:          effectiveDays,
-      assigned_employee_ids: selected,
-      is_urgent:             isUrgent,
-      reminder_minutes:      REMINDER_MINUTES[reminder],
-      evidence_photo:        evidence[0],
-      evidence_name:         evidence[1],
-      evidence_note:         evidence[2],
-      evidence_signature:    evidence[3],
-      company_id:            company?.id,
-    });
+    try {
+      await createActivity({
+        title,
+        description:           descRef.current?.value.trim() || null,
+        start_time:            startRef.current?.value || '09:00',
+        limit_time:            limitRef.current?.value || '10:00',
+        recurrence:            RECURRENCE[recurrence].label.toLowerCase().replace(' ', '-'),
+        days_of_week:          effectiveDays,
+        assigned_employee_ids: selected,
+        is_urgent:             isUrgent,
+        reminder_minutes:      REMINDER_MINUTES[reminder],
+        evidence_photo:        evidence[0],
+        evidence_name:         evidence[1],
+        evidence_note:         evidence[2],
+        evidence_signature:    evidence[3],
+        company_id:            company?.id,
+      });
+    } catch {
+      setSaving(false);
+      return;
+    }
 
     setSaving(false);
-    if (!error) {
-      const startTime = startRef.current?.value || '09:00';
-      fetch('/api/push', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: '📋 Nueva actividad',
-          body: `${title} · ${startTime}`,
-          companyId: company?.id ?? null,
-        }),
-      });
-      router.push('/dashboard');
-    }
+    const startTime = startRef.current?.value || '09:00';
+    fetch('/api/push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: '📋 Nueva actividad',
+        body: `${title} · ${startTime}`,
+        companyId: company?.id ?? null,
+      }),
+    });
+    router.push('/dashboard');
   }
 
   return (

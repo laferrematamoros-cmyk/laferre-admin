@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import AdminShell from '@/components/AdminShell';
 import { supabase } from '@/lib/supabase';
 import { useCompany } from '@/lib/company-context';
+import { setActivityActive, deleteActivity as deleteActivityAction } from './actions';
 
 const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
@@ -53,16 +54,16 @@ export default function ActividadesPage() {
   useEffect(() => { load(); }, [load]);
 
   async function toggleActive(act: Activity) {
-    await supabase.from('activities').update({ is_active: !act.is_active }).eq('id', act.id);
+    await setActivityActive(act.id, !act.is_active);
     setActivities(prev => prev.map(a => a.id === act.id ? { ...a, is_active: !a.is_active } : a));
   }
 
   async function deleteActivity(id: string) {
     setDeleting(id);
-    await supabase.from('completions').delete().eq('activity_id', id);
-    const { error } = await supabase.from('activities').delete().eq('id', id);
-    if (error) {
-      alert('Error al eliminar: ' + error.message);
+    try {
+      await deleteActivityAction(id);
+    } catch (e) {
+      alert('Error al eliminar: ' + (e instanceof Error ? e.message : 'Error'));
       setDeleting(null);
       setConfirmId(null);
       return;
