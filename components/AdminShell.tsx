@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { useCompany } from '@/lib/company-context';
+import { logout } from '@/app/login/actions';
 
 const NAV = [
   { href: '/dashboard',   label: 'Dashboard',   icon: IconHome },
@@ -146,14 +147,25 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         })}
 
         {/* Bottom user */}
-        <div className="mt-auto flex items-center gap-[10px] border-t pt-3" style={{ borderColor: 'rgba(255,255,255,.1)' }}>
-          <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-white" style={{ background: accent }}>
-            {admin.initials}
+        <div className="mt-auto border-t pt-3" style={{ borderColor: 'rgba(255,255,255,.1)' }}>
+          <div className="flex items-center gap-[10px]">
+            <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-white" style={{ background: accent }}>
+              {admin.initials}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{admin.name}</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,.5)' }}>Administrador</div>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{admin.name}</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,.5)' }}>Administrador</div>
-          </div>
+          <form action={logout} className="mt-2">
+            <button
+              type="submit"
+              className="w-full rounded-lg px-[10px] py-[8px] text-[12px] font-semibold text-left transition-colors"
+              style={{ color: 'rgba(255,255,255,.55)' }}
+            >
+              Cerrar sesión
+            </button>
+          </form>
         </div>
       </aside>
 
