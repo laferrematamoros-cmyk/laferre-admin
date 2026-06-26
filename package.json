@@ -5,10 +5,12 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test": "jest"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",
+    "jose": "^5.10.0",
     "jspdf": "^4.2.1",
     "next": "16.2.6",
     "react": "19.2.4",
@@ -16,10 +18,13 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/jest": "^29.5.14",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "jest": "^29.7.0",
     "tailwindcss": "^4",
+    "ts-jest": "^29.4.11",
     "typescript": "^5"
   }
 }
