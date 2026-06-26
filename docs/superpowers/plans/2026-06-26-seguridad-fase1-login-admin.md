@@ -756,35 +756,67 @@ git commit -m "fix(admin): mover escrituras anon remanentes a server actions"
 
 ---
 
-## Task 11: Hardening de API routes (cron) — opcional, coordinado
+## Task 11: Hardening de API routes — dos guards distintos
 
 **Files:**
-- Modify: `app/api/reminders/route.ts`, `app/api/cleanup/route.ts`, `app/api/push/route.ts`
+- Modify: `app/api/push/route.ts` (guard de sesión)
+- Modify: `app/api/reminders/route.ts`, `app/api/cleanup/route.ts` (guard de cron — opcional, coordinado)
 
-> **Atención:** `/api/reminders` es un **GET público** que dispara **cron-job.org cada 5 min**. Agregar un secreto exige actualizar la config de cron-job.org en la MISMA ventana, o el cron deja de funcionar. Hacer esta tarea solo si el usuario coordina el cambio en cron-job.org.
+> **Hecho confirmado por inspección:**
+> - `/api/push` se invoca desde el **navegador del admin** (`app/dashboard/page.tsx`, `app/actividades/nueva/page.tsx`, `app/urgente/page.tsx` hacen `fetch('/api/push', ...)`). NO lo llama cron. → se protege con la **cookie de sesión** (no con un secreto, que no puede vivir en el cliente).
+> - `/api/reminders` (cada 5 min) y `/api/cleanup` (1×/día) los dispara **cron-job.org** (máquina). → se protegen con `CRON_SECRET`.
+> - El middleware (Task 4) excluye TODO `/api`, así que cada ruta hace su propia verificación.
 
-- [ ] **Step 1: Confirmar quién invoca cada ruta** (cron-job.org, la app, manual) revisando comentarios y la consola de cron-job.org del usuario. Anotar la lista.
+### 11A — `/api/push`: guard por sesión (hacer siempre)
 
-- [ ] **Step 2: Agregar guard por secreto**
+- [ ] **Step 1: Proteger `/api/push` con la cookie de sesión**
 
-Variable de entorno `CRON_SECRET`. Al inicio de cada handler:
+Al inicio del handler (es un `POST`), agregar:
+```ts
+import { hasValidSession } from '@/lib/auth';
+// ...dentro del handler, antes de cualquier trabajo:
+if (!(await hasValidSession())) {
+  return NextResponse.json({ error: 'no autorizado' }, { status: 401 });
+}
+```
+Como el `fetch('/api/push')` sale del navegador logueado y es mismo-origen, la cookie viaja automáticamente; las llamadas del panel siguen funcionando.
+
+- [ ] **Step 2: Verificar**
+
+Run: `npm run dev`
+Acción: logueado, disparar una acción del panel que llame a `/api/push` (p. ej. crear alerta urgente) → funciona. En incógnito, `POST http://localhost:3000/api/push` sin cookie → responde 401.
+Expected: con sesión funciona; sin sesión 401.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add app/api/push/route.ts
+git commit -m "feat(admin): /api/push exige sesión de admin"
+```
+
+### 11B — `/api/reminders` y `/api/cleanup`: guard de cron (opcional, coordinado)
+
+> **Atención:** son GET públicos disparados por **cron-job.org**. Agregar el secreto exige actualizar la config de cron-job.org en la MISMA ventana, o el cron deja de correr. Hacer solo si el usuario coordina el cambio.
+
+- [ ] **Step 1: Agregar guard por secreto**
+
+Variable de entorno `CRON_SECRET`. Al inicio de cada handler (cambiar la firma a `GET(req: Request)` para leer headers):
 ```ts
 const auth = req.headers.get('authorization');
 if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
   return NextResponse.json({ error: 'no autorizado' }, { status: 401 });
 }
 ```
-(Para `reminders` que es `export async function GET()`, cambiar la firma a `GET(req: Request)` para leer headers.)
 
-- [ ] **Step 3: Actualizar cron-job.org** para enviar el header `Authorization: Bearer <CRON_SECRET>` y configurar `CRON_SECRET` en Vercel.
+- [ ] **Step 2: Actualizar cron-job.org** para enviar `Authorization: Bearer <CRON_SECRET>` y configurar `CRON_SECRET` en Vercel.
 
-- [ ] **Step 4: Verificar** que el cron sigue ejecutando (revisar logs de cron-job.org / respuesta 200) y que sin el header responde 401.
+- [ ] **Step 3: Verificar** que el cron sigue ejecutando (logs de cron-job.org / 200) y que sin el header responde 401.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add app/api/reminders/route.ts app/api/cleanup/route.ts app/api/push/route.ts
-git commit -m "feat(admin): guard por CRON_SECRET en API routes"
+git add app/api/reminders/route.ts app/api/cleanup/route.ts
+git commit -m "feat(admin): guard por CRON_SECRET en reminders/cleanup"
 ```
 
 ---
