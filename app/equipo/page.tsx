@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import AdminShell from '@/components/AdminShell';
 import { supabase, Employee } from '@/lib/supabase';
 import { useCompany } from '@/lib/company-context';
+import { createEmployee, updateEmployee, setEmployeeActive, deleteEmployee } from './actions';
 
 const COLORS = ['#E11D2E', '#0F9D58', '#1A73E8', '#F2A20C', '#9B4DCA', '#00ACC1', '#FF7043', '#5E35B1'];
 
@@ -67,26 +68,18 @@ export default function EquipoPage() {
     if (!form.name.trim() || !form.role.trim()) { setError('Nombre y puesto son requeridos.'); return; }
     setSaving(true);
     setError('');
-    if (editEmp) {
-      const { error: err } = await supabase.from('employees').update({
-        name: form.name.trim(),
-        role: form.role.trim(),
-        color: form.color,
-        emp_type: form.empType,
-        initials: initials(form.name.trim()),
-      }).eq('id', editEmp.id);
-      if (err) { setError(err.message); setSaving(false); return; }
-    } else {
-      const { error: err } = await supabase.from('employees').insert({
-        name: form.name.trim(),
-        role: form.role.trim(),
-        color: form.color,
-        emp_type: form.empType,
-        initials: initials(form.name.trim()),
-        is_active: true,
-        company_id: company!.id,
-      });
-      if (err) { setError(err.message); setSaving(false); return; }
+    const payload = {
+      name: form.name.trim(),
+      role: form.role.trim(),
+      color: form.color,
+      emp_type: form.empType,
+      initials: initials(form.name.trim()),
+    };
+    try {
+      if (editEmp) await updateEmployee(editEmp.id, payload);
+      else await createEmployee(payload, company!.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al guardar'); setSaving(false); return;
     }
     setSaving(false);
     setShowModal(false);
@@ -94,13 +87,13 @@ export default function EquipoPage() {
   }
 
   async function toggleActive(emp: Employee) {
-    await supabase.from('employees').update({ is_active: !emp.is_active }).eq('id', emp.id);
+    await setEmployeeActive(emp.id, !emp.is_active);
     load();
   }
 
   async function handleDelete(emp: Employee) {
     if (!confirm(`¿Eliminar a ${emp.name}? Esta acción no se puede deshacer.`)) return;
-    await supabase.from('employees').delete().eq('id', emp.id);
+    await deleteEmployee(emp.id);
     load();
   }
 
