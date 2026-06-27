@@ -5,8 +5,9 @@ const SESSION_COOKIE = 'lf_admin_session';
 
 export async function middleware(req: NextRequest) {
   const token = req.cookies.get(SESSION_COOKIE)?.value;
-  const secret = process.env.AUTH_SECRET ?? '';
-  const ok = token ? (await verifySession(token, secret)) !== null : false;
+  const secret = process.env.AUTH_SECRET;
+  // Fail-closed: sin secreto configurado, ninguna sesión es válida (igual que lib/auth.ts).
+  const ok = token && secret ? (await verifySession(token, secret)) !== null : false;
 
   if (!ok) {
     const url = req.nextUrl.clone();
