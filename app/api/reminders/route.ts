@@ -90,10 +90,12 @@ export async function GET() {
       continue;
     }
 
-    // 4. Cada 15 min después del límite hasta fin de jornada
+    // 4. Cada `reminder_minutes` después del límite hasta fin de jornada
+    //    (configurable por actividad desde el panel; mínimo el intervalo del cron)
     if (nowMin > limitMin && nowMin <= END_OF_DAY) {
       const elapsed = nowMin - limitMin;
-      if (elapsed >= 15 && elapsed % 15 < WINDOW) {
+      const every = act.reminder_minutes && act.reminder_minutes >= WINDOW ? act.reminder_minutes : WINDOW;
+      if (elapsed >= every && elapsed % every < WINDOW) {
         await push(tokens, `🔴 ${act.title}`, `${elapsed} min de retraso · pendiente desde ${limitLbl}`);
         sent.push(`${act.title} → ${elapsed}min tarde`);
       }

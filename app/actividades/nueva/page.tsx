@@ -8,20 +8,17 @@ import { useCompany } from '@/lib/company-context';
 import { createActivity } from '../actions';
 
 const RECURRENCE: { label: string; days: number[] }[] = [
-  { label: 'Una vez',       days: [] },
   { label: 'Diaria',        days: [0,1,2,3,4,5,6] },
   { label: 'Lun-Vie',       days: [1,2,3,4,5] },
   { label: 'Lun-Sáb',       days: [1,2,3,4,5,6] },
   { label: 'Personalizado', days: [] },
 ];
+const CUSTOM_IDX = 3; // índice de "Personalizado"
 
-const REMINDER_MINUTES = [1, 5, 10, 15, 30];
+const REMINDER_MINUTES = [5, 10, 15, 30];
 
 const EVIDENCE_FIELDS = [
-  { key: 'evidence_photo',     label: 'Foto' },
-  { key: 'evidence_name',      label: 'Nombre de quien realiza' },
-  { key: 'evidence_note',      label: 'Nota opcional' },
-  { key: 'evidence_signature', label: 'Firma' },
+  { key: 'evidence_photo', label: 'Foto' },
 ] as const;
 
 function initials(name: string) {
@@ -60,15 +57,14 @@ export default function NuevaActividadPage() {
 
   const [employees, setEmployees]   = useState<Employee[]>([]);
   const [selected, setSelected]     = useState<string[]>([]);
-  const [recurrence, setRecurrence] = useState(2);
+  const [recurrence, setRecurrence] = useState(1); // Lun-Vie
   const [customDays, setCustomDays] = useState<number[]>([]);
-  const [reminder, setReminder]     = useState(1);
-  const [evidence, setEvidence]     = useState([true, true, false, false]);
-  const [isUrgent, setIsUrgent]     = useState(false);
+  const [reminder, setReminder]     = useState(0); // 5 min
+  const [evidence, setEvidence]     = useState([true]); // [Foto]
   const [saving, setSaving]         = useState(false);
 
   const isGeneral = selected.length === 0;
-  const effectiveDays = recurrence === 4 ? customDays : RECURRENCE[recurrence].days;
+  const effectiveDays = recurrence === CUSTOM_IDX ? customDays : RECURRENCE[recurrence].days;
 
   function toggleCustomDay(d: number) {
     setCustomDays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]);
@@ -102,12 +98,12 @@ export default function NuevaActividadPage() {
         recurrence:            RECURRENCE[recurrence].label.toLowerCase().replace(' ', '-'),
         days_of_week:          effectiveDays,
         assigned_employee_ids: selected,
-        is_urgent:             isUrgent,
+        is_urgent:             false,
         reminder_minutes:      REMINDER_MINUTES[reminder],
         evidence_photo:        evidence[0],
-        evidence_name:         evidence[1],
-        evidence_note:         evidence[2],
-        evidence_signature:    evidence[3],
+        evidence_name:         false,
+        evidence_note:         false,
+        evidence_signature:    false,
         company_id:            company?.id,
       });
     } catch {
@@ -230,7 +226,7 @@ export default function NuevaActividadPage() {
                   <button key={r.label} onClick={() => setRecurrence(i)} className="rounded-lg px-3.5 py-1.5 text-[12px] font-semibold transition-colors" style={{ background: recurrence === i ? '#0F0F10' : '#F2F2F4', color: recurrence === i ? '#fff' : '#3A3A3D' }}>{r.label}</button>
                 ))}
               </div>
-              {recurrence === 4 && (
+              {recurrence === CUSTOM_IDX && (
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map((name, d) => (
                     <button key={d} onClick={() => toggleCustomDay(d)} className="rounded-lg px-3.5 py-1.5 text-[12px] font-semibold transition-colors" style={{ background: customDays.includes(d) ? 'var(--accent)' : '#F2F2F4', color: customDays.includes(d) ? '#fff' : '#3A3A3D' }}>{name}</button>
@@ -249,30 +245,6 @@ export default function NuevaActividadPage() {
               </div>
             </div>
 
-            {/* Urgent */}
-            <div>
-              <FieldLabel>Prioridad</FieldLabel>
-              <button
-                onClick={() => setIsUrgent(u => !u)}
-                className="w-full flex items-center gap-3 rounded-xl border-2 p-4 transition-all text-left"
-                style={{ borderColor: isUrgent ? 'var(--accent)' : '#E4E4E7', background: isUrgent ? '#FFF6F7' : '#FAFAFA' }}
-              >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[18px]" style={{ background: isUrgent ? '#FCE7E9' : '#F2F2F4' }}>
-                  🔴
-                </div>
-                <div className="flex-1">
-                  <p className="text-[13px] font-bold" style={{ color: isUrgent ? 'var(--accent)' : '#0F0F10' }}>
-                    {isUrgent ? 'Actividad urgente' : 'Marcar como urgente'}
-                  </p>
-                  <p className="mt-0.5 text-[11px]" style={{ color: '#6E6E73' }}>
-                    Notifica aunque el empleado tenga activadas solo las alertas urgentes
-                  </p>
-                </div>
-                <div className="relative h-5 w-9 rounded-full transition-colors" style={{ background: isUrgent ? 'var(--accent)' : '#A8A8AD' }}>
-                  <div className="absolute top-[3px] h-[14px] w-[14px] rounded-full bg-white shadow transition-all" style={{ left: isUrgent ? 18 : 3 }} />
-                </div>
-              </button>
-            </div>
           </div>
 
           {/* Right: Notifications + Preview */}
@@ -284,21 +256,11 @@ export default function NuevaActividadPage() {
                 <h3 className="text-[13px] font-bold tracking-[0.3px]">RECORDATORIOS</h3>
               </div>
               <p className="mb-3.5 text-[12px]" style={{ color: 'rgba(255,255,255,.7)' }}>Si no se completa en la hora límite, enviar notificación cada:</p>
-              <div className="grid grid-cols-5 gap-1.5">
+              <div className="grid grid-cols-4 gap-1.5">
                 {REMINDER_MINUTES.map((min, i) => (
                   <button key={min} onClick={() => setReminder(i)} className="rounded-lg py-2.5 text-center text-[12px] font-bold transition-colors" style={{ background: reminder === i ? 'var(--accent)' : 'rgba(255,255,255,.08)' }}>{min} min</button>
                 ))}
               </div>
-              <div className="mt-4 rounded-lg border p-3" style={{ background: 'rgba(225,29,46,.15)', borderColor: 'rgba(225,29,46,.4)' }}>
-                <p className="text-[11px] font-bold uppercase tracking-[0.6px]" style={{ color: '#FFB4BC' }}>Escalar a supervisor</p>
-                <p className="mt-1 text-[12px]" style={{ color: 'rgba(255,255,255,.9)' }}>Avisar al admin después de 30 min de retraso.</p>
-              </div>
-              {isUrgent && (
-                <div className="mt-3 flex items-center gap-2 rounded-lg border p-3" style={{ background: 'rgba(242,162,12,.1)', borderColor: 'rgba(242,162,12,.4)' }}>
-                  <span className="text-[15px]">🔴</span>
-                  <p className="text-[12px]" style={{ color: '#F2C94C' }}>Urgente — notificará a todos sin importar sus preferencias de silencio.</p>
-                </div>
-              )}
             </div>
 
             {/* Mobile preview */}
