@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import AdminShell from '@/components/AdminShell';
 import { supabase } from '@/lib/supabase';
 import { useCompany } from '@/lib/company-context';
+import { createConoceItem, updateConoceItem, setConoceActive, deleteConoceItem } from './actions';
 
 type ItemType = 'instruccion' | 'ayuda_visual';
 
@@ -125,11 +126,11 @@ export default function ConocePage() {
     }
 
     if (editItem) {
-      await supabase.from('conoce_items').update({
+      await updateConoceItem(editItem.id, {
         type, title: title.trim(), body: body.trim() || null, image_url: imageUrl,
-      }).eq('id', editItem.id);
+      });
     } else {
-      await supabase.from('conoce_items').insert({
+      await createConoceItem({
         type, title: title.trim(), body: body.trim() || null,
         image_url: imageUrl,
         company_id: current?.id ?? null,
@@ -143,12 +144,12 @@ export default function ConocePage() {
 
   async function handleDelete(id: string) {
     if (!confirm('¿Eliminar este elemento?')) return;
-    await supabase.from('conoce_items').delete().eq('id', id);
+    await deleteConoceItem(id);
     load();
   }
 
   async function handleToggle(item: ConoceItem) {
-    await supabase.from('conoce_items').update({ is_active: !item.is_active }).eq('id', item.id);
+    await setConoceActive(item.id, !item.is_active);
     load();
   }
 
