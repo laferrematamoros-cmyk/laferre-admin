@@ -20,6 +20,7 @@ interface Activity {
   is_active: boolean;
   assigned_employee_ids: string[];
   recurrence: string;
+  reminder_minutes: number;
 }
 
 function Badge({ children, color }: { children: React.ReactNode; color: string }) {
@@ -151,6 +152,11 @@ export default function ActividadesPage() {
                           👤 {act.assigned_employee_ids.map(id => empMap.get(id) ?? '?').join(', ')}
                         </span>
                       )}
+                      {act.reminder_minutes ? (
+                        <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: '#FEF3C7', color: '#B45309' }}>
+                          🔔 cada {act.reminder_minutes} min
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                   </div>
