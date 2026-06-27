@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import AdminShell from '@/components/AdminShell';
 import { supabase } from '@/lib/supabase';
 import { useCompany } from '@/lib/company-context';
+import { createUrgentAlert, deactivateUrgentAlert, deleteUrgentAlert } from './actions';
 
 interface UrgentAlert {
   id: string;
@@ -50,24 +51,18 @@ export default function UrgentePage() {
     if (!title.trim()) return;
     setCreating(true);
 
-    const { data: row } = await supabase
-      .from('urgent_alerts')
-      .insert({ title: title.trim(), company_id: current?.id ?? null, is_active: true })
-      .select()
-      .single();
+    await createUrgentAlert(title.trim(), current?.id ?? null);
 
     // Send push notification via server-side API
-    if (row) {
-      await fetch('/api/push', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: '🚨 Actividad Urgente',
-          body: title.trim(),
-          companyId: current?.id ?? null,
-        }),
-      });
-    }
+    await fetch('/api/push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: '🚨 Actividad Urgente',
+        body: title.trim(),
+        companyId: current?.id ?? null,
+      }),
+    });
 
     setTitle('');
     setCreating(false);
@@ -75,13 +70,12 @@ export default function UrgentePage() {
   }
 
   async function handleDeactivate(id: string) {
-    await supabase.from('urgent_alerts').update({ is_active: false }).eq('id', id);
+    await deactivateUrgentAlert(id);
     load();
   }
 
   async function handleDelete(id: string) {
-    await supabase.from('urgent_alert_acks').delete().eq('alert_id', id);
-    await supabase.from('urgent_alerts').delete().eq('id', id);
+    await deleteUrgentAlert(id);
     load();
   }
 
