@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { hasValidSession } from '@/lib/auth';
 
 export async function POST(req: Request) {
+  if (!(await hasValidSession())) {
+    return NextResponse.json({ error: 'no autorizado' }, { status: 401 });
+  }
+
   const { title, body, companyId } = await req.json();
 
   const supabase = createClient(
