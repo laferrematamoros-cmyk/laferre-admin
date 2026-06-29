@@ -19,7 +19,7 @@ function rateColor(rate: number) {
 
 // ── PDF ───────────────────────────────────────────────────────────────────────
 
-async function downloadPDF(data: ReportData, label: string) {
+async function downloadPDF(data: ReportData, label: string, weekStart: Date) {
   const { jsPDF } = await import('jspdf');
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const W = 210;
@@ -93,7 +93,7 @@ async function downloadPDF(data: ReportData, label: string) {
     }
   }
 
-  doc.save(`reporte-laferre-${toDateStr(new Date())}.pdf`);
+  doc.save(`reporte-laferre-${toDateStr(weekStart)}.pdf`);
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -156,7 +156,7 @@ export default function ReportesPage() {
   async function handleDownload() {
     if (!data) return;
     setGenerating(true);
-    await downloadPDF(data, label);
+    await downloadPDF(data, label, weekStart);
     setGenerating(false);
   }
 
