@@ -19,7 +19,7 @@ La página `app/reportes/page.tsx` solo muestra el reporte de la **semana actual
 ## Decisiones (con el usuario)
 
 - **Navegación:** selector de semana (`<input type="week">`).
-- **Tendencia:** gráfica de % por semana (últimas ~8 semanas), semana seleccionada resaltada.
+- **Tendencia:** gráfica de % por semana, **desde la primera semana con una actividad realizada** hasta la semana actual, semana seleccionada resaltada.
 - **Periodos:** solo semanal (sin mensual).
 - **Enfoque:** cálculo al vuelo, **sin tablas nuevas ni cron/snapshots** (YAGNI para este volumen).
 
@@ -39,10 +39,11 @@ Hoy el reporte cuenta **todas** las actividades activas para cada día, sin impo
 - **Limitación documentada:** no hay historial de pausas/activaciones; se usa el estado actual (`is_active`) + `created_at`. Aproximación buena, no perfecta. (Se anota en el código y en la UI no se promete exactitud histórica total.)
 
 ### 3. Gráfica de tendencia (nueva sección)
-- Calcular el % de cumplimiento de las **últimas N=8 semanas** (incluida la actual).
-- Una sola consulta: `completions` con `scheduled_date` entre el lunes de hace 7 semanas y hoy; más las `activities` (ya cargadas). Para cada semana se computa `done/total` con la misma lógica + el filtro `created_at`.
-- Render: barras (o puntos) de % por semana, con color por rango (rojo <70, ámbar <90, verde ≥90, igual que `rateColor`). La **semana seleccionada** se resalta.
+- Rango: **desde la primera semana con una actividad realizada** (lunes de la `MIN(scheduled_date)` de `completions`) **hasta la semana actual**. El número de semanas es dinámico y crece con el tiempo.
+- Una sola consulta: `MIN(scheduled_date)` de `completions` (o cargar todas las `completions` de la empresa una vez) → define la semana inicial; luego se computa `done/total` por cada semana del rango con `computeWeek` + el filtro `created_at`.
+- Render: barras de % por semana, color por rango (rojo <70, ámbar <90, verde ≥90, igual que `rateColor`). La **semana seleccionada** se resalta.
 - **Interacción:** tocar una barra hace `setWeekStart` a esa semana (salta el reporte a ella).
+- **Muchas semanas con el tiempo:** si el rango crece mucho (p. ej. >12-15 barras), el contenedor hace **scroll horizontal** y las barras mantienen un ancho mínimo legible. (Sin truncar el historial; el usuario pidió desde el inicio.)
 
 ### 4. PDF
 - Igual que hoy, pero con la etiqueta y el nombre de archivo de la semana seleccionada (`reporte-laferre-<lunes>.pdf`).
@@ -71,5 +72,5 @@ Hoy el reporte cuenta **todas** las actividades activas para cada día, sin impo
 
 ## Criterios de éxito
 - Puedo elegir una semana pasada y ver/descargar su reporte (PDF con esa semana).
-- Veo una gráfica de % de las últimas 8 semanas y noto si sube o baja.
+- Veo una gráfica de % desde la primera semana con actividad realizada hasta hoy, y noto si sube o baja.
 - Las semanas pasadas no cuentan como "no realizadas" actividades que aún no existían.
