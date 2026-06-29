@@ -1,45 +1,20 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import AdminShell from '@/components/AdminShell';
 import { supabase, Activity, Completion, Employee } from '@/lib/supabase';
 import { useCompany } from '@/lib/company-context';
+import {
+  computeWeek, weekStartFromInput, weekInputValue, weekLabel, currentMonday,
+  mondayOf, pctOf, toDateStr, type ReportData,
+} from '@/lib/reports';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function startOfWeek() {
-  const d = new Date();
-  const diff = d.getDay() === 0 ? -6 : 1 - d.getDay();
-  const mon = new Date(d);
-  mon.setDate(d.getDate() + diff);
-  mon.setHours(0, 0, 0, 0);
-  return mon;
-}
-
-function toDateStr(d: Date) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
-
-function weekLabel(mon: Date) {
-  const sun = new Date(mon);
-  sun.setDate(mon.getDate() + 6);
-  return `${mon.getDate()} al ${sun.getDate()} de ${mon.toLocaleString('es-MX', { month: 'long' })}`;
-}
 
 function rateColor(rate: number) {
   if (rate < 70) return '#E11D2E';
   if (rate < 90) return '#F2A20C';
   return '#0F9D58';
-}
-
-const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-interface EmployeeStat { name: string; done: number; missed: number; rate: number; }
-interface MissedItem   { title: string; date: string; assignee: string; }
-interface DayBar       { d: string; done: number; missed: number; }
-interface ReportData {
-  done: number; missed: number; late: number; total: number;
-  byEmployee: EmployeeStat[]; missed_list: MissedItem[]; daily: DayBar[];
 }
 
 // ── PDF ───────────────────────────────────────────────────────────────────────
@@ -125,85 +100,43 @@ async function downloadPDF(data: ReportData, label: string) {
 
 export default function ReportesPage() {
   const { current: company } = useCompany();
-  const [data, setData]           = useState<ReportData | null>(null);
   const [loading, setLoading]     = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [weekStart]               = useState(startOfWeek);
+  const [weekStart, setWeekStart]   = useState<Date>(currentMonday);
+  const [activities, setActivities]       = useState<Activity[]>([]);
+  const [allCompletions, setAllCompletions] = useState<Completion[]>([]);
+  const [employees, setEmployees]         = useState<Employee[]>([]);
 
   const load = useCallback(async () => {
     if (!company) return;
-    const mon  = startOfWeek();
-    const days = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(mon); d.setDate(mon.getDate() + i); return toDateStr(d);
-    });
+    setLoading(true);
+
+    const { data: firstRow } = await supabase
+      .from('completions').select('scheduled_date')
+      .order('scheduled_date', { ascending: true }).limit(1);
+    const firstDate = firstRow?.[0]?.scheduled_date ?? toDateStr(currentMonday());
+    const firstMon = mondayOf(new Date(firstDate + 'T12:00:00'));
 
     const [{ data: acts }, { data: comps }, { data: emps }] = await Promise.all([
       supabase.from('activities').select('*').eq('is_active', true).eq('company_id', company.id),
-      supabase.from('completions').select('*').gte('scheduled_date', days[0]).lte('scheduled_date', days[6]),
+      supabase.from('completions').select('*').gte('scheduled_date', toDateStr(firstMon)),
       supabase.from('employees').select('*').eq('is_active', true).eq('company_id', company.id),
     ]);
 
-    const activities  = (acts  ?? []) as Activity[];
-    const completions = (comps ?? []) as Completion[];
-    const employees   = (emps  ?? []) as Employee[];
-    const empMap      = Object.fromEntries(employees.map(e => [e.id, e]));
-
-    let totalScheduled = 0, totalDone = 0, totalLate = 0;
-    const byEmpMap: Record<string, { done: number; missed: number }> = {};
-    const missedList: MissedItem[] = [];
-    const daily: DayBar[] = [];
-
-    for (const dateStr of days) {
-      const dow      = new Date(dateStr + 'T12:00:00').getDay();
-      const dayActs  = activities.filter(a => (a.days_of_week as number[]).includes(dow));
-      const dayComps = completions.filter(c => c.scheduled_date === dateStr);
-      const doneIds  = new Set(dayComps.map(c => c.activity_id));
-      let dayDone = 0, dayMissed = 0;
-
-      for (const act of dayActs) {
-        totalScheduled++;
-        const isDone = doneIds.has(act.id);
-        const comp   = dayComps.find(c => c.activity_id === act.id);
-        const ids    = (act.assigned_employee_ids as string[]).length > 0
-          ? act.assigned_employee_ids as string[]
-          : ['general'];
-        const assigneeNames = (act.assigned_employee_ids as string[]).map(id => empMap[id]?.name ?? '?').join(', ') || 'General';
-
-        for (const eid of ids) {
-          if (!byEmpMap[eid]) byEmpMap[eid] = { done: 0, missed: 0 };
-          isDone ? byEmpMap[eid].done++ : byEmpMap[eid].missed++;
-        }
-
-        if (isDone) {
-          totalDone++; dayDone++;
-          if (comp?.was_late) totalLate++;
-        } else {
-          dayMissed++;
-          if (new Date(dateStr + 'T23:59:00') < new Date()) {
-            missedList.push({
-              title: act.title,
-              date:  new Date(dateStr + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' }),
-              assignee: assigneeNames,
-            });
-          }
-        }
-      }
-      daily.push({ d: DAY_LABELS[dow], done: dayDone, missed: dayMissed });
-    }
-
-    const byEmployee = employees.map(e => {
-      const s   = byEmpMap[e.id] ?? { done: 0, missed: 0 };
-      const tot = s.done + s.missed;
-      return { name: e.name, done: s.done, missed: s.missed, rate: tot > 0 ? Math.round(s.done / tot * 100) : 100 };
-    }).sort((a, b) => b.rate - a.rate);
-
-    setData({ done: totalDone, missed: totalScheduled - totalDone, late: totalLate, total: totalScheduled, byEmployee, missed_list: missedList, daily });
+    setActivities((acts ?? []) as Activity[]);
+    setAllCompletions((comps ?? []) as Completion[]);
+    setEmployees((emps ?? []) as Employee[]);
     setLoading(false);
   }, [company]);
 
   useEffect(() => { load(); }, [load]);
 
-  const pct    = data ? Math.round(data.done / Math.max(data.total, 1) * 100) : 0;
+  const data: ReportData | null = useMemo(
+    () => loading ? null : computeWeek(weekStart, activities, allCompletions, employees),
+    [loading, weekStart, activities, allCompletions, employees],
+  );
+
+  const pct    = data ? pctOf(data) : 0;
   const maxBar = data ? Math.max(...data.daily.map(b => b.done + b.missed), 1) : 1;
   const label  = weekLabel(weekStart);
 
@@ -222,6 +155,14 @@ export default function ReportesPage() {
           <h1 className="text-[18px] md:text-[22px] font-extrabold tracking-tight">Reporte semanal</h1>
           <p className="mt-0.5 text-[11px] md:text-[12px]" style={{ color: '#6E6E73' }}>Semana del {label} · resumen automático</p>
         </div>
+        <div className="flex shrink-0 items-center gap-2">
+        <input
+          type="week"
+          value={weekInputValue(weekStart)}
+          onChange={e => { if (e.target.value) setWeekStart(weekStartFromInput(e.target.value)); }}
+          className="rounded-[9px] border px-3 py-2 text-[12px] md:text-[13px] font-semibold"
+          style={{ borderColor: '#E4E4E7', background: '#fff', color: '#0F0F10' }}
+        />
         <button
           onClick={handleDownload}
           disabled={loading || generating}
@@ -230,6 +171,7 @@ export default function ReportesPage() {
         >
           {generating ? 'Generando...' : '↓ Descargar PDF'}
         </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto p-4 md:p-7">
