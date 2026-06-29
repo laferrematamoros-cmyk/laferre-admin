@@ -136,6 +136,19 @@ export default function ReportesPage() {
     [loading, weekStart, activities, allCompletions, employees],
   );
 
+  const trend = useMemo(() => {
+    if (loading || allCompletions.length === 0) return [] as { mon: Date; pct: number }[];
+    const dates = allCompletions.map(c => c.scheduled_date).sort();
+    const firstMon = mondayOf(new Date(dates[0] + 'T12:00:00'));
+    const lastMon  = currentMonday();
+    const out: { mon: Date; pct: number }[] = [];
+    for (let m = new Date(firstMon); m <= lastMon; m.setDate(m.getDate() + 7)) {
+      const mon = new Date(m);
+      out.push({ mon, pct: pctOf(computeWeek(mon, activities, allCompletions, employees)) });
+    }
+    return out;
+  }, [loading, activities, allCompletions, employees]);
+
   const pct    = data ? pctOf(data) : 0;
   const maxBar = data ? Math.max(...data.daily.map(b => b.done + b.missed), 1) : 1;
   const label  = weekLabel(weekStart);
@@ -264,6 +277,37 @@ export default function ReportesPage() {
                 })}
           </div>
         </div>
+
+            {/* Trend */}
+            {trend.length > 1 && (
+              <div className="mt-4 rounded-xl border p-5" style={{ background: '#fff', borderColor: '#E4E4E7' }}>
+                <h3 className="mb-3.5 text-[14px] font-bold">Tendencia de cumplimiento (% por semana)</h3>
+                <div className="overflow-x-auto">
+                  <div className="flex h-[150px] items-end gap-2" style={{ minWidth: trend.length * 36 }}>
+                    {trend.map(t => {
+                      const selected = toDateStr(t.mon) === toDateStr(weekStart);
+                      const h = Math.max(4, (t.pct / 100) * 120);
+                      return (
+                        <button
+                          key={toDateStr(t.mon)}
+                          onClick={() => setWeekStart(new Date(t.mon))}
+                          className="flex flex-1 flex-col items-center gap-1.5"
+                          style={{ minWidth: 28 }}
+                          title={`Semana del ${weekLabel(t.mon)} · ${t.pct}%`}
+                        >
+                          <span className="text-[10px] font-bold" style={{ color: rateColor(t.pct), fontFamily: 'monospace' }}>{t.pct}%</span>
+                          <div className="flex w-full items-end justify-center" style={{ height: 120 }}>
+                            <div className="w-full rounded-t-[4px]" style={{ height: h, background: rateColor(t.pct), outline: selected ? '2px solid #0F0F10' : 'none', outlineOffset: 1 }} />
+                          </div>
+                          <span className="text-[9px]" style={{ color: '#A8A8AD', fontFamily: 'monospace' }}>{t.mon.getDate()}/{t.mon.getMonth() + 1}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <p className="mt-2 text-[11px]" style={{ color: '#A8A8AD' }}>Toca una semana para ver su reporte.</p>
+              </div>
+            )}
           </>
         )}
       </div>
