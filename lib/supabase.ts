@@ -45,6 +45,7 @@ export interface Activity {
   evidence_note: boolean;
   evidence_signature: boolean;
   is_active: boolean;
+  created_at: string;
 }
 
 export interface Completion {
