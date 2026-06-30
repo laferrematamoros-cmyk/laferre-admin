@@ -125,7 +125,7 @@ export default function DashboardPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         title: `🔔 ${a.title}`,
-        body: `El administrador solicita que se complete · límite ${fmtTime(a.limit_time)}`,
+        body: `Tienes una actividad pendiente · límite ${fmtTime(a.limit_time)}`,
         companyId: company.id,
       }),
     });
