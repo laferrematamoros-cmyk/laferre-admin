@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import AdminShell from '@/components/AdminShell';
+import UsersSection from '@/components/UsersSection';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Settings {
@@ -217,6 +218,9 @@ export default function AjustesPage() {
             </Field>
           </Section>
           )}
+
+          {/* Usuarios del panel (solo visible para administradores) */}
+          <UsersSection />
 
           {/* Danger zone */}
           <div className="rounded-xl border p-4 md:p-[22px]" style={{ borderColor: '#FCE7E9', background: '#FFFAFA' }}>

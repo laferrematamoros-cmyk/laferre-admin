@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabase';
+import { useSession } from './session-context';
 
 export interface Company {
   id: string;
@@ -23,24 +24,38 @@ const Ctx = createContext<CompanyCtx>({ companies: [], current: null, setCurrent
 const STORAGE_KEY = 'lf_company_id';
 
 export function CompanyProvider({ children }: { children: React.ReactNode }) {
+  const { company: lockedSlug, loading: sessionLoading } = useSession();
+  const isLocked = !!lockedSlug;
+
   const [companies, setCompanies] = useState<Company[]>([]);
   const [current, setCurrentState] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     const { data } = await supabase.from('companies').select('*').order('name');
-    const list = (data ?? []) as Company[];
-    setCompanies(list);
+    let list = (data ?? []) as Company[];
 
+    if (isLocked) {
+      // Usuario fijado a una empresa: solo ve esa y no puede cambiarla.
+      list = list.filter(c => c.slug === lockedSlug);
+      setCompanies(list);
+      setCurrentState(list[0] ?? null);
+      setLoading(false);
+      return;
+    }
+
+    setCompanies(list);
     const savedId = localStorage.getItem(STORAGE_KEY);
     const saved = list.find(c => c.id === savedId);
     setCurrentState(saved ?? list[0] ?? null);
     setLoading(false);
-  }, []);
+  }, [isLocked, lockedSlug]);
 
-  useEffect(() => { load(); }, [load]);
+  // Esperamos a conocer la sesión antes de cargar, para fijar la empresa correcta.
+  useEffect(() => { if (!sessionLoading) load(); }, [sessionLoading, load]);
 
   function setCurrent(c: Company) {
+    if (isLocked) return; // usuario fijado: no puede cambiar de empresa
     setCurrentState(c);
     localStorage.setItem(STORAGE_KEY, c.id);
   }

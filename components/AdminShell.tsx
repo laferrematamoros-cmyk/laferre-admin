@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { useCompany } from '@/lib/company-context';
+import { useSession } from '@/lib/session-context';
 import { logout } from '@/app/login/actions';
 
 const NAV = [
@@ -17,6 +18,9 @@ const NAV = [
   { href: '/reportes',    label: 'Reportes',    icon: IconChart },
   { href: '/ajustes',     label: 'Ajustes',     icon: IconCog },
 ];
+
+// El practicante solo ve estas secciones en el menú.
+const INTERN_NAV = new Set(['/dashboard', '/reportes']);
 
 const SETTINGS_KEY = 'lf_admin_settings';
 
@@ -37,9 +41,17 @@ const LOGOS: Record<string, string> = {
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const { companies, current, setCurrent } = useCompany();
+  const { role, name: sessionName } = useSession();
+  const isIntern = role === 'practicante';
+  const navItems = isIntern ? NAV.filter(n => INTERN_NAV.has(n.href)) : NAV;
+  const roleLabel = isIntern ? 'Practicante' : 'Administrador';
   const [admin, setAdmin]     = useState({ name: 'Administrador', initials: 'AD' });
   const [pickerOpen, setPickerOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+
+  // Nombre del usuario logueado; si es el admin maestro (sin nombre) usamos el de Ajustes.
+  const displayName = sessionName || admin.name;
+  const displayInitials = sessionName ? sessionName.slice(0, 2).toUpperCase() : admin.initials;
 
   // Cierra el menú lateral al cambiar de página (en móvil)
   useEffect(() => { setNavOpen(false); }, [path]);
@@ -125,7 +137,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         </div>
 
         {/* Nav items */}
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {navItems.map(({ href, label, icon: Icon }) => {
           const active = path.startsWith(href);
           return (
             <Link
@@ -150,11 +162,11 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         <div className="mt-auto border-t pt-3" style={{ borderColor: 'rgba(255,255,255,.1)' }}>
           <div className="flex items-center gap-[10px]">
             <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-white" style={{ background: accent }}>
-              {admin.initials}
+              {displayInitials}
             </div>
             <div className="min-w-0 flex-1">
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{admin.name}</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,.5)' }}>Administrador</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{displayName}</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,.5)' }}>{roleLabel}</div>
             </div>
           </div>
           <form action={logout} className="mt-2">
