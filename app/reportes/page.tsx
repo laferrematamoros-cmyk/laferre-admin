@@ -49,10 +49,11 @@ function Chevron({ open }: { open: boolean }) {
   );
 }
 
-function CollapsibleCard({ storageKey, title, children }: { storageKey: string; title: React.ReactNode; children: React.ReactNode }) {
+function CollapsibleCard({ storageKey, title, children, defaultOpen = true }: { storageKey: string; title: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true;
-    return localStorage.getItem(storageKey) !== '0';
+    if (typeof window === 'undefined') return defaultOpen;
+    const stored = localStorage.getItem(storageKey);
+    return stored === null ? defaultOpen : stored !== '0';
   });
   function toggle() {
     setOpen(o => {
@@ -346,7 +347,7 @@ export default function ReportesPage() {
             {/* Two columns */}
             <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
               {/* By employee */}
-              <CollapsibleCard storageKey="lf_report_open_emp" title="Cumplimiento por empleado">
+              <CollapsibleCard storageKey="lf_report_open_emp" title="Cumplimiento por empleado" defaultOpen={false}>
                 {empWith.length === 0 ? (
                   <p className="py-4 text-center text-[13px]" style={{ color: '#A8A8AD' }}>Nadie tuvo actividades asignadas esta semana.</p>
                 ) : (
@@ -374,6 +375,7 @@ export default function ReportesPage() {
               {/* Missed */}
               <CollapsibleCard
                 storageKey="lf_report_open_missed"
+                defaultOpen={false}
                 title={<span className="flex items-center gap-2"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: RED }} />Actividades no realizadas ({data.missed})</span>}
               >
                 {data.missed_list.length === 0 ? (
