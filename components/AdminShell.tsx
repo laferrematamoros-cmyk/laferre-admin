@@ -15,7 +15,7 @@ const NAV = [
   { href: '/equipo',      label: 'Equipo',      icon: IconUser },
   { href: '/urgente',     label: 'Urgente',     icon: IconAlert },
   { href: '/conoce',      label: 'Conoce',      icon: IconBook },
-  { href: '/reportes',    label: 'Reportes',    icon: IconChart },
+  { href: '/reportes',    label: 'Reportes y estadísticas',    icon: IconChart },
   { href: '/ajustes',     label: 'Ajustes',     icon: IconCog },
 ];
 

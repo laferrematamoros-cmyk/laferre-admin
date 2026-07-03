@@ -2,7 +2,7 @@ import type { Activity, Completion, Employee } from './supabase';
 
 export interface EmployeeStat { name: string; done: number; missed: number; rate: number; }
 export interface MissedItem   { title: string; date: string; assignee: string; }
-export interface DayBar       { d: string; done: number; missed: number; }
+export interface DayBar       { d: string; done: number; missed: number; late: number; }
 export interface ReportData {
   done: number; missed: number; late: number; total: number;
   byEmployee: EmployeeStat[]; missed_list: MissedItem[]; daily: DayBar[];
@@ -90,7 +90,7 @@ export function computeWeek(
     );
     const dayComps = completions.filter(c => c.scheduled_date === dateStr);
     const doneIds = new Set(dayComps.map(c => c.activity_id));
-    let dayDone = 0, dayMissed = 0;
+    let dayDone = 0, dayMissed = 0, dayLate = 0;
 
     for (const act of dayActs) {
       totalScheduled++;
@@ -109,7 +109,7 @@ export function computeWeek(
 
       if (isDone) {
         totalDone++; dayDone++;
-        if (comp?.was_late) totalLate++;
+        if (comp?.was_late) { totalLate++; dayLate++; }
       } else {
         dayMissed++;
         if (dayEnd < now) {
@@ -121,7 +121,7 @@ export function computeWeek(
         }
       }
     }
-    daily.push({ d: DAY_LABELS[dow], done: dayDone, missed: dayMissed });
+    daily.push({ d: DAY_LABELS[dow], done: dayDone, missed: dayMissed, late: dayLate });
   }
 
   const byEmployee = employees.map(e => {
@@ -138,4 +138,28 @@ export function computeWeek(
 
 export function pctOf(r: ReportData): number {
   return r.total > 0 ? Math.round(r.done / r.total * 100) : 0;
+}
+
+/** Cumplimiento (realizadas / programadas) en un rango de días [start, end]. */
+export function rangeStats(
+  start: Date, end: Date,
+  activities: Activity[], completions: Completion[],
+): { done: number; total: number } {
+  let total = 0, done = 0;
+  const d = new Date(start); d.setHours(12, 0, 0, 0);
+  const stop = new Date(end); stop.setHours(12, 0, 0, 0);
+  while (d <= stop) {
+    const dateStr = toDateStr(d);
+    const dow = d.getDay();
+    const dayEnd = new Date(d); dayEnd.setHours(23, 59, 59, 999);
+    const doneIds = new Set(completions.filter(c => c.scheduled_date === dateStr).map(c => c.activity_id));
+    for (const a of activities) {
+      if ((a.days_of_week as number[]).includes(dow) && new Date(a.created_at) <= dayEnd) {
+        total++;
+        if (doneIds.has(a.id)) done++;
+      }
+    }
+    d.setDate(d.getDate() + 1);
+  }
+  return { done, total };
 }
