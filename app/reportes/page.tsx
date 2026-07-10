@@ -346,14 +346,12 @@ export default function ReportesPage() {
               A tiempo + Tarde + No realizadas = {data.total} actividades programadas en la semana.
             </p>
 
-            {/* Two columns (el ranking solo lo ve el admin) */}
-            <div className={`mb-4 grid grid-cols-1 gap-4 ${isAdmin ? 'lg:grid-cols-2' : ''}`}>
-              {/* Ranking de empleados por actividades realizadas — solo admin */}
-              {isAdmin && (
-                <CollapsibleCard storageKey="lf_report_open_emp" title="Actividades realizadas por empleado" defaultOpen={false}>
-                  <EmployeeRanking employees={employees} completions={allCompletions} />
-                </CollapsibleCard>
-              )}
+            {/* Two columns */}
+            <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {/* Ranking de empleados — el practicante lo ve sin los números */}
+              <CollapsibleCard storageKey="lf_report_open_emp" title="Actividades realizadas por empleado" defaultOpen={false}>
+                <EmployeeRanking employees={employees} completions={allCompletions} showCounts={isAdmin} />
+              </CollapsibleCard>
 
               {/* Missed */}
               <CollapsibleCard

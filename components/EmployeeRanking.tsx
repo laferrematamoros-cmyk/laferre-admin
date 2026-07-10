@@ -11,7 +11,7 @@ const PERIOD_LABEL: Record<Period, string> = { week: 'esta semana', month: 'este
 
 // Ranking de empleados por cantidad de actividades REALIZADAS (según quién las
 // completó, `completion.employee_id`). Sirve aunque las actividades sean generales.
-export default function EmployeeRanking({ employees, completions }: { employees: Employee[]; completions: Completion[] }) {
+export default function EmployeeRanking({ employees, completions, showCounts = true }: { employees: Employee[]; completions: Completion[]; showCounts?: boolean }) {
   const [period, setPeriod] = useState<Period>('week');
 
   useEffect(() => {
@@ -65,7 +65,7 @@ export default function EmployeeRanking({ employees, completions }: { employees:
                   <span className="font-semibold">
                     <span style={{ color: '#A8A8AD' }}>{i + 1}.</span> {r.name}
                   </span>
-                  <span className="font-bold" style={{ fontFamily: 'monospace' }}>{r.count}</span>
+                  {showCounts && <span className="font-bold" style={{ fontFamily: 'monospace' }}>{r.count}</span>}
                 </div>
                 <div className="h-2 overflow-hidden rounded-full" style={{ background: '#F2F2F4' }}>
                   <div className="h-full rounded-full" style={{ width: `${Math.max(6, (r.count / max) * 100)}%`, background: i === 0 ? '#0F9D58' : '#0F0F10' }} />
@@ -73,9 +73,11 @@ export default function EmployeeRanking({ employees, completions }: { employees:
               </div>
             ))}
           </div>
-          <p className="mt-3 text-[11px]" style={{ color: '#A8A8AD' }}>
-            {totalDone} actividades realizadas {PERIOD_LABEL[period]} por {ranking.length} {ranking.length === 1 ? 'persona' : 'personas'}.
-          </p>
+          {showCounts && (
+            <p className="mt-3 text-[11px]" style={{ color: '#A8A8AD' }}>
+              {totalDone} actividades realizadas {PERIOD_LABEL[period]} por {ranking.length} {ranking.length === 1 ? 'persona' : 'personas'}.
+            </p>
+          )}
         </>
       )}
     </div>
