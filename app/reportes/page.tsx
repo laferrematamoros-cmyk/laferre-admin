@@ -4,11 +4,13 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import AdminShell from '@/components/AdminShell';
 import { supabase, Activity, Completion, Employee } from '@/lib/supabase';
 import { useCompany } from '@/lib/company-context';
+import { useSession } from '@/lib/session-context';
 import {
   computeWeek, weekStartFromInput, weekInputValue, weekLabel, currentMonday,
   mondayOf, pctOf, toDateStr, rangeStats, type ReportData,
 } from '@/lib/reports';
 import { DailyChart, TrendChart, ChartTypeToggle, type DailyType, type TrendType, type TrendPoint } from '@/components/ReportCharts';
+import EmployeeRanking from '@/components/EmployeeRanking';
 
 type Granularity = 'weeks' | 'months' | 'years';
 const MONTHS_ABBR = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -164,6 +166,8 @@ async function downloadPDF(data: ReportData, label: string, weekStart: Date) {
 
 export default function ReportesPage() {
   const { current: company } = useCompany();
+  const { role } = useSession();
+  const isAdmin = role === 'admin';
   const [loading, setLoading]     = useState(true);
   const [generating, setGenerating] = useState(false);
   const [weekStart, setWeekStart]   = useState<Date>(currentMonday);
@@ -259,8 +263,6 @@ export default function ReportesPage() {
   const label  = weekLabel(weekStart);
 
   const onTime    = data ? data.done - data.late : 0;
-  const empWith    = data ? data.byEmployee.filter(e => e.done + e.missed > 0) : [];
-  const empWithout = data ? data.byEmployee.filter(e => e.done + e.missed === 0) : [];
 
   async function handleDownload() {
     if (!data) return;
@@ -344,33 +346,14 @@ export default function ReportesPage() {
               A tiempo + Tarde + No realizadas = {data.total} actividades programadas en la semana.
             </p>
 
-            {/* Two columns */}
-            <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-              {/* By employee */}
-              <CollapsibleCard storageKey="lf_report_open_emp" title="Cumplimiento por empleado" defaultOpen={false}>
-                {empWith.length === 0 ? (
-                  <p className="py-4 text-center text-[13px]" style={{ color: '#A8A8AD' }}>Nadie tuvo actividades asignadas esta semana.</p>
-                ) : (
-                  <div className="flex flex-col gap-3">
-                    {empWith.map(e => (
-                      <div key={e.name}>
-                        <div className="mb-1.5 flex justify-between text-[12px]">
-                          <span className="font-semibold">{e.name}</span>
-                          <span className="font-bold" style={{ color: rateColor(e.rate), fontFamily: 'monospace' }}>{e.rate}% · {e.done}/{e.done + e.missed}</span>
-                        </div>
-                        <div className="h-2 overflow-hidden rounded-full" style={{ background: '#F2F2F4' }}>
-                          <div className="h-full rounded-full" style={{ width: `${e.rate}%`, background: rateColor(e.rate) }} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {empWithout.length > 0 && (
-                  <p className="mt-3.5 border-t pt-3 text-[11px] leading-relaxed" style={{ borderColor: '#F2F2F4', color: '#A8A8AD' }}>
-                    Sin actividades asignadas esta semana: {empWithout.map(e => e.name).join(', ')}.
-                  </p>
-                )}
-              </CollapsibleCard>
+            {/* Two columns (el ranking solo lo ve el admin) */}
+            <div className={`mb-4 grid grid-cols-1 gap-4 ${isAdmin ? 'lg:grid-cols-2' : ''}`}>
+              {/* Ranking de empleados por actividades realizadas — solo admin */}
+              {isAdmin && (
+                <CollapsibleCard storageKey="lf_report_open_emp" title="Actividades realizadas por empleado" defaultOpen={false}>
+                  <EmployeeRanking employees={employees} completions={allCompletions} />
+                </CollapsibleCard>
+              )}
 
               {/* Missed */}
               <CollapsibleCard
