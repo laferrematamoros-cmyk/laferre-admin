@@ -10,11 +10,13 @@ export interface SessionData {
   name: string | null;
   /** slug de la empresa fijada; null = ve todas. */
   company: string | null;
+  /** empleado vinculado (para "Mis actividades"); null = ninguno. */
+  employeeId: string | null;
 }
 
 interface SessionCtx extends SessionData { loading: boolean; }
 
-const EMPTY: SessionData = { role: null, name: null, company: null };
+const EMPTY: SessionData = { role: null, name: null, company: null, employeeId: null };
 
 const Ctx = createContext<SessionCtx>({ ...EMPTY, loading: true });
 
@@ -30,7 +32,7 @@ export function SessionProvider({ children, initial }: { children: React.ReactNo
     let alive = true;
     fetch('/api/me')
       .then(r => r.json())
-      .then(d => { if (alive) setState({ role: d.role ?? null, name: d.name ?? null, company: d.company ?? null }); })
+      .then(d => { if (alive) setState({ role: d.role ?? null, name: d.name ?? null, company: d.company ?? null, employeeId: d.employeeId ?? null }); })
       .catch(() => { /* mantiene estado previo */ })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };

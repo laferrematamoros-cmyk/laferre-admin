@@ -4,7 +4,7 @@ import { verifySession } from '@/lib/auth-session';
 const SESSION_COOKIE = 'lf_admin_session';
 
 // Rutas que el rol 'practicante' puede ver. Todo lo demás lo manda al dashboard.
-const INTERN_ALLOWED = ['/dashboard', '/reportes'];
+const INTERN_ALLOWED = ['/dashboard', '/reportes', '/mis-actividades'];
 
 export async function middleware(req: NextRequest) {
   const token = req.cookies.get(SESSION_COOKIE)?.value;

@@ -12,6 +12,8 @@ export interface AdminUser {
   role: Role;
   company_id: string | null;
   companyName: string | null;
+  employee_id: string | null;
+  employeeName: string | null;
 }
 
 export interface UserInput {
@@ -19,7 +21,10 @@ export interface UserInput {
   password?: string;   // en edición: vacío = no cambiar
   role: Role;
   companyId: string | null;
+  employeeId: string | null;
 }
+
+export interface EmployeeOpt { id: string; name: string; company_id: string | null; }
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -38,18 +43,48 @@ export async function listUsers(): Promise<AdminUser[]> {
   await requireAdmin();
   const { data } = await supabaseAdmin()
     .from('admin_users')
-    .select('id, name, role, company_id, companies(name)')
+    .select('id, name, role, company_id, employee_id, companies(name), employees(name)')
     .order('created_at', { ascending: true });
 
   return ((data ?? []) as unknown as Array<{
-    id: string; name: string; role: Role; company_id: string | null; companies: { name: string } | null;
+    id: string; name: string; role: Role; company_id: string | null; employee_id: string | null;
+    companies: { name: string } | null; employees: { name: string } | null;
   }>).map(u => ({
     id: u.id,
     name: u.name,
     role: u.role,
     company_id: u.company_id,
     companyName: u.companies?.name ?? null,
+    employee_id: u.employee_id,
+    employeeName: u.employees?.name ?? null,
   }));
+}
+
+/** Empleados activos (para el selector de "empleado vinculado"). Solo admin. */
+export async function listEmployees(): Promise<EmployeeOpt[]> {
+  await requireAdmin();
+  const { data } = await supabaseAdmin()
+    .from('employees')
+    .select('id, name, company_id')
+    .eq('is_active', true)
+    .order('name');
+  return (data ?? []) as EmployeeOpt[];
+}
+
+/** Crea un empleado nuevo y lo devuelve. Solo admin. */
+export async function createEmployee(name: string, companyId: string | null): Promise<{ ok: true; employee: EmployeeOpt } | { ok: false; error: string }> {
+  await requireAdmin();
+  const n = name.trim();
+  if (!n) return { ok: false, error: 'El nombre del empleado es obligatorio.' };
+  if (!companyId) return { ok: false, error: 'Fija primero la empresa del usuario para crear el empleado.' };
+  const initials = n.replace(/[^A-Za-zÁÉÍÓÚÑ ]/g, '').split(/\s+/).map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase() || 'PR';
+  const { data, error } = await supabaseAdmin()
+    .from('employees')
+    .insert({ name: n, role: 'Practicante', initials, color: '#6E6E73', is_active: true, company_id: companyId })
+    .select('id, name, company_id')
+    .single();
+  if (error || !data) return { ok: false, error: 'No se pudo crear el empleado.' };
+  return { ok: true, employee: data as EmployeeOpt };
 }
 
 /** Crea un usuario. Solo admin. */
@@ -66,12 +101,13 @@ export async function createUser(input: UserInput): Promise<Result> {
     password_hash: hashPassword(password),
     role: input.role,
     company_id: input.companyId,
+    employee_id: input.employeeId,
   });
   if (error) return { ok: false, error: 'No se pudo crear el usuario.' };
   return { ok: true };
 }
 
-/** Edita un usuario (nombre, rol, empresa y opcionalmente contraseña). Solo admin. */
+/** Edita un usuario (nombre, rol, empresa, empleado y opcionalmente contraseña). Solo admin. */
 export async function updateUser(id: string, input: UserInput): Promise<Result> {
   await requireAdmin();
   const name = input.name.trim();
@@ -81,6 +117,7 @@ export async function updateUser(id: string, input: UserInput): Promise<Result> 
     name,
     role: input.role,
     company_id: input.companyId,
+    employee_id: input.employeeId,
   };
 
   const password = (input.password ?? '').trim();

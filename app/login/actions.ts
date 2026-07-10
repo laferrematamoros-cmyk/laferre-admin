@@ -18,6 +18,7 @@ interface UserRow {
   name: string;
   password_hash: string;
   role: 'admin' | 'practicante';
+  employee_id: string | null;
   companies: { slug: string } | null;
 }
 
@@ -28,14 +29,14 @@ export async function login(_prev: string | undefined, formData: FormData): Prom
   // 1) Admin maestro por variable de entorno (red de seguridad).
   const masterPw = process.env.ADMIN_PASSWORD;
   if (masterPw && safeEqual(password, masterPw)) {
-    await createSessionCookie({ role: 'admin', name: null, company: null });
+    await createSessionCookie({ role: 'admin', name: null, company: null, employeeId: null });
     redirect('/dashboard');
   }
 
   // 2) Usuarios de la tabla admin_users (identificados por su contraseña).
   const { data } = await supabaseAdmin()
     .from('admin_users')
-    .select('id, name, password_hash, role, companies(slug)');
+    .select('id, name, password_hash, role, employee_id, companies(slug)');
 
   const users = (data ?? []) as unknown as UserRow[];
   const match = users.find(u => verifyPassword(password, u.password_hash));
@@ -44,6 +45,7 @@ export async function login(_prev: string | undefined, formData: FormData): Prom
       role: match.role,
       name: match.name,
       company: match.companies?.slug ?? null,
+      employeeId: match.employee_id ?? null,
     });
     redirect('/dashboard');
   }

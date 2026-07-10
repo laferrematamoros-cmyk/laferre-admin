@@ -12,6 +12,8 @@ export interface SessionInfo {
   name: string | null;
   /** slug de la empresa a la que queda fijo el usuario; null = ve todas. */
   company: string | null;
+  /** empleado vinculado (para registrar actividades realizadas); null = ninguno. */
+  employeeId: string | null;
 }
 
 function secret(): string {
@@ -23,7 +25,7 @@ function secret(): string {
 /** Crea la cookie de sesión (llamar desde un server action / route handler). */
 export async function createSessionCookie(info: SessionInfo) {
   const token = await signSession(
-    { role: info.role, name: info.name, company: info.company },
+    { role: info.role, name: info.name, company: info.company, eid: info.employeeId },
     secret(),
     TTL_SECONDS,
   );
@@ -54,6 +56,7 @@ export async function getSession(): Promise<SessionInfo | null> {
     role: payload.role === 'admin' ? 'admin' : 'practicante',
     name: typeof payload.name === 'string' ? payload.name : null,
     company: typeof payload.company === 'string' ? payload.company : null,
+    employeeId: typeof payload.eid === 'string' ? payload.eid : null,
   };
 }
 

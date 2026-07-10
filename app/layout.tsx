@@ -24,6 +24,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     role: session?.role ?? null,
     name: session?.name ?? null,
     company: session?.company ?? null,
+    employeeId: session?.employeeId ?? null,
   };
   return (
     <html lang="es" className={`${inter.variable} h-full`}>

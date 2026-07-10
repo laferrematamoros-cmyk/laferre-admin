@@ -19,8 +19,12 @@ const NAV = [
   { href: '/ajustes',     label: 'Ajustes',     icon: IconCog },
 ];
 
-// El practicante solo ve estas secciones en el menú.
-const INTERN_NAV = new Set(['/dashboard', '/reportes']);
+// Menú del practicante: Dashboard, Mis actividades y Reportes.
+const INTERN_NAV_ITEMS = [
+  { href: '/dashboard',       label: 'Dashboard',               icon: IconHome },
+  { href: '/mis-actividades', label: 'Mis actividades',         icon: IconTask },
+  { href: '/reportes',        label: 'Reportes y estadísticas', icon: IconChart },
+];
 
 const SETTINGS_KEY = 'lf_admin_settings';
 
@@ -43,7 +47,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const { companies, current, setCurrent } = useCompany();
   const { role, name: sessionName } = useSession();
   const isIntern = role === 'practicante';
-  const navItems = isIntern ? NAV.filter(n => INTERN_NAV.has(n.href)) : NAV;
+  const navItems = isIntern ? INTERN_NAV_ITEMS : NAV;
   const roleLabel = isIntern ? 'Practicante' : 'Administrador';
   const [admin, setAdmin]     = useState({ name: 'Administrador', initials: 'AD' });
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -204,6 +208,9 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 }
 
 /* ── Icons ── */
+function IconTask({ size = 16 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>;
+}
 function IconHome({ size = 16 }: { size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
 }

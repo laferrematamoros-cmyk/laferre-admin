@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSession } from '@/lib/session-context';
 import { supabase } from '@/lib/supabase';
 import {
-  listUsers, createUser, updateUser, deleteUser,
-  type AdminUser, type Role,
+  listUsers, listEmployees, createEmployee, createUser, updateUser, deleteUser,
+  type AdminUser, type EmployeeOpt, type Role,
 } from '@/app/ajustes/users-actions';
 
 interface CompanyOpt { id: string; name: string; slug: string }
@@ -21,13 +21,14 @@ const ROLE_LABEL: Record<Role, string> = { admin: 'Administrador', practicante: 
 const inputCls = 'w-full rounded-[9px] border px-3 py-2 text-[13px] outline-none focus:border-gray-400';
 const inputStyle = { borderColor: '#E4E4E7' } as const;
 
-interface FormState { name: string; password: string; role: Role; companyId: string }
-const EMPTY_FORM: FormState = { name: '', password: '', role: 'practicante', companyId: '' };
+interface FormState { name: string; password: string; role: Role; companyId: string; employeeId: string }
+const EMPTY_FORM: FormState = { name: '', password: '', role: 'practicante', companyId: '', employeeId: '' };
 
 export default function UsersSection() {
   const { role } = useSession();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [companies, setCompanies] = useState<CompanyOpt[]>([]);
+  const [employees, setEmployees] = useState<EmployeeOpt[]>([]);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<FormState>(EMPTY_FORM);
@@ -41,6 +42,7 @@ export default function UsersSection() {
   useEffect(() => {
     supabase.from('companies').select('id,name,slug').order('name')
       .then(({ data }) => setCompanies((data ?? []) as CompanyOpt[]));
+    listEmployees().then(setEmployees).catch(() => {});
     refresh();
   }, [refresh]);
 
@@ -50,11 +52,23 @@ export default function UsersSection() {
   const companyName = (id: string | null) =>
     id ? (companies.find(c => c.id === id) ? companyLabel(companies.find(c => c.id === id)!) : '—') : 'Todas';
 
+  // Crea un empleado nuevo (pidiendo el nombre) y lo deja seleccionado en el formulario dado.
+  async function handleCreateEmployee(companyId: string, apply: (empId: string) => void) {
+    const name = window.prompt('Nombre del empleado nuevo:');
+    if (!name || !name.trim()) return;
+    setBusy(true); setError(null);
+    const res = await createEmployee(name.trim(), companyId || null);
+    setBusy(false);
+    if (!res.ok) { setError(res.error); return; }
+    setEmployees(prev => [...prev, res.employee].sort((a, b) => a.name.localeCompare(b.name)));
+    apply(res.employee.id);
+  }
+
   async function handleCreate() {
     setBusy(true); setError(null);
     const res = await createUser({
       name: form.name, password: form.password, role: form.role,
-      companyId: form.companyId || null,
+      companyId: form.companyId || null, employeeId: form.employeeId || null,
     });
     setBusy(false);
     if (!res.ok) { setError(res.error); return; }
@@ -64,7 +78,7 @@ export default function UsersSection() {
 
   function startEdit(u: AdminUser) {
     setEditingId(u.id);
-    setEditForm({ name: u.name, password: '', role: u.role, companyId: u.company_id ?? '' });
+    setEditForm({ name: u.name, password: '', role: u.role, companyId: u.company_id ?? '', employeeId: u.employee_id ?? '' });
     setError(null);
   }
 
@@ -73,7 +87,7 @@ export default function UsersSection() {
     setBusy(true); setError(null);
     const res = await updateUser(editingId, {
       name: editForm.name, password: editForm.password, role: editForm.role,
-      companyId: editForm.companyId || null,
+      companyId: editForm.companyId || null, employeeId: editForm.employeeId || null,
     });
     setBusy(false);
     if (!res.ok) { setError(res.error); return; }
@@ -100,17 +114,37 @@ export default function UsersSection() {
 
   const RoleSelect = ({ value, onChange }: { value: Role; onChange: (v: Role) => void }) => (
     <select className={inputCls} style={inputStyle} value={value} onChange={e => onChange(e.target.value as Role)}>
-      <option value="practicante">Practicante (solo Dashboard y Reportes)</option>
+      <option value="practicante">Practicante (solo Dashboard, Reportes y Mis actividades)</option>
       <option value="admin">Administrador (ve todo)</option>
     </select>
   );
+
+  // Selector de empleado vinculado (para que sus actividades realizadas cuenten en el reporte).
+  const EmployeeSelect = ({ companyId, value, onChange }: { companyId: string; value: string; onChange: (v: string) => void }) => {
+    const opts = companyId ? employees.filter(e => e.company_id === companyId) : employees;
+    return (
+      <div>
+        <label className="mb-1 block text-[11px] font-semibold" style={{ color: '#6E6E73' }}>Empleado vinculado (para realizar actividades)</label>
+        <div className="flex gap-2">
+          <select className={inputCls} style={inputStyle} value={value} onChange={e => onChange(e.target.value)}>
+            <option value="">Ninguno</option>
+            {opts.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+          </select>
+          <button type="button" disabled={busy} onClick={() => handleCreateEmployee(companyId, onChange)}
+            className="shrink-0 rounded-[9px] border px-3 py-2 text-[12px] font-semibold whitespace-nowrap" style={{ borderColor: '#E4E4E7', color: '#0F0F10' }}>
+            ＋ Nuevo
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="rounded-xl border p-4 md:p-[22px]" style={{ background: '#fff', borderColor: '#E4E4E7' }}>
       <h2 className="mb-1 text-[13px] font-bold">Usuarios del panel</h2>
       <p className="mb-4 text-[12px]" style={{ color: '#6E6E73' }}>
-        Cada usuario entra con su propia contraseña. El practicante solo ve Dashboard y Reportes.
-        Fija una empresa para limitarlo a ella.
+        Cada usuario entra con su propia contraseña. El practicante ve Dashboard, Reportes y Mis actividades.
+        Fija una empresa para limitarlo a ella, y vincúlalo a un empleado si además realiza actividades.
       </p>
 
       {error && (
@@ -133,7 +167,8 @@ export default function UsersSection() {
                 <input className={inputCls} style={inputStyle} type="password" placeholder="Nueva contraseña (vacío = no cambiar)"
                   value={editForm.password} onChange={e => setEditForm(f => ({ ...f, password: e.target.value }))} />
                 <RoleSelect value={editForm.role} onChange={v => setEditForm(f => ({ ...f, role: v }))} />
-                <CompanySelect value={editForm.companyId} onChange={v => setEditForm(f => ({ ...f, companyId: v }))} />
+                <CompanySelect value={editForm.companyId} onChange={v => setEditForm(f => ({ ...f, companyId: v, employeeId: '' }))} />
+                <EmployeeSelect companyId={editForm.companyId} value={editForm.employeeId} onChange={v => setEditForm(f => ({ ...f, employeeId: v }))} />
                 <div className="flex gap-2">
                   <button disabled={busy} onClick={handleUpdate}
                     className="rounded-[9px] px-[14px] py-[8px] text-[12px] font-semibold text-white" style={{ background: 'var(--accent)', opacity: busy ? 0.6 : 1 }}>
@@ -153,7 +188,7 @@ export default function UsersSection() {
                 <div className="min-w-0 flex-1">
                   <p className="text-[13px] font-semibold truncate">{u.name}</p>
                   <p className="text-[11px]" style={{ color: '#6E6E73' }}>
-                    {ROLE_LABEL[u.role]} · {companyName(u.company_id)}
+                    {ROLE_LABEL[u.role]} · {companyName(u.company_id)}{u.employeeName ? ` · realiza como ${u.employeeName}` : ''}
                   </p>
                 </div>
                 <button onClick={() => startEdit(u)} className="rounded-[8px] border px-3 py-1.5 text-[12px] font-semibold" style={{ borderColor: '#E4E4E7' }}>
@@ -177,7 +212,8 @@ export default function UsersSection() {
           <input className={inputCls} style={inputStyle} type="password" placeholder="Contraseña"
             value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
           <RoleSelect value={form.role} onChange={v => setForm(f => ({ ...f, role: v }))} />
-          <CompanySelect value={form.companyId} onChange={v => setForm(f => ({ ...f, companyId: v }))} />
+          <CompanySelect value={form.companyId} onChange={v => setForm(f => ({ ...f, companyId: v, employeeId: '' }))} />
+          <EmployeeSelect companyId={form.companyId} value={form.employeeId} onChange={v => setForm(f => ({ ...f, employeeId: v }))} />
           <button disabled={busy} onClick={handleCreate}
             className="self-start rounded-[9px] px-[14px] py-[9px] text-[13px] font-semibold text-white" style={{ background: 'var(--accent)', opacity: busy ? 0.6 : 1 }}>
             {busy ? 'Guardando…' : '+ Agregar usuario'}

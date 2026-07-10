@@ -10,5 +10,6 @@ export async function GET() {
     role: session?.role ?? null,
     name: session?.name ?? null,
     company: session?.company ?? null,
+    employeeId: session?.employeeId ?? null,
   });
 }
