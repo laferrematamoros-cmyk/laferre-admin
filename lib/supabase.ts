@@ -37,6 +37,8 @@ export interface Activity {
   limit_time: string;
   recurrence: string;
   days_of_week: number[];
+  /** null = cada semana · 1..5 = esa semana del mes · -1 = última semana */
+  week_of_month: number | null;
   assigned_employee_ids: string[];
   is_urgent: boolean;
   reminder_minutes: number;

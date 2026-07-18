@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { matchesWeekOfMonth } from '@/lib/reports';
 
 // Cron runs every 5 minutes via cron-job.org
 // Notification rules per activity (if not completed):
@@ -18,6 +19,21 @@ function timeToMin(t: string) {
 
 function inWindow(now: number, trigger: number) {
   return now >= trigger && now < trigger + WINDOW;
+}
+
+/** Prende/apaga is_active de las actividades por-semana-del-mes según la fecha.
+ *  Así la app del empleado las muestra solo en su semana (sin actualizar la app). */
+async function syncMonthlyActive(supabase: SupabaseClient, today: Date) {
+  const { data } = await supabase
+    .from('activities')
+    .select('id, week_of_month, is_active')
+    .not('week_of_month', 'is', null);
+  for (const a of (data ?? []) as { id: string; week_of_month: number; is_active: boolean }[]) {
+    const should = matchesWeekOfMonth(a.week_of_month, today);
+    if (a.is_active !== should) {
+      await supabase.from('activities').update({ is_active: should }).eq('id', a.id);
+    }
+  }
 }
 
 async function push(tokens: string[], title: string, body: string) {
@@ -40,12 +56,15 @@ export async function GET() {
   const todayDow = mxNow.getDay();
   const todayStr = `${mxNow.getFullYear()}-${String(mxNow.getMonth() + 1).padStart(2, '0')}-${String(mxNow.getDate()).padStart(2, '0')}`;
 
-  if (nowMin > END_OF_DAY) return NextResponse.json({ ok: true, sent: [], reason: 'fuera de jornada' });
-
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   );
+
+  // Corre siempre (aunque sea fuera de jornada) para captar el cambio de semana.
+  await syncMonthlyActive(supabase, mxNow);
+
+  if (nowMin > END_OF_DAY) return NextResponse.json({ ok: true, sent: [], reason: 'fuera de jornada' });
 
   const [{ data: acts }, { data: comps }, { data: devices }] = await Promise.all([
     supabase.from('activities').select('*').eq('is_active', true),

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import AdminShell from '@/components/AdminShell';
 import { supabase, Activity, Completion, Employee } from '@/lib/supabase';
 import { useCompany } from '@/lib/company-context';
+import { activityRunsOn } from '@/lib/reports';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const ROW_H   = 38;
@@ -136,7 +137,7 @@ export default function CalendarioPage() {
     const dates = weekDays.map(toDateStr);
 
     const [{ data: acts }, { data: comps }, { data: emps }] = await Promise.all([
-      supabase.from('activities').select('*').eq('is_active', true).eq('company_id', company.id),
+      supabase.from('activities').select('*').eq('company_id', company.id).or('is_active.eq.true,week_of_month.not.is.null'),
       supabase.from('completions').select('*').gte('scheduled_date', dates[0]).lte('scheduled_date', dates[6]),
       supabase.from('employees').select('id, name').eq('is_active', true).eq('company_id', company.id),
     ]);
@@ -149,8 +150,7 @@ export default function CalendarioPage() {
 
     weekDays.forEach((date, dayIndex) => {
       const dateStr  = toDateStr(date);
-      const dow      = date.getDay();
-      const dayActs  = activities.filter(a => (a.days_of_week as number[]).includes(dow));
+      const dayActs  = activities.filter(a => activityRunsOn(a, date));
       const dayComps = completions.filter(c => c.scheduled_date === dateStr);
 
       for (const act of dayActs) {

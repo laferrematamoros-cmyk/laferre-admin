@@ -16,6 +16,7 @@ interface Activity {
   start_time: string;
   limit_time: string;
   days_of_week: number[];
+  week_of_month: number | null;
   is_urgent: boolean;
   is_active: boolean;
   assigned_employee_ids: string[];
@@ -117,7 +118,7 @@ export default function ActividadesPage() {
               <div
                 key={act.id}
                 className="rounded-xl border p-5"
-                style={{ background: '#fff', borderColor: act.is_active ? '#E4E4E7' : '#F2F2F4', opacity: act.is_active ? 1 : 0.6 }}
+                style={{ background: '#fff', borderColor: act.is_active ? '#E4E4E7' : '#F2F2F4', opacity: (act.is_active || act.week_of_month != null) ? 1 : 0.6 }}
               >
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:gap-4">
                   {/* Tiempo + info (agrupados) */}
@@ -134,7 +135,8 @@ export default function ActividadesPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-[15px] font-bold" style={{ color: '#0F0F10' }}>{act.title}</p>
                       {act.is_urgent && <Badge color="#E11D2E">🔴 Urgente</Badge>}
-                      {!act.is_active && <Badge color="#A8A8AD">Pausada</Badge>}
+                      {act.week_of_month != null && <Badge color="#7C3AED">📅 {act.week_of_month === -1 ? 'Última sem/mes' : `${act.week_of_month}ª sem/mes`}</Badge>}
+                      {!act.is_active && act.week_of_month == null && <Badge color="#A8A8AD">Pausada</Badge>}
                     </div>
                     {act.description && (
                       <p className="mt-0.5 text-[12px] truncate" style={{ color: '#6E6E73' }}>{act.description}</p>
@@ -172,18 +174,20 @@ export default function ActividadesPage() {
                       Editar
                     </button>
 
-                    {/* Toggle active */}
-                    <button
-                      onClick={() => toggleActive(act)}
-                      className="rounded-lg px-3 py-1.5 text-[12px] font-semibold border transition-colors"
-                      style={{
-                        borderColor: act.is_active ? '#E4E4E7' : 'var(--accent)',
-                        color: act.is_active ? '#6E6E73' : 'var(--accent)',
-                        background: '#fff',
-                      }}
-                    >
-                      {act.is_active ? 'Pausar' : 'Activar'}
-                    </button>
+                    {/* Toggle active (las mensuales las maneja el cron por semana del mes) */}
+                    {act.week_of_month == null && (
+                      <button
+                        onClick={() => toggleActive(act)}
+                        className="rounded-lg px-3 py-1.5 text-[12px] font-semibold border transition-colors"
+                        style={{
+                          borderColor: act.is_active ? '#E4E4E7' : 'var(--accent)',
+                          color: act.is_active ? '#6E6E73' : 'var(--accent)',
+                          background: '#fff',
+                        }}
+                      >
+                        {act.is_active ? 'Pausar' : 'Activar'}
+                      </button>
+                    )}
 
                     {/* Delete */}
                     {confirmId === act.id ? (

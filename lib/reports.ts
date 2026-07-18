@@ -10,6 +10,32 @@ export interface ReportData {
 
 const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
+// ── Semana del mes ──────────────────────────────────────────────────────────────
+/** Semana del mes (1..): la semana que contiene el día 1 es la 1ª (base lunes). */
+export function weekOfMonth(d: Date): number {
+  const first = new Date(d.getFullYear(), d.getMonth(), 1);
+  const offset = (first.getDay() + 6) % 7; // Lun=0 … Dom=6
+  return Math.ceil((d.getDate() + offset) / 7);
+}
+
+/** Cantidad de semanas del mes de `d` (para resolver "última semana"). */
+export function maxWeekOfMonth(d: Date): number {
+  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  return weekOfMonth(last);
+}
+
+/** True si la semana del mes de `d` coincide con `wom` (wom = -1 → última). */
+export function matchesWeekOfMonth(wom: number, d: Date): boolean {
+  return wom === -1 ? weekOfMonth(d) === maxWeekOfMonth(d) : weekOfMonth(d) === wom;
+}
+
+/** ¿La actividad "corre" en la fecha `d`? (día de la semana + semana del mes). */
+export function activityRunsOn(a: { days_of_week: number[]; week_of_month?: number | null }, d: Date): boolean {
+  if (!(a.days_of_week as number[]).includes(d.getDay())) return false;
+  const wom = a.week_of_month ?? null;
+  return wom == null ? true : matchesWeekOfMonth(wom, d);
+}
+
 export function toDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
@@ -85,7 +111,7 @@ export function computeWeek(
     const dayEnd = new Date(dayDate); dayEnd.setHours(23, 59, 59, 999);
 
     const dayActs = activities.filter(a =>
-      (a.days_of_week as number[]).includes(dow) &&
+      activityRunsOn(a, dayDate) &&
       new Date(a.created_at) <= dayEnd,
     );
     const dayComps = completions.filter(c => c.scheduled_date === dateStr);
@@ -150,11 +176,11 @@ export function rangeStats(
   const stop = new Date(end); stop.setHours(12, 0, 0, 0);
   while (d <= stop) {
     const dateStr = toDateStr(d);
-    const dow = d.getDay();
+    const dayDate = new Date(d);
     const dayEnd = new Date(d); dayEnd.setHours(23, 59, 59, 999);
     const doneIds = new Set(completions.filter(c => c.scheduled_date === dateStr).map(c => c.activity_id));
     for (const a of activities) {
-      if ((a.days_of_week as number[]).includes(dow) && new Date(a.created_at) <= dayEnd) {
+      if (activityRunsOn(a, dayDate) && new Date(a.created_at) <= dayEnd) {
         total++;
         if (doneIds.has(a.id)) done++;
       }

@@ -5,7 +5,18 @@ import { useRouter } from 'next/navigation';
 import AdminShell from '@/components/AdminShell';
 import { supabase, Employee } from '@/lib/supabase';
 import { useCompany } from '@/lib/company-context';
+import { matchesWeekOfMonth } from '@/lib/reports';
 import { createActivity } from '../actions';
+
+// Semana del mes: null = cada semana · 1..4 = esa semana · -1 = última
+const WEEK_OF_MONTH: { label: string; value: number | null }[] = [
+  { label: 'Cada semana', value: null },
+  { label: '1ª', value: 1 },
+  { label: '2ª', value: 2 },
+  { label: '3ª', value: 3 },
+  { label: '4ª', value: 4 },
+  { label: 'Última', value: -1 },
+];
 
 const RECURRENCE: { label: string; days: number[] }[] = [
   { label: 'Diaria',        days: [0,1,2,3,4,5,6] },
@@ -59,6 +70,7 @@ export default function NuevaActividadPage() {
   const [selected, setSelected]     = useState<string[]>([]);
   const [recurrence, setRecurrence] = useState(1); // Lun-Vie
   const [customDays, setCustomDays] = useState<number[]>([]);
+  const [weekOfMonth, setWeekOfMonth] = useState<number | null>(null); // cada semana
   const [reminder, setReminder]     = useState(0); // 5 min
   const [evidence, setEvidence]     = useState([true]); // [Foto]
   const [saving, setSaving]         = useState(false);
@@ -97,6 +109,9 @@ export default function NuevaActividadPage() {
         limit_time:            limitRef.current?.value || '10:00',
         recurrence:            RECURRENCE[recurrence].label.toLowerCase().replace(' ', '-'),
         days_of_week:          effectiveDays,
+        week_of_month:         weekOfMonth,
+        // Si es mensual y no estamos en su semana, arranca apagada (el cron la prende en su semana).
+        is_active:             weekOfMonth == null ? true : matchesWeekOfMonth(weekOfMonth, new Date()),
         assigned_employee_ids: selected,
         is_urgent:             false,
         reminder_minutes:      REMINDER_MINUTES[reminder],
@@ -232,6 +247,24 @@ export default function NuevaActividadPage() {
                     <button key={d} onClick={() => toggleCustomDay(d)} className="rounded-lg px-3.5 py-1.5 text-[12px] font-semibold transition-colors" style={{ background: customDays.includes(d) ? 'var(--accent)' : '#F2F2F4', color: customDays.includes(d) ? '#fff' : '#3A3A3D' }}>{name}</button>
                   ))}
                 </div>
+              )}
+            </div>
+
+            {/* Semana del mes */}
+            <div className="mb-[18px]">
+              <FieldLabel>Semana del mes</FieldLabel>
+              <div className="flex flex-wrap gap-1.5">
+                {WEEK_OF_MONTH.map(w => {
+                  const on = weekOfMonth === w.value;
+                  return (
+                    <button key={String(w.value)} onClick={() => setWeekOfMonth(w.value)} className="rounded-lg px-3.5 py-1.5 text-[12px] font-semibold transition-colors" style={{ background: on ? '#0F0F10' : '#F2F2F4', color: on ? '#fff' : '#3A3A3D' }}>{w.label}</button>
+                  );
+                })}
+              </div>
+              {weekOfMonth != null && (
+                <p className="mt-2 text-[11px]" style={{ color: '#6E6E73' }}>
+                  Se activa solo en {weekOfMonth === -1 ? 'la última semana' : `la ${weekOfMonth}ª semana`} de cada mes (según los días elegidos arriba).
+                </p>
               )}
             </div>
 

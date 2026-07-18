@@ -189,7 +189,7 @@ export default function ReportesPage() {
     const firstMon = mondayOf(new Date(firstDate + 'T12:00:00'));
 
     const [{ data: acts }, { data: comps }, { data: emps }] = await Promise.all([
-      supabase.from('activities').select('*').eq('is_active', true).eq('company_id', company.id),
+      supabase.from('activities').select('*').eq('company_id', company.id).or('is_active.eq.true,week_of_month.not.is.null'),
       supabase.from('completions').select('*').gte('scheduled_date', toDateStr(firstMon)),
       supabase.from('employees').select('*').eq('is_active', true).eq('company_id', company.id),
     ]);
