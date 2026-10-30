@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Geist } from 'next/font/google';
 import { CompanyProvider } from '@/lib/company-context';
 import { SessionProvider } from '@/lib/session-context';
 import { getSession } from '@/lib/auth';
 import './globals.css';
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+const geist = Geist({ subsets: ['latin'], variable: '--font-geist' });
 
 export const metadata: Metadata = {
   title: 'Admin · Actividades',
@@ -27,7 +27,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     employeeId: session?.employeeId ?? null,
   };
   return (
-    <html lang="es" className={`${inter.variable} h-full`}>
+    <html lang="es" className={`${geist.variable} h-full`}>
       <body className="h-full">
         <SessionProvider initial={initial}>
           <CompanyProvider>{children}</CompanyProvider>

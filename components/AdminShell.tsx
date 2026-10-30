@@ -75,7 +75,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   }, [accent]);
 
   return (
-    <div className="flex h-screen w-full overflow-hidden" style={{ background: '#FAFAFA' }}>
+    <div className="flex h-screen w-full overflow-hidden" style={{ background: '#F4F4F6' }}>
       {/* Backdrop (solo móvil, cuando el menú está abierto) */}
       {navOpen && (
         <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={() => setNavOpen(false)} />
@@ -83,8 +83,8 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
       {/* Sidebar — cajón deslizable en móvil, fijo en escritorio */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex flex-col gap-1 shrink-0 overflow-y-auto p-[14px] transition-transform duration-300 md:static md:z-auto md:translate-x-0 ${navOpen ? 'translate-x-0' : '-translate-x-full'}`}
-        style={{ width: 224, background: '#0F0F10' }}
+        className={`lf-side fixed inset-y-0 left-0 z-50 flex flex-col gap-1 shrink-0 overflow-y-auto p-[14px] transition-transform duration-300 md:static md:z-auto md:translate-x-0 ${navOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        style={{ width: 220 }}
       >
 
         {/* Company selector */}
@@ -148,13 +148,9 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
               key={href}
               href={href}
               onClick={() => setNavOpen(false)}
-              className="flex items-center gap-[10px] rounded-lg px-[10px] py-[9px] text-[13px] font-medium transition-colors"
-              style={{
-                background: active ? accent : 'transparent',
-                color: active ? '#fff' : 'rgba(255,255,255,.7)',
-                fontWeight: active ? 600 : 500,
-                textDecoration: 'none',
-              }}
+              aria-current={active ? 'page' : undefined}
+              className="lf-nav flex items-center gap-[10px] rounded-xl px-3 py-[10px] text-[13px]"
+              style={{ fontWeight: active ? 600 : 500, textDecoration: 'none' }}
             >
               <Icon size={16} />
               <span>{label}</span>

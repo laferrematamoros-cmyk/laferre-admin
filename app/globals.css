@@ -2,6 +2,12 @@
 
 :root {
   --accent: #E11D2E;
+
+  /* Estados de una actividad. Revisados con el validador de daltonismo (2026-10-30). */
+  --st-ok:   #0A7D55;  --st-ok-soft:   #E4F3EB;  --st-ok-ink:   #06603F;
+  --st-late: #E8930C;  --st-late-soft: #FDF0DB;  --st-late-ink: #8A5100;
+  --st-miss: #E11D2E;  --st-miss-soft: #FDE8EA;  --st-miss-ink: #A50F1C;
+  --st-todo: #DEDEE4;
 }
 
 @theme inline {
@@ -16,7 +22,7 @@
   --color-paper:     #FAFAFA;
   --color-ok:        #0F9D58;
   --color-warn:      #F2A20C;
-  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-sans: var(--font-geist), system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 
@@ -25,6 +31,24 @@
 body {
   background: #FAFAFA;
   color: #0F0F10;
-  font-family: var(--font-sans);
+  font-family: var(--font-geist), system-ui, -apple-system, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Menú lateral: flotante en escritorio; en el celular sigue siendo cajón de pantalla completa. */
+.lf-side { background: linear-gradient(180deg, #18181B 0%, #0B0B0C 100%); }
+@media (min-width: 768px) {
+  .lf-side {
+    margin: 12px 0 12px 12px;
+    border-radius: 22px;
+    box-shadow: 0 24px 48px -26px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 255, 255, .07);
+  }
+}
+.lf-nav { color: rgba(255, 255, 255, .66); transition: background .15s, color .15s; }
+.lf-nav:hover { background: rgba(255, 255, 255, .06); color: #fff; }
+.lf-nav[aria-current="page"] {
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 78%, #FF8A3D) 100%);
+  box-shadow: 0 8px 22px -8px color-mix(in srgb, var(--accent) 80%, transparent), inset 0 1px 0 rgba(255, 255, 255, .2);
+}
+@media (prefers-reduced-motion: reduce) { .lf-nav { transition: none; } }
