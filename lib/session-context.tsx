@@ -32,7 +32,12 @@ export function SessionProvider({ children, initial }: { children: React.ReactNo
     let alive = true;
     fetch('/api/me')
       .then(r => r.json())
-      .then(d => { if (alive) setState({ role: d.role ?? null, name: d.name ?? null, company: d.company ?? null, employeeId: d.employeeId ?? null }); })
+      .then(d => {
+        if (!alive) return;
+        // Usuario eliminado desde Ajustes: el servidor ya borró su cookie → a la entrada.
+        if (!d.role && pathname !== '/login') { window.location.replace('/login'); return; }
+        setState({ role: d.role ?? null, name: d.name ?? null, company: d.company ?? null, employeeId: d.employeeId ?? null });
+      })
       .catch(() => { /* mantiene estado previo */ })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };

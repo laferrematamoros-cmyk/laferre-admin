@@ -1,36 +1,39 @@
 'use server';
 
-import { requireAdmin } from '@/lib/auth';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin as admin } from '@/lib/supabase';
+import { adminAccess, ownsRow, fail, OK, type Result } from '@/lib/admin-access';
+import { allows, pick } from '@/lib/access-rules';
 
-function admin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
-
+export type { Result };
 export type ActivityInput = Record<string, unknown>;
 
-// Devuelven { ok, error } en lugar de lanzar: en producción Next oculta el mensaje
-// de los errores lanzados y la pantalla no podría decir qué pasó.
-export type Result = { ok: true } | { ok: false; error: string };
-const fail = (m: string): Result => ({ ok: false, error: m });
-const OK: Result = { ok: true };
+// Columnas que el formulario maneja (lib/activity-form toRow) + el encendido.
+// company_id sólo al crear y siempre de una empresa permitida; al editar no se mueve.
+const EDITABLE = [
+  'title', 'description', 'start_time', 'limit_time', 'recurrence', 'days_of_week',
+  'week_of_month', 'assigned_employee_ids', 'reminder_minutes', 'evidence_photo', 'is_active',
+] as const;
+const ON_CREATE = [...EDITABLE, 'is_urgent', 'evidence_name', 'evidence_note', 'evidence_signature', 'company_id'] as const;
 
-// Todas piden administrador: el practicante no administra actividades
-// (antes bastaba con tener sesión).
+// Todas piden administrador (el practicante no administra actividades) y sólo
+// tocan actividades de la empresa de la sesión.
 
 export async function createActivity(input: ActivityInput): Promise<Result> {
-  await requireAdmin();
-  const { error } = await admin().from('activities').insert(input);
+  const a = await adminAccess();
+  if (!a.ok) return a;
+  const row = pick(input, ON_CREATE);
+  if (!allows(a.own, row.company_id) || row.company_id === null) return fail('Empresa no permitida');
+  const { error } = await admin().from('activities').insert(row);
   if (error) return fail(error.message);
   return OK;
 }
 
 export async function updateActivity(id: string, input: ActivityInput): Promise<Result> {
-  await requireAdmin();
-  const { error } = await admin().from('activities').update(input).eq('id', id);
+  const a = await adminAccess();
+  if (!a.ok) return a;
+  const o = await ownsRow('activities', id, a.own);
+  if (!o.ok) return o;
+  const { error } = await admin().from('activities').update(pick(input, EDITABLE)).eq('id', id);
   if (error) return fail(error.message);
   return OK;
 }
@@ -38,9 +41,12 @@ export async function updateActivity(id: string, input: ActivityInput): Promise<
 /** Pausar / reanudar. Guarda cada pausa con su inicio y su fin para que Reportes
  *  sólo deje fuera esos días (supabase/005). */
 export async function setActivityActive(id: string, isActive: boolean): Promise<Result> {
-  await requireAdmin();
+  const acc = await adminAccess();
+  if (!acc.ok) return acc;
+  const o = await ownsRow('activities', id, acc.own);
+  if (!o.ok) return o;
   const a = admin();
-  const { error } = await a.from('activities').update({ is_active: isActive }).eq('id', id);
+  const { error } = await a.from('activities').update({ is_active: isActive === true }).eq('id', id);
   if (error) return fail(error.message);
   const now = new Date().toISOString();
   const p = isActive
@@ -53,7 +59,10 @@ export async function setActivityActive(id: string, isActive: boolean): Promise<
 /** Archivar en lugar de borrar: sale de la lista y de la app de empleados,
  *  pero sus registros y su lugar en los reportes pasados se conservan. */
 export async function archiveActivity(id: string): Promise<Result> {
-  await requireAdmin();
+  const acc = await adminAccess();
+  if (!acc.ok) return acc;
+  const o = await ownsRow('activities', id, acc.own);
+  if (!o.ok) return o;
   const { error } = await admin().from('activities')
     .update({ archived_at: new Date().toISOString(), is_active: false }).eq('id', id);
   if (error) return fail(error.message);
@@ -63,7 +72,10 @@ export async function archiveActivity(id: string): Promise<Result> {
 /** Restaurar una archivada. El tiempo que estuvo archivada queda como pausa
  *  para que esos días no cuenten como "sin hacer". */
 export async function restoreActivity(id: string): Promise<Result> {
-  await requireAdmin();
+  const acc = await adminAccess();
+  if (!acc.ok) return acc;
+  const o = await ownsRow('activities', id, acc.own);
+  if (!o.ok) return o;
   const a = admin();
   const { data, error } = await a.from('activities').select('archived_at').eq('id', id).single();
   if (error) return fail(error.message);

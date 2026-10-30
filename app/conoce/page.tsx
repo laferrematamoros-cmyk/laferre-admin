@@ -43,6 +43,7 @@ export default function ConocePage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [saving, setSaving]           = useState(false);
   const [uploadError, setUploadError] = useState(false);
+  const [error, setError]             = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -125,31 +126,33 @@ export default function ConocePage() {
       imageUrl = null;
     }
 
-    if (editItem) {
-      await updateConoceItem(editItem.id, {
-        type, title: title.trim(), body: body.trim() || null, image_url: imageUrl,
-      });
-    } else {
-      await createConoceItem({
-        type, title: title.trim(), body: body.trim() || null,
-        image_url: imageUrl,
-        company_id: current?.id ?? null,
-      });
-    }
+    const r = editItem
+      ? await updateConoceItem(editItem.id, {
+          type, title: title.trim(), body: body.trim() || null, image_url: imageUrl,
+        })
+      : await createConoceItem({
+          type, title: title.trim(), body: body.trim() || null,
+          image_url: imageUrl,
+          company_id: current?.id ?? null,
+        });
 
     setSaving(false);
+    if (!r.ok) { setError(`No se pudo guardar: ${r.error}`); return; }
+    setError(null);
     setShowForm(false);
     load();
   }
 
   async function handleDelete(id: string) {
     if (!confirm('¿Eliminar este elemento?')) return;
-    await deleteConoceItem(id);
+    const r = await deleteConoceItem(id);
+    setError(r.ok ? null : `No se pudo eliminar: ${r.error}`);
     load();
   }
 
   async function handleToggle(item: ConoceItem) {
-    await setConoceActive(item.id, !item.is_active);
+    const r = await setConoceActive(item.id, !item.is_active);
+    setError(r.ok ? null : `No se pudo cambiar: ${r.error}`);
     load();
   }
 
@@ -175,6 +178,12 @@ export default function ConocePage() {
             + Nuevo elemento
           </button>
         </div>
+
+        {error && (
+          <p role="alert" className="text-[13px] font-semibold rounded-xl px-4 py-3" style={{ background: '#FEF2F2', color: '#E11D2E', border: '1px solid #FECACA' }}>
+            {error}
+          </p>
+        )}
 
         {/* Form */}
         {showForm && (

@@ -1,14 +1,10 @@
 'use server';
 
-import { requireAdmin } from '@/lib/auth';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin as admin } from '@/lib/supabase';
+import { adminAccess, ownsRow, fail, OK, type Result } from '@/lib/admin-access';
+import { allows, pick } from '@/lib/access-rules';
 
-function admin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
+export type { Result };
 
 export interface EmployeeInput {
   name: string;
@@ -18,41 +14,48 @@ export interface EmployeeInput {
   initials: string;
 }
 
-// Devuelven { ok, error } en lugar de lanzar: en producción Next oculta el mensaje
-// de los errores lanzados y la pantalla no podría decir qué pasó.
-export type Result = { ok: true } | { ok: false; error: string };
+// Lo único que la pantalla puede escribir; la empresa sale de la sesión.
+const FIELDS = ['name', 'role', 'color', 'emp_type', 'initials'] as const;
 
 export async function createEmployee(input: EmployeeInput, companyId: string): Promise<Result> {
-  await requireAdmin();
-  const { error } = await admin().from('employees').insert({ ...input, is_active: true, company_id: companyId });
-  return error ? { ok: false, error: error.message } : { ok: true };
+  const a = await adminAccess();
+  if (!a.ok) return a;
+  if (!allows(a.own, companyId) || companyId === null) return fail('Empresa no permitida');
+  const { error } = await admin().from('employees').insert({ ...pick(input, FIELDS), is_active: true, company_id: companyId });
+  return error ? fail(error.message) : OK;
 }
 
 export async function updateEmployee(id: string, input: EmployeeInput): Promise<Result> {
-  await requireAdmin();
-  const { error } = await admin().from('employees').update(input).eq('id', id);
-  return error ? { ok: false, error: error.message } : { ok: true };
+  const a = await adminAccess();
+  if (!a.ok) return a;
+  const o = await ownsRow('employees', id, a.own);
+  if (!o.ok) return o;
+  const { error } = await admin().from('employees').update(pick(input, FIELDS)).eq('id', id);
+  return error ? fail(error.message) : OK;
 }
 
 export async function setEmployeeActive(id: string, isActive: boolean): Promise<Result> {
-  await requireAdmin();
-  const { error } = await admin().from('employees').update({ is_active: isActive }).eq('id', id);
-  return error ? { ok: false, error: error.message } : { ok: true };
+  const a = await adminAccess();
+  if (!a.ok) return a;
+  const o = await ownsRow('employees', id, a.own);
+  if (!o.ok) return o;
+  const { error } = await admin().from('employees').update({ is_active: isActive === true }).eq('id', id);
+  return error ? fail(error.message) : OK;
 }
 
 /** Sólo se elimina a quien no tiene registros; con historial se da de baja
  *  (la base tampoco deja borrarlo: completions.employee_id apunta a él). */
 export async function deleteEmployee(id: string): Promise<Result> {
-  await requireAdmin();
+  const acc = await adminAccess();
+  if (!acc.ok) return acc;
+  const o = await ownsRow('employees', id, acc.own);
+  if (!o.ok) return o;
   const a = admin();
   const { count, error: ce } = await a.from('completions').select('id', { count: 'exact', head: true }).eq('employee_id', id);
-  if (ce) return { ok: false, error: ce.message };
+  if (ce) return fail(ce.message);
   if ((count ?? 0) > 0) {
-    return {
-      ok: false,
-      error: `Tiene ${count} actividad${count === 1 ? '' : 'es'} registrada${count === 1 ? '' : 's'}. Para no perder su historial, dale de baja en lugar de eliminarlo.`,
-    };
+    return fail(`Tiene ${count} actividad${count === 1 ? '' : 'es'} registrada${count === 1 ? '' : 's'}. Para no perder su historial, dale de baja en lugar de eliminarlo.`);
   }
   const { error } = await a.from('employees').delete().eq('id', id);
-  return error ? { ok: false, error: error.message } : { ok: true };
+  return error ? fail(error.message) : OK;
 }

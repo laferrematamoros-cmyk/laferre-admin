@@ -29,7 +29,7 @@ export async function login(_prev: string | undefined, formData: FormData): Prom
   // 1) Admin maestro por variable de entorno (red de seguridad).
   const masterPw = process.env.ADMIN_PASSWORD;
   if (masterPw && safeEqual(password, masterPw)) {
-    await createSessionCookie({ role: 'admin', name: null, company: null, employeeId: null });
+    await createSessionCookie({ role: 'admin', name: null, company: null, employeeId: null, userId: null });
     redirect('/dashboard');
   }
 
@@ -46,6 +46,7 @@ export async function login(_prev: string | undefined, formData: FormData): Prom
       name: match.name,
       company: match.companies?.slug ?? null,
       employeeId: match.employee_id ?? null,
+      userId: match.id,
     });
     redirect('/dashboard');
   }
