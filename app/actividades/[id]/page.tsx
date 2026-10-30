@@ -40,7 +40,8 @@ export default function EditActividadPage() {
       : v.weekOfMonth != null ? { is_active: matchesWeekOfMonth(v.weekOfMonth, new Date()) }
       : activity.week_of_month != null ? { is_active: true }
       : {};
-    await updateActivity(activity.id, { ...toRow(v), ...active });
+    const r = await updateActivity(activity.id, { ...toRow(v), ...active });
+    if (!r.ok) throw new Error(r.error);
     router.push('/actividades');
   }
 

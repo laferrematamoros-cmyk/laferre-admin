@@ -6,7 +6,7 @@ import AdminShell from '@/components/AdminShell';
 import { supabase } from '@/lib/supabase';
 import { useCompany } from '@/lib/company-context';
 import { loadActivities, type LiveActivity } from '@/lib/load-activities';
-import { archiveActivity, restoreActivity, setActivityActive } from './actions';
+import { archiveActivity, restoreActivity, setActivityActive, type Result } from './actions';
 import { IconBell, IconCamera, IconChevronDown, IconPlus, IconUsers } from '@/components/panel/icons';
 import s from '@/components/panel/panel.module.css';
 import a from '@/components/actividades/act.module.css';
@@ -66,11 +66,12 @@ export default function ActividadesPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  async function run(id: string, fn: () => Promise<void>) {
+  async function run(id: string, fn: () => Promise<Result>) {
     setBusy(id);
     setError(null);
     try {
-      await fn();
+      const r = await fn();
+      if (!r.ok) setError(friendly(r.error));
     } catch (e) {
       setError(friendly(e));
     }

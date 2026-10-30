@@ -24,7 +24,7 @@ export default function NuevaActividadPage() {
 
   async function save(v: ActivityValues) {
     if (!company) throw new Error('Escoge una empresa en el menú.');
-    await createActivity({
+    const r = await createActivity({
       ...toRow(v),
       // Si es mensual y no estamos en su semana, arranca apagada (el cron la prende en su semana).
       is_active: v.weekOfMonth == null ? true : matchesWeekOfMonth(v.weekOfMonth, new Date()),
@@ -34,6 +34,7 @@ export default function NuevaActividadPage() {
       evidence_signature: false,
       company_id: company.id,
     });
+    if (!r.ok) throw new Error(r.error);
     // Aviso a los teléfonos de la empresa (si falla, la actividad ya quedó creada).
     fetch('/api/push', {
       method: 'POST',
