@@ -158,10 +158,10 @@ export default function ConocePage() {
 
   return (
     <AdminShell>
-      <div className="flex flex-1 flex-col overflow-y-auto p-8 gap-8">
+      <div className="flex flex-1 flex-col overflow-y-auto p-4 gap-6 md:p-8 md:gap-8">
         {/* Header */}
-        <div className="flex items-start justify-between">
-          <div>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1 basis-56">
             <h1 className="text-[22px] font-extrabold" style={{ color: '#0F0F10', letterSpacing: -0.4 }}>Conoce</h1>
             <p className="text-[13px] mt-1" style={{ color: '#6E6E73' }}>
               Gestiona las instrucciones de trabajo y ayuda visual para tus empleados.
@@ -169,7 +169,7 @@ export default function ConocePage() {
           </div>
           <button
             onClick={openNew}
-            className="rounded-xl px-5 py-2.5 text-[13px] font-bold text-white"
+            className="shrink-0 rounded-xl px-5 py-2.5 text-[13px] font-bold text-white"
             style={{ background: '#E11D2E' }}
           >
             + Nuevo elemento
@@ -178,13 +178,13 @@ export default function ConocePage() {
 
         {/* Form */}
         {showForm && (
-          <div className="rounded-2xl p-6 flex flex-col gap-4" style={{ background: '#fff', border: '1px solid #E5E5EA' }}>
+          <div className="rounded-2xl p-4 md:p-6 flex flex-col gap-4" style={{ background: '#fff', border: '1px solid #E5E5EA' }}>
             <p className="text-[13px] font-bold uppercase tracking-wider" style={{ color: '#6E6E73' }}>
               {editItem ? 'Editar elemento' : 'Nuevo elemento'}
             </p>
 
             {/* Type selector */}
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {(['instruccion', 'ayuda_visual'] as ItemType[]).map(t => (
                 <button
                   key={t}
@@ -206,7 +206,7 @@ export default function ConocePage() {
               placeholder="Título…"
               value={title}
               onChange={e => setTitle(e.target.value)}
-              className="rounded-xl px-4 py-3 text-[14px] outline-none"
+              className="rounded-xl px-4 py-3 text-base md:text-[14px] outline-none"
               style={{ border: '1.5px solid #E5E5EA', color: '#0F0F10', background: '#FAFAFA' }}
             />
             <textarea
@@ -214,7 +214,7 @@ export default function ConocePage() {
               value={body}
               onChange={e => setBody(e.target.value)}
               rows={4}
-              className="rounded-xl px-4 py-3 text-[14px] outline-none resize-none"
+              className="rounded-xl px-4 py-3 text-base md:text-[14px] outline-none resize-none"
               style={{ border: '1.5px solid #E5E5EA', color: '#0F0F10', background: '#FAFAFA' }}
             />
 
@@ -232,7 +232,8 @@ export default function ConocePage() {
                   />
                   <button
                     onClick={removeImage}
-                    className="absolute top-2 right-2 rounded-full w-7 h-7 flex items-center justify-center text-[13px] font-bold"
+                    aria-label="Quitar imagen"
+                    className="absolute top-2 right-2 rounded-full w-9 h-9 flex items-center justify-center text-[13px] font-bold"
                     style={{ background: 'rgba(0,0,0,0.55)', color: '#fff' }}
                   >
                     ✕
@@ -267,7 +268,7 @@ export default function ConocePage() {
               </p>
             )}
 
-            <div className="flex gap-3 justify-end">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
               <button
                 onClick={() => setShowForm(false)}
                 className="rounded-xl px-5 py-2.5 text-[13px] font-semibold"
@@ -319,31 +320,37 @@ function ItemSection({ title, items, type, onEdit, onDelete, onToggle }: {
             className="rounded-2xl p-5 flex flex-col gap-2"
             style={{ background: item.is_active ? c.bg : '#F5F5F7', border: `1.5px solid ${item.is_active ? c.border : '#E5E5EA'}`, opacity: item.is_active ? 1 : 0.6 }}
           >
-            <div className="flex items-start justify-between gap-4">
+            {/* En celular: título arriba y botones abajo. En pantallas anchas: lado a lado. */}
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
               <div className="flex-1 min-w-0">
-                <p className="text-[15px] font-bold" style={{ color: '#0F0F10' }}>{item.title}</p>
-                {item.body && <p className="text-[13px] mt-1" style={{ color: '#6E6E73' }}>{item.body}</p>}
+                <p className="text-[15px] font-bold break-words" style={{ color: '#0F0F10' }}>{item.title}</p>
+                {/* En celular la etiqueta va bajo el título para que los tres botones quepan en una fila. */}
+                <span className="mt-2 inline-flex items-center rounded-full px-3 py-1 text-[11px] font-bold md:hidden" style={{ background: item.is_active ? c.bg : '#E5E5EA', color: item.is_active ? c.text : '#6E6E73', border: `1px solid ${item.is_active ? c.border : '#E5E5EA'}` }}>
+                  {item.is_active ? 'Visible' : 'Oculto'}
+                </span>
+                {item.body && <p className="text-[13px] mt-1 break-words" style={{ color: '#6E6E73' }}>{item.body}</p>}
                 {item.image_url && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={item.image_url}
                     alt={item.title}
                     className="rounded-xl mt-3 object-contain"
-                    style={{ maxHeight: 160, maxWidth: 260, border: '1px solid rgba(0,0,0,.06)' }}
+                    style={{ maxHeight: 160, maxWidth: 'min(260px, 100%)', border: '1px solid rgba(0,0,0,.06)' }}
                   />
                 )}
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="rounded-full px-3 py-1 text-[11px] font-bold" style={{ background: item.is_active ? c.bg : '#E5E5EA', color: item.is_active ? c.text : '#6E6E73', border: `1px solid ${item.is_active ? c.border : '#E5E5EA'}` }}>
+              <div className="grid grid-cols-3 gap-2 md:flex md:items-center md:shrink-0">
+                <span className="hidden items-center rounded-full px-3 py-1 text-[11px] font-bold md:inline-flex" style={{ background: item.is_active ? c.bg : '#E5E5EA', color: item.is_active ? c.text : '#6E6E73', border: `1px solid ${item.is_active ? c.border : '#E5E5EA'}` }}>
                   {item.is_active ? 'Visible' : 'Oculto'}
                 </span>
-                <button onClick={() => onToggle(item)} className="rounded-full px-3 py-1 text-[11px] font-bold" style={{ background: '#fff', border: '1px solid #E5E5EA', color: '#6E6E73' }}>
+                {/* Botones de 40 px de alto en celular (tamaño cómodo para el dedo); compactos en escritorio. */}
+                <button onClick={() => onToggle(item)} className="inline-flex min-h-10 items-center justify-center rounded-full px-2 text-[12px] font-bold md:min-h-0 md:px-3 md:py-1 md:text-[11px]" style={{ background: '#fff', border: '1px solid #E5E5EA', color: '#6E6E73' }}>
                   {item.is_active ? 'Ocultar' : 'Mostrar'}
                 </button>
-                <button onClick={() => onEdit(item)} className="rounded-full px-3 py-1 text-[11px] font-bold" style={{ background: '#fff', border: '1px solid #E5E5EA', color: '#6E6E73' }}>
+                <button onClick={() => onEdit(item)} className="inline-flex min-h-10 items-center justify-center rounded-full px-2 text-[12px] font-bold md:min-h-0 md:px-3 md:py-1 md:text-[11px]" style={{ background: '#fff', border: '1px solid #E5E5EA', color: '#6E6E73' }}>
                   Editar
                 </button>
-                <button onClick={() => onDelete(item.id)} className="rounded-full px-3 py-1 text-[11px] font-bold" style={{ background: '#fff', border: '1px solid #FECACA', color: '#E11D2E' }}>
+                <button onClick={() => onDelete(item.id)} className="inline-flex min-h-10 items-center justify-center rounded-full px-2 text-[12px] font-bold md:min-h-0 md:px-3 md:py-1 md:text-[11px]" style={{ background: '#fff', border: '1px solid #FECACA', color: '#E11D2E' }}>
                   Eliminar
                 </button>
               </div>
