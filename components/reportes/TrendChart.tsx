@@ -92,7 +92,7 @@ export default function TrendChart({ points, current, onSelect }: {
               </text>
             ))}
             {points.map((p, i) => (
-              <rect key={`h${i}`} x={x(i) - step / 2} y={pt} width={step} height={plotH} className={s.hit}
+              <rect key={`h${i}`} x={x(i) - step / 2} y={pt} width={step} height={plotH} className={s.hit} role="button" aria-label={`Abrir la semana del ${p.label}`}
                 onClick={() => onSelect(p.start)}
                 onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(p.start); } }}
                 {...tip(

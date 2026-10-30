@@ -194,13 +194,18 @@ export function buildWeekReport(
           if (comp.was_late) p.late++;
         }
       } else if (st === 'miss') {
-        if (assigned.length === 0) generalMiss++;
-        for (const id of assigned) if (emp.has(id)) bump(id).miss++;
+        // Asignada sólo a empleados dados de baja: nadie activo responde por ella,
+        // así que cuenta con las generales para que los totales cuadren.
+        const owners = assigned.filter(id => emp.has(id));
+        if (owners.length === 0) generalMiss++;
+        for (const id of owners) bump(id).miss++;
         missed.push({
           title: a.title,
           date: day,
           limit: a.limit_time.slice(0, 5),
-          assignee: assigned.length ? assigned.map(id => emp.get(id)?.name ?? '?').join(', ') : 'General',
+          assignee: assigned.length === 0 ? 'General'
+            : owners.length === 0 ? 'Sin responsable activo'
+            : owners.map(id => emp.get(id)!.name).join(', '),
           general: assigned.length === 0,
         });
       }

@@ -98,6 +98,9 @@ export default function ReportesPage() {
   const insights = useMemo(() => (report ? buildInsights(report, prevPct, isAdmin) : []), [report, prevPct, isAdmin]);
   const isCurrent = !!data && data.weekStart.getTime() === mondayOf(data.loadedAt).getTime();
   const weekKey = data ? toDateStr(data.weekStart) : '';
+  // Mientras carga otra semana de la misma empresa, la anterior se queda atenuada.
+  // Si cambió la empresa o hubo error, no se enseñan números que no corresponden.
+  const shown = report && !error && data!.key.startsWith(`${company?.id ?? ''}|`) ? report : null;
 
   async function handleDownload() {
     if (!report) return;
@@ -117,7 +120,7 @@ export default function ReportesPage() {
             <div>
               <div className={s.eyebrow}><i />{company?.name ?? 'Actividades'} · Actividades</div>
               <h1 className={s.title}>Reportes</h1>
-              <div className={s.sub}>Semana del {weekLabel(weekStart)}</div>
+              <div className={s.sub} suppressHydrationWarning>Semana del {weekLabel(weekStart)}</div>
             </div>
             <div className={s.tools}>
               <WeekPicker weekStart={weekStart} onChange={setWeekStart} />
@@ -127,26 +130,26 @@ export default function ReportesPage() {
             </div>
           </header>
 
-          <div className={s.content} style={{ opacity: loading && report ? 0.55 : 1 }} aria-busy={loading}>
+          <div className={s.content} style={{ opacity: loading && shown ? 0.55 : 1 }} aria-busy={loading}>
             {error && (
               <div className={s.error}>
                 No se pudo cargar el reporte ({error}).
                 <button type="button" className={`${s.btn} ${s.btnSoft}`} onClick={() => setAttempt(n => n + 1)}>Reintentar</button>
               </div>
             )}
-            {!report ? (
+            {!shown ? (
               !error && <p className={s.loading}>Cargando reporte…</p>
             ) : (
               <>
                 <div className={s.bento}>
-                  <SummaryCard key={weekKey} report={report} prevPct={prevPct} isCurrent={isCurrent} />
+                  <SummaryCard key={weekKey} report={shown} prevPct={prevPct} isCurrent={isCurrent} />
                   <InsightsCard insights={insights} />
                 </div>
-                <PeopleCard key={`p${weekKey}`} people={report.people} generalMiss={report.generalMiss} showCounts={isAdmin} />
-                <MissedCard missed={report.missed} hasDue={report.due > 0} today={toDateStr(data!.loadedAt)} />
+                <PeopleCard key={`p${weekKey}`} people={shown.people} generalMiss={shown.generalMiss} showCounts={isAdmin} />
+                <MissedCard missed={shown.missed} hasDue={shown.due > 0} today={toDateStr(data!.loadedAt)} />
                 <div className={s.divider}>Más detalle</div>
-                <FoldCard storageKey="lf_rep_open_daily" icon={<IconBars />} title="Día por día" peek={dailyPeek(report)}>
-                  <DailyChart key={weekKey} days={report.days} />
+                <FoldCard storageKey="lf_rep_open_daily" icon={<IconBars />} title="Día por día" peek={dailyPeek(shown)}>
+                  <DailyChart key={weekKey} days={shown.days} />
                 </FoldCard>
                 <FoldCard storageKey="lf_rep_open_trend" icon={<IconTrend />} title="Semanas pasadas" peek={trendPeek(trend)}>
                   <TrendChart points={trend} current={isCurrent} onSelect={setWeekStart} />

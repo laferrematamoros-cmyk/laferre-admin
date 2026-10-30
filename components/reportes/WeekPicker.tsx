@@ -13,7 +13,7 @@ export default function WeekPicker({ weekStart, onChange }: { weekStart: Date; o
         <button type="button" className={s.wbtn} aria-label="Semana anterior" onClick={() => onChange(addWeeks(weekStart, -1))}>
           <IconLeft />
         </button>
-        <span className={s.wlabel}>{weekShortLabel(weekStart)}</span>
+        <span className={s.wlabel} suppressHydrationWarning>{weekShortLabel(weekStart)}</span>
         <button type="button" className={s.wbtn} aria-label="Semana siguiente" disabled={atCurrent} onClick={() => onChange(addWeeks(weekStart, 1))}>
           <IconRight />
         </button>

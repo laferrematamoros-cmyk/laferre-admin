@@ -128,6 +128,13 @@ describe('buildWeekReport (casos)', () => {
     expect(byName.BETO.done).toBe(1);
     expect(byName.ANA.done + byName.ANA.miss).toBe(0);
   });
+  it('asignada a alguien dado de baja: cuenta con las generales y lo dice', () => {
+    const acts = [act({ id: 'a1', days_of_week: [1], assigned_employee_ids: ['baja'] })];
+    const r = buildWeekReport(MON, acts, [], EMP, pastNow);
+    expect(r.counts.miss).toBe(1);
+    expect(r.generalMiss).toBe(1);
+    expect(r.missed[0]).toMatchObject({ assignee: 'Sin responsable activo', general: false });
+  });
   it('quien no tuvo nada en la semana va al final', () => {
     const acts = [act({ id: 'a1', days_of_week: [1], assigned_employee_ids: ['e3'] })];
     const r = buildWeekReport(MON, acts, [comp('a1', '2026-10-26', 'e3')], EMP, pastNow);

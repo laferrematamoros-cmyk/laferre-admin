@@ -85,7 +85,7 @@
 .ringWrap svg { display: block; }
 .ringTrack { fill: none; stroke: var(--track); stroke-width: 13; }
 .ringArc { fill: none; stroke-width: 13; stroke-linecap: round; animation: ringIn 1.2s cubic-bezier(.2, .7, .2, 1) both; }
-.arcOk { stroke: url(#rp-arc-ok); filter: drop-shadow(0 6px 10px rgba(10, 125, 85, .28)); }
+.arcOk { stroke: url(#rp-arc-ok); }
 .arcLate { stroke: var(--late); }
 .arcMiss { stroke: var(--miss); }
 .ringVal { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }

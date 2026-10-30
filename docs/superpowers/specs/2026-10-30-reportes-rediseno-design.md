@@ -76,7 +76,7 @@ Son tres frases que la pantalla arma con los números de la semana, en este orde
 2. **Tarde:** se usa *r* = tarde ÷ hechas.
    - Si *r* ≥ 0.5: "La mitad o más se hizo tarde".
    - Si no: "1 de cada N se hizo tarde", con N = redondeo de hechas ÷ tarde.
-   - Debajo: "13 de 36". Si un solo día tiene el 40% o más de lo tarde, se agrega ", sobre todo el lunes".
+   - Debajo: "13 de 36". Si hubo 3 o más tarde y un solo día junta el 40% o más, se agrega ", sobre todo el lunes" (con 1 o 2 no se dice: "1 de 36, sobre todo el lunes" no tiene sentido).
    - Si no hubo nada tarde: "Todo lo hecho fue a tiempo", en verde.
    - Si no se ha hecho nada, se omite.
 3. **Comparación:**

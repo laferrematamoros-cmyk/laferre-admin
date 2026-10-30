@@ -8,7 +8,7 @@ const FILL: Record<Status, string> = { ok: s.fOk, late: s.fLate, miss: s.fMiss, 
 const SW: Record<Status, string> = { ok: s.ok, late: s.late, miss: s.miss, todo: s.todo };
 
 function niceMax(v: number): number {
-  for (const n of [4, 5, 8, 10, 12, 15, 20, 25, 30, 40, 50]) if (v <= n) return n;
+  for (const n of [4, 6, 8, 10, 12, 16, 20, 24, 30, 40, 50]) if (v <= n) return n;
   return Math.ceil(v / 50) * 50;
 }
 
