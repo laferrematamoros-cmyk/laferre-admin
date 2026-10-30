@@ -1,6 +1,6 @@
 'use server';
 
-import { requireSession } from '@/lib/auth';
+import { requireAdmin } from '@/lib/auth';
 import { createClient } from '@supabase/supabase-js';
 
 function admin() {
@@ -18,28 +18,41 @@ export interface EmployeeInput {
   initials: string;
 }
 
-export async function createEmployee(input: EmployeeInput, companyId: string) {
-  await requireSession();
-  const { error } = await admin().from('employees').insert({
-    ...input, is_active: true, company_id: companyId,
-  });
-  if (error) throw new Error(error.message);
+// Devuelven { ok, error } en lugar de lanzar: en producción Next oculta el mensaje
+// de los errores lanzados y la pantalla no podría decir qué pasó.
+export type Result = { ok: true } | { ok: false; error: string };
+
+export async function createEmployee(input: EmployeeInput, companyId: string): Promise<Result> {
+  await requireAdmin();
+  const { error } = await admin().from('employees').insert({ ...input, is_active: true, company_id: companyId });
+  return error ? { ok: false, error: error.message } : { ok: true };
 }
 
-export async function updateEmployee(id: string, input: EmployeeInput) {
-  await requireSession();
+export async function updateEmployee(id: string, input: EmployeeInput): Promise<Result> {
+  await requireAdmin();
   const { error } = await admin().from('employees').update(input).eq('id', id);
-  if (error) throw new Error(error.message);
+  return error ? { ok: false, error: error.message } : { ok: true };
 }
 
-export async function setEmployeeActive(id: string, isActive: boolean) {
-  await requireSession();
+export async function setEmployeeActive(id: string, isActive: boolean): Promise<Result> {
+  await requireAdmin();
   const { error } = await admin().from('employees').update({ is_active: isActive }).eq('id', id);
-  if (error) throw new Error(error.message);
+  return error ? { ok: false, error: error.message } : { ok: true };
 }
 
-export async function deleteEmployee(id: string) {
-  await requireSession();
-  const { error } = await admin().from('employees').delete().eq('id', id);
-  if (error) throw new Error(error.message);
+/** Sólo se elimina a quien no tiene registros; con historial se da de baja
+ *  (la base tampoco deja borrarlo: completions.employee_id apunta a él). */
+export async function deleteEmployee(id: string): Promise<Result> {
+  await requireAdmin();
+  const a = admin();
+  const { count, error: ce } = await a.from('completions').select('id', { count: 'exact', head: true }).eq('employee_id', id);
+  if (ce) return { ok: false, error: ce.message };
+  if ((count ?? 0) > 0) {
+    return {
+      ok: false,
+      error: `Tiene ${count} actividad${count === 1 ? '' : 'es'} registrada${count === 1 ? '' : 's'}. Para no perder su historial, dale de baja en lugar de eliminarlo.`,
+    };
+  }
+  const { error } = await a.from('employees').delete().eq('id', id);
+  return error ? { ok: false, error: error.message } : { ok: true };
 }

@@ -1,290 +1,287 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import AdminShell from '@/components/AdminShell';
-import { supabase, Employee } from '@/lib/supabase';
+import { supabase, type Employee } from '@/lib/supabase';
 import { useCompany } from '@/lib/company-context';
-import { createEmployee, updateEmployee, setEmployeeActive, deleteEmployee } from './actions';
-
-const COLORS = ['#E11D2E', '#0F9D58', '#1A73E8', '#F2A20C', '#9B4DCA', '#00ACC1', '#FF7043', '#5E35B1'];
-
-function initials(name: string) {
-  return name.split(' ').slice(0, 2).map(s => s[0]).join('').toUpperCase();
-}
-
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,.45)' }}>
-      <div className="w-full max-w-md rounded-2xl p-6 shadow-xl" style={{ background: '#fff' }}>
-        <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-[17px] font-bold">{title}</h2>
-          <button onClick={onClose} className="text-[20px] leading-none" style={{ color: '#A8A8AD' }}>×</button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
+import { loadActivities, type LiveActivity } from '@/lib/load-activities';
+import { IconBell, IconList, IconPlus } from '@/components/panel/icons';
+import s from '@/components/panel/panel.module.css';
+import q from '@/components/equipo/eq.module.css';
+import { createEmployee, deleteEmployee, setEmployeeActive, updateEmployee, type Result } from './actions';
 
 type EmpType = 'empleado' | 'practicante';
+type Emp = Employee & { emp_type?: EmpType | null; push_token?: string | null };
 interface FormState { name: string; role: string; color: string; empType: EmpType; }
+
+const COLORS = ['#E11D2E', '#0F9D58', '#1A73E8', '#F2A20C', '#9B4DCA', '#00ACC1', '#FF7043', '#5E35B1'];
 const EMPTY: FormState = { name: '', role: '', color: COLORS[0], empType: 'empleado' };
+
+function initials(name: string) {
+  return name.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
+}
+
+/** Actividades (no archivadas) a su nombre, y cuáles sólo tienen a esta persona activa. */
+function assignedTo(id: string, acts: LiveActivity[], activeIds: Set<string>) {
+  const mine = acts.filter(a => !a.archived_at && a.assigned_employee_ids.includes(id));
+  const onlyMe = mine.filter(a => a.assigned_employee_ids.every(x => x === id || !activeIds.has(x)));
+  return { mine, onlyMe };
+}
 
 export default function EquipoPage() {
   const { current: company } = useCompany();
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [saving, setSaving]       = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [editEmp, setEditEmp]     = useState<Employee | null>(null);
-  const [form, setForm]           = useState<FormState>(EMPTY);
-  const [error, setError]         = useState('');
+  const [emps, setEmps] = useState<Emp[] | null>(null);
+  const [acts, setActs] = useState<LiveActivity[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<{ emp: Emp | null } | null>(null);
 
   const load = useCallback(async () => {
     if (!company) return;
-    setLoading(true);
-    const { data } = await supabase.from('employees').select('*').eq('company_id', company.id).order('name');
-    setEmployees((data ?? []) as Employee[]);
-    setLoading(false);
+    try {
+      const [e, a] = await Promise.all([
+        supabase.from('employees').select('*').eq('company_id', company.id).order('name'),
+        loadActivities(supabase, company.id),
+      ]);
+      if (e.error) throw new Error(e.error.message);
+      setEmps((e.data ?? []) as Emp[]);
+      setActs(a);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo cargar el equipo.');
+    }
   }, [company]);
 
   useEffect(() => { load(); }, [load]);
 
-  function openNew() {
-    setEditEmp(null);
-    setForm(EMPTY);
-    setError('');
-    setShowModal(true);
+  async function run(id: string, fn: () => Promise<Result>) {
+    setBusy(id);
+    setError(null);
+    const r = await fn();
+    if (!r.ok) setError(r.error);
+    await load();
+    setBusy(null);
+    setConfirmId(null);
   }
 
-  function openEdit(emp: Employee) {
-    setEditEmp(emp);
-    setForm({ name: emp.name, role: emp.role, color: emp.color, empType: (emp as any).emp_type ?? 'empleado' });
-    setError('');
-    setShowModal(true);
-  }
-
-  async function handleSave() {
-    if (!form.name.trim() || !form.role.trim()) { setError('Nombre y puesto son requeridos.'); return; }
-    setSaving(true);
-    setError('');
-    const payload = {
-      name: form.name.trim(),
-      role: form.role.trim(),
-      color: form.color,
-      emp_type: form.empType,
-      initials: initials(form.name.trim()),
-    };
-    try {
-      if (editEmp) await updateEmployee(editEmp.id, payload);
-      else await createEmployee(payload, company!.id);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error al guardar'); setSaving(false); return;
-    }
-    setSaving(false);
-    setShowModal(false);
-    load();
-  }
-
-  async function toggleActive(emp: Employee) {
-    await setEmployeeActive(emp.id, !emp.is_active);
-    load();
-  }
-
-  async function handleDelete(emp: Employee) {
-    if (!confirm(`¿Eliminar a ${emp.name}? Esta acción no se puede deshacer.`)) return;
-    await deleteEmployee(emp.id);
-    load();
-  }
-
-  const active   = employees.filter(e => e.is_active);
-  const inactive = employees.filter(e => !e.is_active);
+  const active = (emps ?? []).filter(e => e.is_active);
+  const inactive = (emps ?? []).filter(e => !e.is_active);
+  const activeIds = new Set(active.map(e => e.id));
+  const withPhone = active.filter(e => e.push_token).length;
 
   return (
     <AdminShell>
-      {/* Topbar */}
-      <div className="flex items-center justify-between gap-5 border-b px-7 py-5" style={{ borderColor: '#E4E4E7', background: '#fff' }}>
-        <div>
-          <h1 className="text-[22px] font-extrabold tracking-tight">Equipo</h1>
-          <p className="mt-0.5 text-[12px]" style={{ color: '#6E6E73' }}>{active.length} empleados activos</p>
-        </div>
-        <button
-          onClick={openNew}
-          className="rounded-[9px] px-[14px] py-[9px] text-[13px] font-semibold text-white"
-          style={{ background: 'var(--accent)' }}
-        >
-          + Nuevo empleado
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-auto p-7">
-        {loading ? (
-          <p className="text-[13px] text-center py-10" style={{ color: '#A8A8AD' }}>Cargando...</p>
-        ) : (
-          <>
-            {/* Active */}
-            <h2 className="mb-3 text-[11px] font-bold uppercase tracking-[1.5px]" style={{ color: '#6E6E73' }}>Activos</h2>
-            <div className="mb-7 grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
-              {active.map(emp => (
-                <EmpCard key={emp.id} emp={emp} onEdit={openEdit} onToggle={toggleActive} onDelete={handleDelete} />
-              ))}
-              {active.length === 0 && (
-                <p className="text-[13px]" style={{ color: '#A8A8AD' }}>Sin empleados activos.</p>
-              )}
-            </div>
-
-            {/* Inactive */}
-            {inactive.length > 0 && (
-              <>
-                <h2 className="mb-3 text-[11px] font-bold uppercase tracking-[1.5px]" style={{ color: '#A8A8AD' }}>Inactivos</h2>
-                <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
-                  {inactive.map(emp => (
-                    <EmpCard key={emp.id} emp={emp} onEdit={openEdit} onToggle={toggleActive} onDelete={handleDelete} />
-                  ))}
-                </div>
-              </>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Modal */}
-      {showModal && (
-        <Modal title={editEmp ? 'Editar empleado' : 'Nuevo empleado'} onClose={() => setShowModal(false)}>
-          <div className="flex flex-col gap-4">
-            <Field label="Nombre completo">
-              <input
-                className="w-full rounded-[9px] border px-3 py-2 text-[13px] outline-none"
-                style={{ borderColor: '#E4E4E7' }}
-                value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                placeholder="Ej. Carlos Martínez"
-              />
-            </Field>
-            <Field label="Puesto">
-              <input
-                className="w-full rounded-[9px] border px-3 py-2 text-[13px] outline-none"
-                style={{ borderColor: '#E4E4E7' }}
-                value={form.role}
-                onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
-                placeholder="Ej. Vendedor, Almacenista"
-              />
-            </Field>
-            <Field label="Tipo">
-              <div className="flex gap-2">
-                {(['empleado', 'practicante'] as EmpType[]).map(t => (
-                  <button
-                    key={t}
-                    onClick={() => setForm(f => ({ ...f, empType: t }))}
-                    className="flex-1 rounded-[9px] border py-[9px] text-[13px] font-semibold capitalize transition-colors"
-                    style={{
-                      borderColor: form.empType === t ? '#0F0F10' : '#E4E4E7',
-                      background: form.empType === t ? '#0F0F10' : '#fff',
-                      color: form.empType === t ? '#fff' : '#3A3A3D',
-                    }}
-                  >
-                    {t.charAt(0).toUpperCase() + t.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </Field>
-            <Field label="Color de identificación">
-              <div className="flex gap-2 flex-wrap">
-                {COLORS.map(c => (
-                  <button
-                    key={c}
-                    onClick={() => setForm(f => ({ ...f, color: c }))}
-                    className="h-7 w-7 rounded-full border-2 transition-transform"
-                    style={{ background: c, borderColor: form.color === c ? '#0F0F10' : 'transparent', transform: form.color === c ? 'scale(1.2)' : 'scale(1)' }}
-                  />
-                ))}
-              </div>
-            </Field>
-
-            {/* Preview */}
-            <div className="flex items-center gap-3 rounded-xl p-3" style={{ background: '#F2F2F4' }}>
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[14px] font-bold text-white" style={{ background: form.color }}>
-                {form.name ? initials(form.name) : '?'}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold">{form.name || 'Nombre empleado'}</p>
-                <p className="text-[11px]" style={{ color: '#6E6E73' }}>{form.role || 'Puesto'}</p>
-              </div>
-              <span
-                className="shrink-0 rounded-full px-[8px] py-[3px] text-[10px] font-bold"
-                style={form.empType === 'practicante'
-                  ? { background: '#EEE6FA', color: '#9B4DCA' }
-                  : { background: '#E5F4EC', color: '#0F9D58' }}
-              >
-                {form.empType === 'practicante' ? 'PRACTICANTE' : 'EMPLEADO'}
-              </span>
-            </div>
-
-            {error && <p className="text-[12px]" style={{ color: '#E11D2E' }}>{error}</p>}
-
-            <div className="flex gap-2 pt-1">
-              <button onClick={() => setShowModal(false)} className="flex-1 rounded-[9px] border py-[10px] text-[13px] font-semibold" style={{ borderColor: '#E4E4E7' }}>
-                Cancelar
-              </button>
-              <button onClick={handleSave} disabled={saving} className="flex-1 rounded-[9px] py-[10px] text-[13px] font-semibold text-white" style={{ background: 'var(--accent)', opacity: saving ? .6 : 1 }}>
-                {saving ? 'Guardando...' : editEmp ? 'Guardar cambios' : 'Crear empleado'}
-              </button>
+      <div className={s.page}>
+        <header className={s.top}>
+          <div>
+            <div className={s.eyebrow}><i />{company?.name ?? 'Actividades'} · Actividades</div>
+            <h1 className={s.title}>Equipo</h1>
+            <div className={s.sub}>
+              {emps ? `${active.length} activo${active.length === 1 ? '' : 's'} · ${withPhone} con avisos en su teléfono` : 'Cargando…'}
             </div>
           </div>
-        </Modal>
-      )}
+          <div className={s.tools}>
+            <button type="button" className={`${s.btn} ${s.btnPrimary}`} onClick={() => setDialog({ emp: null })}><IconPlus />Nuevo empleado</button>
+          </div>
+        </header>
+
+        <div className={s.content}>
+          {error && <div className={s.error}>{error}</div>}
+          {!emps ? (
+            !error && <p className={s.loading}>Cargando equipo…</p>
+          ) : (
+            <>
+              {active.length === 0 ? (
+                <p className={s.foot}>Todavía no hay empleados activos.</p>
+              ) : (
+                <div className={q.grid}>
+                  {active.map(e => {
+                    const { mine, onlyMe } = assignedTo(e.id, acts, activeIds);
+                    return (
+                      <article key={e.id} className={`${s.card} ${q.card}`}>
+                        <div className={q.who}>
+                          <span className={q.av} style={{ background: e.color }}>{initials(e.name)}</span>
+                          <div className={q.name}><b>{e.name}</b><span>{e.role}</span></div>
+                        </div>
+                        <div className={q.facts}>
+                          <span className={`${q.chip} ${e.emp_type === 'practicante' ? q.chipPrac : ''}`}>{e.emp_type === 'practicante' ? 'Practicante' : 'Empleado'}</span>
+                          {e.push_token
+                            ? <span className={`${q.chip} ${q.chipOk}`}><IconBell size={13} />Recibe avisos</span>
+                            : <span className={`${q.chip} ${q.chipWarn}`} title="Que abra la app de actividades en su teléfono y escoja su nombre"><IconBell size={13} />Sin teléfono registrado</span>}
+                          <span className={q.chip}><IconList size={13} />{mine.length ? `${mine.length} a su nombre` : 'Sólo generales'}</span>
+                        </div>
+                        {confirmId === e.id ? (
+                          <div className={q.confirm} role="alert">
+                            <span><b>¿Dar de baja a {e.name}?</b> Deja de aparecer en la app y en las listas. Su historial se conserva y lo puedes reactivar.</span>
+                            {onlyMe.length > 0 && (
+                              <span>
+                                Estas actividades quedarían sin nadie que las vea en su teléfono; después pásalas a otra persona o hazlas generales en Actividades:
+                                <ul>{onlyMe.map(a => <li key={a.id}>{a.title}</li>)}</ul>
+                              </span>
+                            )}
+                            <div className={q.confirmBtns}>
+                              <button type="button" className={`${q.btn} ${q.dark}`} disabled={busy === e.id} onClick={() => run(e.id, () => setEmployeeActive(e.id, false))}>
+                                {busy === e.id ? 'Guardando…' : 'Sí, dar de baja'}
+                              </button>
+                              <button type="button" className={q.btn} onClick={() => setConfirmId(null)}>Cancelar</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className={q.actions}>
+                            <button type="button" className={`${q.btn} ${q.dark}`} onClick={() => setDialog({ emp: e })}>Editar</button>
+                            <button type="button" className={`${q.btn} ${q.danger}`} onClick={() => setConfirmId(e.id)}>Dar de baja</button>
+                          </div>
+                        )}
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+
+              {inactive.length > 0 && (
+                <>
+                  <p className={q.secLbl}>Dados de baja ({inactive.length})</p>
+                  <div className={q.grid}>
+                    {inactive.map(e => (
+                      <article key={e.id} className={`${s.card} ${q.card} ${q.off}`}>
+                        <div className={q.who}>
+                          <span className={q.av} style={{ background: e.color }}>{initials(e.name)}</span>
+                          <div className={q.name}><b>{e.name}</b><span>{e.role}</span></div>
+                        </div>
+                        <div className={q.actions}>
+                          <button type="button" className={q.btn} onClick={() => setDialog({ emp: e })}>Editar</button>
+                          <button type="button" className={q.btn} disabled={busy === e.id} onClick={() => run(e.id, () => setEmployeeActive(e.id, true))}>
+                            {busy === e.id ? 'Guardando…' : 'Reactivar'}
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </div>
+
+        {dialog && company && (
+          <EmployeeDialog
+            emp={dialog.emp}
+            companyId={company.id}
+            onClose={() => setDialog(null)}
+            onSaved={async () => { setDialog(null); await load(); }}
+          />
+        )}
+      </div>
     </AdminShell>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[1px]" style={{ color: '#6E6E73' }}>{label}</label>
-      {children}
-    </div>
+function EmployeeDialog({ emp, companyId, onClose, onSaved }: {
+  emp: Emp | null; companyId: string; onClose: () => void; onSaved: () => Promise<void>;
+}) {
+  const [form, setForm] = useState<FormState>(
+    emp ? { name: emp.name, role: emp.role, color: emp.color, empType: emp.emp_type ?? 'empleado' } : EMPTY,
   );
-}
+  const [tried, setTried] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [askDelete, setAskDelete] = useState(false);
+  const nameRef = useRef<HTMLInputElement>(null);
 
-function EmpCard({ emp, onEdit, onToggle, onDelete }: { emp: Employee; onEdit: (e: Employee) => void; onToggle: (e: Employee) => void; onDelete: (e: Employee) => void }) {
+  useEffect(() => {
+    nameRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const missing = { name: !form.name.trim(), role: !form.role.trim() };
+
+  async function save() {
+    setTried(true);
+    if (missing.name || missing.role) return;
+    setSaving(true);
+    setErr(null);
+    const payload = { name: form.name.trim(), role: form.role.trim(), color: form.color, emp_type: form.empType, initials: initials(form.name) };
+    const r = emp ? await updateEmployee(emp.id, payload) : await createEmployee(payload, companyId);
+    if (!r.ok) { setErr(`No se pudo guardar: ${r.error}`); setSaving(false); return; }
+    await onSaved();
+  }
+
+  async function remove() {
+    if (!emp) return;
+    setSaving(true);
+    setErr(null);
+    const r = await deleteEmployee(emp.id);
+    if (!r.ok) { setErr(r.error); setSaving(false); setAskDelete(false); return; }
+    await onSaved();
+  }
+
   return (
-    <div className="flex items-center gap-3 rounded-xl border p-4" style={{ background: '#fff', borderColor: '#E4E4E7', opacity: emp.is_active ? 1 : 0.55 }}>
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[14px] font-bold text-white" style={{ background: emp.color }}>
-        {initials(emp.name)}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
-          <p className="text-[13px] font-semibold truncate">{emp.name}</p>
-          {(emp as any).emp_type === 'practicante' && (
-            <span className="shrink-0 rounded-full px-[6px] py-[2px] text-[9px] font-bold" style={{ background: '#EEE6FA', color: '#9B4DCA' }}>PRAC</span>
+    <>
+      <div className={q.overlay} onClick={onClose} />
+      <div className={q.dialog} role="dialog" aria-modal="true" aria-label={emp ? 'Editar empleado' : 'Nuevo empleado'}>
+        <div className={q.dHead}>
+          <h2>{emp ? 'Editar empleado' : 'Nuevo empleado'}</h2>
+          <button type="button" className={q.btn} onClick={onClose}>Cerrar</button>
+        </div>
+        <div className={q.dBody}>
+          <div className={q.field}>
+            <label className={q.label} htmlFor="e-name">Nombre</label>
+            <input id="e-name" ref={nameRef} className={`${q.input} ${tried && missing.name ? q.invalid : ''}`} value={form.name} maxLength={60}
+              placeholder="Ej. Carlos Martínez" onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+          </div>
+          <div className={q.field}>
+            <label className={q.label} htmlFor="e-role">Puesto</label>
+            <input id="e-role" className={`${q.input} ${tried && missing.role ? q.invalid : ''}`} value={form.role} maxLength={60}
+              placeholder="Ej. Vendedor, almacenista" onChange={e => setForm(f => ({ ...f, role: e.target.value }))} />
+          </div>
+          {tried && (missing.name || missing.role) && <p className={q.err}>Escribe {missing.name && missing.role ? 'el nombre y el puesto' : missing.name ? 'el nombre' : 'el puesto'}.</p>}
+          <div className={q.field}>
+            <span className={q.label}>Tipo</span>
+            <div className={q.seg}>
+              {(['empleado', 'practicante'] as EmpType[]).map(t => (
+                <button key={t} type="button" aria-pressed={form.empType === t} onClick={() => setForm(f => ({ ...f, empType: t }))}>
+                  {t === 'empleado' ? 'Empleado' : 'Practicante'}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className={q.field}>
+            <span className={q.label}>Color</span>
+            <div className={q.swatches}>
+              {COLORS.map(c => (
+                <button key={c} type="button" className={q.sw} style={{ background: c }} aria-pressed={form.color === c} aria-label={`Color ${c}`} onClick={() => setForm(f => ({ ...f, color: c }))} />
+              ))}
+            </div>
+            <p className={q.hint}>Así aparece en la app de los empleados cuando escogen su nombre.</p>
+          </div>
+          <div className={q.preview}>
+            <span className={q.av} style={{ background: form.color }}>{initials(form.name)}</span>
+            <div className={q.name}><b>{form.name.trim() || 'Nombre'}</b><span>{form.role.trim() || 'Puesto'} · {form.empType === 'practicante' ? 'Practicante' : 'Empleado'}</span></div>
+          </div>
+          {err && <p className={q.err} role="alert">{err}</p>}
+          <div className={q.dFoot}>
+            <button type="button" className={q.btn} onClick={onClose} disabled={saving}>Cancelar</button>
+            <button type="button" className={`${q.btn} ${q.dark}`} onClick={save} disabled={saving}>{saving ? 'Guardando…' : emp ? 'Guardar cambios' : 'Crear empleado'}</button>
+          </div>
+          {emp && (
+            <div className={q.dangerZone}>
+              {askDelete ? (
+                <>
+                  <p className={q.hint}><b>¿Eliminar a {emp.name} para siempre?</b> Sólo se puede si nunca ha registrado actividades; si tiene historial, mejor dale de baja.</p>
+                  <div className={q.confirmBtns}>
+                    <button type="button" className={`${q.btn} ${q.danger}`} disabled={saving} onClick={remove}>Sí, eliminar</button>
+                    <button type="button" className={q.btn} onClick={() => setAskDelete(false)}>Cancelar</button>
+                  </div>
+                </>
+              ) : (
+                <button type="button" className={`${q.btn} ${q.danger}`} onClick={() => setAskDelete(true)}>Eliminar empleado</button>
+              )}
+            </div>
           )}
         </div>
-        <p className="text-[11px]" style={{ color: '#6E6E73' }}>{emp.role}</p>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <button
-          onClick={() => onEdit(emp)}
-          className="rounded-[7px] border px-[10px] py-[6px] text-[11px] font-semibold"
-          style={{ borderColor: '#E4E4E7', color: '#3A3A3D' }}
-        >
-          Editar
-        </button>
-        <button
-          onClick={() => onToggle(emp)}
-          className="rounded-[7px] px-[10px] py-[6px] text-[11px] font-semibold"
-          style={{ background: emp.is_active ? '#FCE7E9' : '#E5F4EC', color: emp.is_active ? '#E11D2E' : '#0F9D58' }}
-        >
-          {emp.is_active ? 'Desactivar' : 'Activar'}
-        </button>
-        <button
-          onClick={() => onDelete(emp)}
-          className="rounded-[7px] px-[10px] py-[6px] text-[11px] font-semibold"
-          style={{ background: '#F2F2F4', color: '#6E6E73' }}
-          title="Eliminar"
-        >
-          ✕
-        </button>
-      </div>
-    </div>
+    </>
   );
 }
