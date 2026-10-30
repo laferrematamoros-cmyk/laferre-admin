@@ -235,3 +235,8 @@
   .ringArc, .seg, .pfill, .bars, .draw, .pop, .fadeIn { animation-duration: .5s !important; animation-delay: 0s !important; }
   .tip, .chev, .prow, .ins li, .seg, .content { transition: none; }
 }
+
+/* Flechas del selector de semana: más grandes para el dedo en celular. */
+@media (max-width: 767px) {
+  .wbtn { height: 38px; min-width: 38px; }
+}

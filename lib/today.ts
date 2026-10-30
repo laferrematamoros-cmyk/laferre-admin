@@ -63,13 +63,30 @@ export function todayStatus(comp: TodayCompletion | undefined, start: Date, limi
   return 'upcoming';
 }
 
+/** En un día ya pasado, "atrasada" se lee como "sin hacer" (ya no hay tiempo de hacerla). */
+export function statusLabel(s: TodayStatus, past: boolean): string {
+  return past && s === 'overdue' ? 'Sin hacer' : TODAY_LABEL[s];
+}
+
+/** El día de hoy, visto en el momento `now`. */
 export function buildToday(
   activities: TodayActivity[],
   completions: TodayCompletion[],
   employees: ReportEmployee[],
   now: Date = new Date(),
 ): TodayReport {
-  const day = new Date(now); day.setHours(0, 0, 0, 0);
+  return buildDay(now, activities, completions, employees, now);
+}
+
+/** Cualquier día (pasado, hoy o futuro), visto en el momento `now`. */
+export function buildDay(
+  date: Date,
+  activities: TodayActivity[],
+  completions: TodayCompletion[],
+  employees: ReportEmployee[],
+  now: Date = new Date(),
+): TodayReport {
+  const day = new Date(date); day.setHours(0, 0, 0, 0);
   const dayEnd = new Date(day); dayEnd.setHours(23, 59, 59, 999);
   const dateStr = toDateStr(day);
   const emp = new Map(employees.map(e => [e.id, e]));

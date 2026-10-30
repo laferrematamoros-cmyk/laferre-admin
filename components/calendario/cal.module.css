@@ -1,0 +1,74 @@
+/* Calendario. Se apoya en panel.module.css (página, tarjetas) y en los colores de hoy.module.css. */
+
+.desk { display: block; }
+.mobile { display: none; }
+@media (max-width: 767px) {
+  .desk { display: none; }
+  .mobile { display: block; }
+}
+
+/* ── Semana (computadora): una columna por día con sus actividades en orden de hora ── */
+.colsWrap { overflow-x: auto; margin-inline: -4px; padding: 4px; }
+.cols { display: grid; grid-template-columns: repeat(7, minmax(112px, 1fr)); gap: 8px; align-items: start; }
+.colCard { min-width: 0; overflow: hidden; border: 1px solid var(--card-border); border-radius: 20px; background: var(--card-bg); box-shadow: var(--card-shadow); -webkit-backdrop-filter: blur(18px) saturate(150%); backdrop-filter: blur(18px) saturate(150%); }
+.todayCard { border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+.dayHead { display: flex; flex-direction: column; gap: 5px; padding: 12px 12px 10px; border-bottom: 1px solid var(--hair); min-width: 0; }
+.dname { font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.dnum { font-size: 20px; font-weight: 700; line-height: 1; letter-spacing: -.02em; }
+.dsum { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mini { display: flex; gap: 2px; height: 5px; border-radius: 999px; overflow: hidden; background: var(--track); }
+.mini i { flex-basis: 0; }
+.today { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.today .dnum { color: var(--accent); }
+.colList { display: flex; flex-direction: column; gap: 6px; padding: 8px; }
+.empty { margin: 0; padding: 12px 4px; text-align: center; font-size: 12px; color: var(--faint); }
+.tile { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 8px 9px 8px 10px; border: 0; border-left-width: 3px; border-left-style: solid; border-radius: 12px; text-align: left; color: var(--ink); cursor: pointer; transition: transform .12s, box-shadow .12s; }
+.tile:hover { transform: translateY(-1px); box-shadow: 0 6px 16px -8px rgba(12, 12, 16, .35); }
+.tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.tTime { font-size: 11px; font-weight: 700; color: var(--ink2); font-variant-numeric: tabular-nums; }
+.tTime span { font-weight: 500; color: var(--muted); }
+.tile b { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+.tile small { font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gap { display: flex; align-items: center; gap: 6px; padding: 2px; font-size: 10.5px; color: var(--faint); white-space: nowrap; }
+.gap::before, .gap::after { content: ""; flex: 1; border-top: 1px dashed var(--line); }
+.nowMark { display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+.nowMark::after { content: ""; flex: 1; height: 2px; border-radius: 2px; background: var(--accent); }
+.eDone { background: var(--st-ok-soft); border-left-color: var(--st-ok); }
+.eDoneLate { background: var(--st-late-soft); border-left-color: var(--st-late); }
+.eRunning { background: var(--st-run-soft); border-left-color: var(--st-run); }
+.eUpcoming { background: #F2F2F5; border-left-color: #B9B9C1; }
+.eOverdue { background: var(--st-miss-soft); border-left-color: var(--st-miss); }
+
+/* ── Agenda por día (celular) ── */
+.agenda { display: flex; flex-direction: column; gap: 14px; }
+.strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.dayBtn { display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 68px; padding: 9px 0 8px; border: 1px solid var(--card-border); border-radius: 16px; background: var(--card-bg); color: var(--ink); cursor: pointer; }
+.dayBtn[aria-selected="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+.dayBtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dl { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .7; }
+.dn { font-size: 17px; font-weight: 700; line-height: 1; }
+.dayBtn.isToday .dn { color: var(--accent); }
+.dayBtn.isToday[aria-selected="true"] .dn { color: #fff; }
+.dot { width: 7px; height: 7px; border-radius: 50%; }
+.dotNone { background: transparent; }
+.agendaHead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; padding: 0 2px; }
+.agendaHead h2 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
+.agendaHead h2::first-letter { text-transform: uppercase; }
+.cards { display: flex; flex-direction: column; gap: 10px; }
+.cardItem { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 10px; align-items: start; width: 100%; padding: 14px; border: 1px solid var(--card-border); border-left: 4px solid transparent; border-radius: 18px; background: var(--card-bg); box-shadow: var(--card-shadow); text-align: left; color: inherit; cursor: pointer; }
+.cardItem:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.bDone { border-left-color: var(--st-ok); }
+.bDoneLate { border-left-color: var(--st-late); }
+.bRunning { border-left-color: var(--st-run); }
+.bUpcoming { border-left-color: #B9B9C1; }
+.bOverdue { border-left-color: var(--st-miss); }
+.ctime { display: flex; flex-direction: column; gap: 2px; font-variant-numeric: tabular-nums; }
+.ctime b { font-size: 14px; font-weight: 700; }
+.ctime small { font-size: 11.5px; color: var(--muted); }
+.cmain { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.cmain > b { font-size: 14.5px; font-weight: 600; overflow-wrap: anywhere; }
+.cmeta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 12.5px; color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tile { transition: none; }
+}

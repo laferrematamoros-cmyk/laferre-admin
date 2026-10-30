@@ -1,4 +1,4 @@
-import { buildToday, todayStatus, assignLanes, dayRange, type TodayActivity, type TodayCompletion } from '../today';
+import { buildToday, buildDay, statusLabel, todayStatus, assignLanes, dayRange, type TodayActivity, type TodayCompletion } from '../today';
 import type { ReportEmployee } from '../reports';
 
 const WED_3PM = new Date(2026, 9, 28, 15, 0); // miércoles 28 oct 2026, 3:00 pm
@@ -82,6 +82,27 @@ describe('buildToday', () => {
   it('temprano en el día no hay porcentaje', () => {
     const t = buildToday([act({ id: 'x', start_time: '16:00:00', limit_time: '17:00:00' })], [], EMP, WED_3PM);
     expect(t.pct).toBeNull();
+  });
+});
+
+describe('buildDay (otros días, para el Calendario)', () => {
+  const acts = [act({ id: 'a', start_time: '10:00:00', limit_time: '11:00:00', assigned_employee_ids: ['e1'] })];
+  it('un día pasado sin registro queda sin hacer', () => {
+    const d = buildDay(new Date(2026, 9, 26), acts, [], EMP, WED_3PM);
+    expect([d.rows[0].status, statusLabel(d.rows[0].status, true), d.pct]).toEqual(['overdue', 'Sin hacer', 0]);
+  });
+  it('un día pasado con registro de ese día queda hecho', () => {
+    const d = buildDay(new Date(2026, 9, 26), acts, [comp('a', 'e1', false, '2026-10-26')], EMP, WED_3PM);
+    expect([d.rows[0].status, d.rows[0].doneBy]).toEqual(['done', 'ANA']);
+  });
+  it('un día futuro queda por hacer y sin porcentaje', () => {
+    const d = buildDay(new Date(2026, 9, 30), acts, [], EMP, WED_3PM);
+    expect([d.rows[0].status, d.pct]).toEqual(['upcoming', null]);
+  });
+  it('no aparece en días antes de que se creara la actividad', () => {
+    const late = [act({ id: 'n', created_at: '2026-10-28T15:00:00Z' })];
+    expect(buildDay(new Date(2026, 9, 27), late, [], EMP, WED_3PM).rows).toHaveLength(0);
+    expect(buildDay(new Date(2026, 9, 28), late, [], EMP, WED_3PM).rows).toHaveLength(1);
   });
 });
 

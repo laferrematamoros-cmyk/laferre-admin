@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { TODAY_LABEL, type TodayRow } from '@/lib/today';
+import { statusLabel, type TodayRow } from '@/lib/today';
 import { safeHttps } from '@/lib/safe-url';
 import h from './hoy.module.css';
 import { PILL, fmtMin } from './look';
@@ -11,8 +11,11 @@ function Fact({ k, v }: { k: string; v: string }) {
   return <div className={h.fact}><span>{k}</span><b>{v}</b></div>;
 }
 
-/** Detalle de una actividad: a la derecha en computadora, desde abajo en celular. */
-export default function ActivitySheet({ row, remind, onClose }: { row: TodayRow; remind: Remind; onClose: () => void }) {
+/** Detalle de una actividad: a la derecha en computadora, desde abajo en celular.
+ *  Desde el Calendario se abre para otros días: `dateLabel` dice cuál, y "Recordar" sólo sale si es hoy. */
+export default function ActivitySheet({ row, remind, onClose, dateLabel, isToday = true, past = false }: {
+  row: TodayRow; remind: Remind; onClose: () => void; dateLabel?: string; isToday?: boolean; past?: boolean;
+}) {
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     closeRef.current?.focus();
@@ -40,15 +43,16 @@ export default function ActivitySheet({ row, remind, onClose }: { row: TodayRow;
         </div>
         <div className={h.sheetBody}>
           <div className={h.sheetTop}>
-            <span className={`${h.statusPill} ${PILL[row.status]}`}>{TODAY_LABEL[row.status]}</span>
-            <RemindButton row={row} remind={remind} />
+            <span className={`${h.statusPill} ${PILL[row.status]}`}>{statusLabel(row.status, past)}</span>
+            {isToday && <RemindButton row={row} remind={remind} />}
           </div>
           <div className={h.facts}>
+            {dateLabel && <Fact k="Fecha" v={dateLabel} />}
             <Fact k="Horario" v={`${row.start} – ${row.limit}`} />
             <Fact k="Asignada a" v={row.assignee} />
             {row.doneBy && <Fact k="La hizo" v={row.doneBy} />}
             {registered && <Fact k="Hora de registro" v={registered} />}
-            {row.status === 'overdue' && row.minutesLate !== null && <Fact k="Atraso" v={fmtMin(row.minutesLate)} />}
+            {isToday && row.status === 'overdue' && row.minutesLate !== null && <Fact k="Atraso" v={fmtMin(row.minutesLate)} />}
             {row.status === 'running' && row.minutesLeft !== null && <Fact k="Le quedan" v={fmtMin(row.minutesLeft)} />}
           </div>
           {row.description && (
@@ -66,7 +70,7 @@ export default function ActivitySheet({ row, remind, onClose }: { row: TodayRow;
               </a>
             ) : (
               <div className={h.noPhoto}>
-                {c?.photo_url ? 'La foto tiene un enlace no válido' : c ? 'Se marcó sin foto' : 'Todavía no se hace'}
+                {c?.photo_url ? 'La foto tiene un enlace no válido' : c ? 'Se marcó sin foto' : past ? 'No se hizo' : 'Todavía no se hace'}
               </div>
             )}
           </div>

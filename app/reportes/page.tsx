@@ -13,7 +13,7 @@ import { buildInsights, dailyPeek, trendPeek } from '@/lib/report-insights';
 import { fetchAllPages } from '@/lib/fetch-all';
 import { downloadReportPdf } from '@/lib/report-pdf';
 import { FoldCard, TipProvider } from '@/components/panel/ui';
-import WeekPicker from '@/components/reportes/WeekPicker';
+import WeekPicker from '@/components/panel/WeekPicker';
 import SummaryCard from '@/components/reportes/SummaryCard';
 import InsightsCard from '@/components/reportes/InsightsCard';
 import PeopleCard from '@/components/reportes/PeopleCard';
