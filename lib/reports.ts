@@ -96,7 +96,25 @@ export const STATUSES: Status[] = ['ok', 'late', 'miss', 'todo'];
 export const STATUS_LABEL: Record<Status, string> = { ok: 'A tiempo', late: 'Tarde', miss: 'Sin hacer', todo: 'Por hacer' };
 export type Counts = Record<Status, number>;
 
-export type ReportActivity = Pick<Activity, 'id' | 'title' | 'limit_time' | 'days_of_week' | 'week_of_month' | 'assigned_employee_ids' | 'created_at'>;
+/** Una pausa de la actividad (resumed_at null = sigue pausada). */
+export interface PauseSpan { paused_at: string; resumed_at: string | null; }
+/** Ciclo de vida: archivada desde `archived_at` y pausada en cada `pauses`. */
+export interface Lifecycle { archived_at?: string | null; pauses?: PauseSpan[]; }
+
+/** ¿La actividad estaba vigente en el momento `t`? (ni archivada ni dentro de una pausa).
+ *  Así archivar o pausar no borra el pasado de los reportes. */
+export function liveAt(a: Lifecycle, t: Date): boolean {
+  const ms = t.getTime();
+  if (a.archived_at && ms >= new Date(a.archived_at).getTime()) return false;
+  for (const p of a.pauses ?? []) {
+    const from = new Date(p.paused_at).getTime();
+    const to = p.resumed_at ? new Date(p.resumed_at).getTime() : Infinity;
+    if (ms >= from && ms < to) return false;
+  }
+  return true;
+}
+
+export type ReportActivity = Pick<Activity, 'id' | 'title' | 'limit_time' | 'days_of_week' | 'week_of_month' | 'assigned_employee_ids' | 'created_at'> & Lifecycle;
 export type ReportCompletion = Pick<Completion, 'activity_id' | 'employee_id' | 'scheduled_date' | 'was_late'>;
 export type ReportEmployee = Pick<Employee, 'id' | 'name' | 'initials'>;
 
@@ -180,7 +198,7 @@ export function buildWeekReport(
     const dc = emptyCounts();
 
     for (const a of activities) {
-      if (!activityRunsOn(a, day) || new Date(a.created_at) > dayEnd) continue;
+      if (!activityRunsOn(a, day) || new Date(a.created_at) > dayEnd || !liveAt(a, dueAt(day, a.limit_time))) continue;
       const comp = compByKey.get(`${a.id}|${dateStr}`);
       const st = activityStatus(comp, day, a.limit_time, now);
       dc[st]++;

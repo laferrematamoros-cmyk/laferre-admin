@@ -48,6 +48,8 @@ export interface Activity {
   evidence_signature: boolean;
   is_active: boolean;
   created_at: string;
+  /** Archivada desde esta fecha (sale de la lista y de la app; el pasado se conserva). */
+  archived_at?: string | null;
 }
 
 export interface Completion {

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminShell from '@/components/AdminShell';
 import { supabase } from '@/lib/supabase';
+import { loadActivities } from '@/lib/load-activities';
 import { useCompany } from '@/lib/company-context';
 import { useSession } from '@/lib/session-context';
 import { currentMonday, toDateStr, weekLabel, type ReportEmployee } from '@/lib/reports';
@@ -62,18 +63,13 @@ export default function CalendarioPage() {
     if (!company) return;
     const now = new Date();
     try {
-      const [acts, emps] = await Promise.all([
-        supabase.from('activities')
-          .select('id, title, description, start_time, limit_time, days_of_week, week_of_month, assigned_employee_ids, created_at')
-          .eq('company_id', company.id)
-          .or('is_active.eq.true,week_of_month.not.is.null'),
+      const [activities, emps] = await Promise.all([
+        loadActivities(supabase, company.id) as Promise<TodayActivity[]>,
         supabase.from('employees')
           .select('id, name, initials')
           .eq('is_active', true).eq('company_id', company.id).order('name'),
       ]);
-      if (acts.error) throw new Error(acts.error.message);
       if (emps.error) throw new Error(emps.error.message);
-      const activities = (acts.data ?? []) as TodayActivity[];
       const ids = activities.map(a => a.id);
       const completions = ids.length === 0 ? [] : await fetchAllPages<TodayCompletion>((f, t) =>
         supabase.from('completions')

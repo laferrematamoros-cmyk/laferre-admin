@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import AdminShell from '@/components/AdminShell';
 import { supabase } from '@/lib/supabase';
+import { loadActivities } from '@/lib/load-activities';
 import { useCompany } from '@/lib/company-context';
 import { useSession } from '@/lib/session-context';
 import {
@@ -51,18 +52,13 @@ export default function ReportesPage() {
     setError(null);
     (async () => {
       try {
-        const [acts, emps] = await Promise.all([
-          supabase.from('activities')
-            .select('id, title, limit_time, days_of_week, week_of_month, assigned_employee_ids, created_at')
-            .eq('company_id', company.id)
-            .or('is_active.eq.true,week_of_month.not.is.null'),
+        const [activities, emps] = await Promise.all([
+          loadActivities(supabase, company.id) as Promise<ReportActivity[]>,
           supabase.from('employees')
             .select('id, name, initials')
             .eq('is_active', true).eq('company_id', company.id).order('name'),
         ]);
-        if (acts.error) throw new Error(acts.error.message);
         if (emps.error) throw new Error(emps.error.message);
-        const activities = (acts.data ?? []) as ReportActivity[];
         const ids = activities.map(a => a.id);
         // Sólo las 12 semanas que se pintan, en orden y por páginas:
         // la base nunca entrega más de 1,000 filas por consulta y no avisa.

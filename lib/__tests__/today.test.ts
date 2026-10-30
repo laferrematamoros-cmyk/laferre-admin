@@ -99,6 +99,13 @@ describe('buildDay (otros días, para el Calendario)', () => {
     const d = buildDay(new Date(2026, 9, 30), acts, [], EMP, WED_3PM);
     expect([d.rows[0].status, d.pct]).toEqual(['upcoming', null]);
   });
+  it('archivada o en pausa no aparece en el día', () => {
+    const arch = [act({ id: 'x', start_time: '10:00:00', limit_time: '11:00:00', archived_at: new Date(2026, 9, 27, 18).toISOString() })];
+    expect(buildDay(new Date(2026, 9, 27), arch, [], EMP, WED_3PM).rows).toHaveLength(1);
+    expect(buildDay(new Date(2026, 9, 28), arch, [], EMP, WED_3PM).rows).toHaveLength(0);
+    const paused = [act({ id: 'p', pauses: [{ paused_at: new Date(2026, 9, 28, 6).toISOString(), resumed_at: null }] })];
+    expect(buildToday(paused, [], EMP, WED_3PM).rows).toHaveLength(0);
+  });
   it('no aparece en días antes de que se creara la actividad', () => {
     const late = [act({ id: 'n', created_at: '2026-10-28T15:00:00Z' })];
     expect(buildDay(new Date(2026, 9, 27), late, [], EMP, WED_3PM).rows).toHaveLength(0);

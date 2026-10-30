@@ -24,11 +24,13 @@ function inWindow(now: number, trigger: number) {
 /** Prende/apaga is_active de las actividades por-semana-del-mes según la fecha.
  *  Así la app del empleado las muestra solo en su semana (sin actualizar la app). */
 async function syncMonthlyActive(supabase: SupabaseClient, today: Date) {
+  // select('*') para que funcione antes y después de correr supabase/005 (archived_at).
   const { data } = await supabase
     .from('activities')
-    .select('id, week_of_month, is_active')
+    .select('*')
     .not('week_of_month', 'is', null);
-  for (const a of (data ?? []) as { id: string; week_of_month: number; is_active: boolean }[]) {
+  for (const a of (data ?? []) as { id: string; week_of_month: number; is_active: boolean; archived_at?: string | null }[]) {
+    if (a.archived_at) continue; // archivada: no se vuelve a prender
     const should = matchesWeekOfMonth(a.week_of_month, today);
     if (a.is_active !== should) {
       await supabase.from('activities').update({ is_active: should }).eq('id', a.id);

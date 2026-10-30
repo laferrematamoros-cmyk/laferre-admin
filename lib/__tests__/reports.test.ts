@@ -1,6 +1,6 @@
 import {
   mondayOf, toDateStr, addWeeks, weekLabel, weekShortLabel, reportRange,
-  dueAt, activityStatus, buildWeekReport, buildTrend, ratingOf, pctOf,
+  dueAt, activityStatus, buildWeekReport, buildTrend, ratingOf, pctOf, liveAt,
   type ReportActivity, type ReportCompletion, type ReportEmployee,
 } from '../reports';
 
@@ -155,6 +155,33 @@ describe('buildWeekReport (casos)', () => {
     const r = buildWeekReport(addWeeks(MON, 1), [act({ id: 'a1' })], [], EMP, FRI_430PM);
     expect(r.due).toBe(0);
     expect(r.pct).toBeNull();
+  });
+});
+
+describe('archivar y pausar sin borrar el pasado', () => {
+  const pastNow = new Date(2026, 10, 3, 9, 0);
+  const at = (d: number, h: number) => new Date(2026, 9, d, h, 0).toISOString();
+
+  it('liveAt: no cuenta lo archivado ni lo que cae dentro de una pausa', () => {
+    const a = { archived_at: at(30, 8), pauses: [{ paused_at: at(20, 0), resumed_at: at(22, 0) }] };
+    expect(liveAt(a, new Date(2026, 9, 19, 10))).toBe(true);
+    expect(liveAt(a, new Date(2026, 9, 21, 10))).toBe(false);
+    expect(liveAt(a, new Date(2026, 9, 23, 10))).toBe(true);
+    expect(liveAt(a, new Date(2026, 9, 30, 10))).toBe(false);
+    expect(liveAt({}, new Date(2026, 9, 30, 10))).toBe(true);
+  });
+  it('archivada el miércoles a las 8: cuentan lunes y martes, ya no del miércoles en adelante', () => {
+    const r = buildWeekReport(MON, [act({ id: 'a1', archived_at: at(28, 8) })], [], EMP, pastNow);
+    expect(r.days.map(d => d.miss)).toEqual([1, 1, 0, 0, 0, 0, 0]);
+    expect(r.due).toBe(2);
+  });
+  it('pausada de martes a jueves al mediodía: esos días no cuentan, el resto sí', () => {
+    const r = buildWeekReport(MON, [act({ id: 'a1', pauses: [{ paused_at: at(27, 0), resumed_at: at(29, 12) }] })], [], EMP, pastNow);
+    expect(r.days.map(d => d.miss)).toEqual([1, 0, 0, 0, 1, 1, 1]);
+  });
+  it('una pausa que sigue abierta deja fuera todo lo que viene', () => {
+    const r = buildWeekReport(MON, [act({ id: 'a1', pauses: [{ paused_at: at(29, 0), resumed_at: null }] })], [], EMP, pastNow);
+    expect(r.days.map(d => d.miss)).toEqual([1, 1, 1, 0, 0, 0, 0]);
   });
 });
 

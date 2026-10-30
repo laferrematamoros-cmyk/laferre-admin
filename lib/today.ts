@@ -1,5 +1,5 @@
 import type { Activity, Completion } from './supabase';
-import { activityRunsOn, dueAt, pctOf, toDateStr, type ReportEmployee } from './reports';
+import { activityRunsOn, dueAt, liveAt, pctOf, toDateStr, type Lifecycle, type ReportEmployee } from './reports';
 
 // ── Estados de una actividad HOY ────────────────────────────────────────────────
 // Mismas reglas que Reportes (lo hecho tarde cuenta, lo que no vence no baja el %),
@@ -12,7 +12,7 @@ export const TODAY_LABEL: Record<TodayStatus, string> = {
 /** "Por vencer": en curso y le quedan estos minutos o menos. */
 export const SOON_MIN = 30;
 
-export type TodayActivity = Pick<Activity, 'id' | 'title' | 'description' | 'start_time' | 'limit_time' | 'days_of_week' | 'week_of_month' | 'assigned_employee_ids' | 'created_at'>;
+export type TodayActivity = Pick<Activity, 'id' | 'title' | 'description' | 'start_time' | 'limit_time' | 'days_of_week' | 'week_of_month' | 'assigned_employee_ids' | 'created_at'> & Lifecycle;
 export type TodayCompletion = Pick<Completion, 'activity_id' | 'employee_id' | 'scheduled_date' | 'was_late' | 'completed_at' | 'photo_url' | 'note'>;
 
 export interface TodayRow {
@@ -96,7 +96,7 @@ export function buildDay(
   }
 
   const rows: TodayRow[] = activities
-    .filter(a => activityRunsOn(a, day) && new Date(a.created_at) <= dayEnd)
+    .filter(a => activityRunsOn(a, day) && new Date(a.created_at) <= dayEnd && liveAt(a, dueAt(day, a.limit_time)))
     .map(a => {
       const start = dueAt(day, a.start_time);
       const limit = dueAt(day, a.limit_time);
