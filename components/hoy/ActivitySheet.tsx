@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { TODAY_LABEL, type TodayRow } from '@/lib/today';
+import { safeHttps } from '@/lib/safe-url';
 import h from './hoy.module.css';
 import { PILL, fmtMin } from './look';
 import RemindButton, { type Remind } from './RemindButton';
@@ -21,6 +22,7 @@ export default function ActivitySheet({ row, remind, onClose }: { row: TodayRow;
   }, [onClose]);
 
   const c = row.completion;
+  const photo = safeHttps(c?.photo_url);
   const registered = c?.completed_at
     ? new Date(c.completed_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false })
     : null;
@@ -57,13 +59,15 @@ export default function ActivitySheet({ row, remind, onClose }: { row: TodayRow;
           )}
           <div>
             <p className={h.secLbl}>Evidencia</p>
-            {c?.photo_url ? (
-              <a href={c.photo_url} target="_blank" rel="noreferrer">
+            {photo ? (
+              <a href={photo} target="_blank" rel="noopener noreferrer">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={c.photo_url} alt={`Evidencia de ${row.title}`} className={h.photo} />
+                <img src={photo} alt={`Evidencia de ${row.title}`} className={h.photo} />
               </a>
             ) : (
-              <div className={h.noPhoto}>{c ? 'Se marcó sin foto' : 'Todavía no se hace'}</div>
+              <div className={h.noPhoto}>
+                {c?.photo_url ? 'La foto tiene un enlace no válido' : c ? 'Se marcó sin foto' : 'Todavía no se hace'}
+              </div>
             )}
           </div>
           {c?.note && (

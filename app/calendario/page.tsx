@@ -6,6 +6,7 @@ import AdminShell from '@/components/AdminShell';
 import { supabase, Activity, Completion, Employee } from '@/lib/supabase';
 import { useCompany } from '@/lib/company-context';
 import { activityRunsOn } from '@/lib/reports';
+import { safeHttps } from '@/lib/safe-url';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const ROW_H   = 38;
@@ -379,10 +380,10 @@ export default function CalendarioPage() {
                 {/* Evidence photo */}
                 <div>
                   <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.8px]" style={{ color: '#6E6E73' }}>Evidencia fotográfica</p>
-                  {detail.photoUrl ? (
-                    <a href={detail.photoUrl} target="_blank" rel="noreferrer">
+                  {safeHttps(detail.photoUrl) ? (
+                    <a href={safeHttps(detail.photoUrl)!} target="_blank" rel="noopener noreferrer">
                       <img
-                        src={detail.photoUrl}
+                        src={safeHttps(detail.photoUrl)!}
                         alt="Evidencia"
                         className="w-full rounded-[10px] object-cover"
                         style={{ maxHeight: 260, border: '1px solid #E4E4E7' }}
