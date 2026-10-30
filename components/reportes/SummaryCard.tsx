@@ -1,41 +1,13 @@
 'use client';
 
-import type { CSSProperties } from 'react';
 import { STATUSES, STATUS_LABEL, RATING_LABEL, ratingOf, type Status, type WeekReport } from '@/lib/reports';
 import { CountUp, TipBody, useInView, useTip } from '@/components/panel/ui';
 import { IconCaretDown, IconCaretUp, IconCheck, IconClock, IconX } from '@/components/panel/icons';
+import Ring from '@/components/panel/Ring';
 import s from '@/components/panel/panel.module.css';
 
 const SEG: Record<Status, string> = { ok: s.ok, late: s.late, miss: s.miss, todo: s.todo };
 const PILL = { ok: s.okPill, late: s.latePill, miss: s.missPill };
-const ARC = { ok: s.arcOk, late: s.arcLate, miss: s.arcMiss };
-
-function Ring({ pct }: { pct: number | null }) {
-  const r = 64;
-  const C = 2 * Math.PI * r;
-  const rating = pct === null ? null : ratingOf(pct);
-  const arcStyle = { strokeDasharray: C, strokeDashoffset: C * (1 - (pct ?? 0) / 100), '--C': C } as CSSProperties;
-  return (
-    <div className={s.ringWrap}>
-      <svg viewBox="0 0 156 156" width={156} height={156} aria-hidden>
-        <defs>
-          <linearGradient id="rp-arc-ok" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor="#19B97C" /><stop offset="1" stopColor="#0A7D55" />
-          </linearGradient>
-        </defs>
-        <circle cx={78} cy={78} r={r} className={s.ringTrack} />
-        {rating && pct! > 0 && (
-          <circle cx={78} cy={78} r={r} transform="rotate(-90 78 78)" className={`${s.ringArc} ${ARC[rating]}`} style={arcStyle} />
-        )}
-      </svg>
-      <div className={s.ringVal}>
-        <b>{pct === null ? '—' : <><CountUp value={pct} duration={2200} />%</>}</b>
-        <span>{pct === null ? 'sin datos' : 'hecho'}</span>
-      </div>
-    </div>
-  );
-}
-
 export default function SummaryCard({ report, prevPct, isCurrent }: { report: WeekReport; prevPct: number | null; isCurrent: boolean }) {
   const tip = useTip();
   const { pct, done, due, counts } = report;
