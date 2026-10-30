@@ -67,22 +67,47 @@ export function TipBody({ title, counts, line, foot }: {
   );
 }
 
-// ── Número que cuenta hacia arriba al aparecer ──────────────────────────────────
-export function CountUp({ value }: { value: number }) {
+// ── Animación de carga ──────────────────────────────────────────────────────────
+/** Si Windows/el navegador pide menos movimiento, se anima igual pero corto y sin escalonar. */
+function reducedMotion(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/** `seen` se vuelve true la primera vez que el elemento aparece en pantalla (y se queda así). */
+export function useInView<T extends Element>(threshold = 0.25) {
+  const ref = useRef<T>(null);
+  const [seen, setSeen] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || seen) return;
+    if (typeof IntersectionObserver === 'undefined') { setSeen(true); return; }
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) { setSeen(true); io.disconnect(); }
+    }, { threshold });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [seen, threshold]);
+  return { ref, seen };
+}
+
+/** Número que cuenta de 0 hasta `value` cuando `play` se vuelve true. */
+export function CountUp({ value, play = true, delay = 0 }: { value: number; play?: boolean; delay?: number }) {
   const [shown, setShown] = useState(value);
   useLayoutEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setShown(value); return; }
+    if (!play) { setShown(0); return; }
+    const reduced = reducedMotion();
+    const dur = reduced ? 500 : 1100;
+    const t0 = performance.now() + (reduced ? 0 : delay);
     let raf = 0;
-    const t0 = performance.now();
     const tick = (t: number) => {
-      const k = Math.min(1, (t - t0) / 1000);
-      setShown(Math.round(value * (1 - Math.pow(1 - k, 3))));
+      const k = Math.max(0, Math.min(1, (t - t0) / dur));
+      setShown(Math.round(value * (1 - Math.pow(1 - k, 3)))); // frena al final
       if (k < 1) raf = requestAnimationFrame(tick);
     };
     setShown(0);
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [value]);
+  }, [value, play, delay]);
   return <>{shown}</>;
 }
 

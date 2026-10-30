@@ -2,7 +2,7 @@
 
 import type { CSSProperties } from 'react';
 import { STATUSES, STATUS_LABEL, RATING_LABEL, ratingOf, type Status, type WeekReport } from '@/lib/reports';
-import { CountUp, TipBody, useTip } from './ui';
+import { CountUp, TipBody, useInView, useTip } from './ui';
 import { IconCaretDown, IconCaretUp, IconCheck, IconClock, IconX } from './icons';
 import s from './reportes.module.css';
 
@@ -43,9 +43,10 @@ export default function SummaryCard({ report, prevPct, isCurrent }: { report: We
   const total = STATUSES.reduce((n, k) => n + counts[k], 0);
   const legend = STATUSES.filter(k => k !== 'todo' || counts.todo > 0);
   const delta = pct !== null && prevPct !== null ? pct - prevPct : null;
+  const { ref, seen } = useInView<HTMLElement>();
 
   return (
-    <section className={`${s.card} ${s.hero}`} aria-label="Cómo vamos esta semana">
+    <section ref={ref} className={`${s.card} ${s.hero} ${seen ? s.play : ''}`} aria-label="Cómo vamos esta semana">
       <Ring pct={pct} />
       <div className={s.heroText}>
         {rating && (
@@ -71,14 +72,15 @@ export default function SummaryCard({ report, prevPct, isCurrent }: { report: We
         {total > 0 && (
           <>
             <div className={s.weekBar} aria-label={`Las ${total} actividades de la semana`}>
-              {STATUSES.filter(k => counts[k] > 0).map(k => (
-                <i key={k} className={`${s.seg} ${SEG[k]}`} style={{ flexGrow: counts[k] }}
+              {/* Se llena de izquierda a derecha: un color tras otro. */}
+              {STATUSES.filter(k => counts[k] > 0).map((k, i) => (
+                <i key={k} className={`${s.seg} ${SEG[k]}`} style={{ flexGrow: counts[k], animationDelay: `${i * 380}ms` }}
                   {...tip(<TipBody title={STATUS_LABEL[k]} line={`${counts[k]} de ${total} actividades de la semana`} />)} />
               ))}
             </div>
             <div className={s.legendRow}>
-              {legend.map(k => (
-                <span key={k}><i className={`${s.sw} ${SEG[k]}`} /><b>{counts[k]}</b>{STATUS_LABEL[k].toLowerCase()}</span>
+              {legend.map((k, i) => (
+                <span key={k}><i className={`${s.sw} ${SEG[k]}`} /><b><CountUp value={counts[k]} play={seen} delay={i * 380} /></b>{STATUS_LABEL[k].toLowerCase()}</span>
               ))}
               <span className={s.muted}>de {total} en la semana</span>
             </div>

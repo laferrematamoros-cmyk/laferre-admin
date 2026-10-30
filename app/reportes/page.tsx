@@ -152,7 +152,7 @@ export default function ReportesPage() {
                   <DailyChart key={weekKey} days={shown.days} />
                 </FoldCard>
                 <FoldCard storageKey="lf_rep_open_trend" icon={<IconTrend />} title="Semanas pasadas" peek={trendPeek(trend)}>
-                  <TrendChart points={trend} current={isCurrent} onSelect={setWeekStart} />
+                  <TrendChart key={weekKey} points={trend} current={isCurrent} onSelect={setWeekStart} />
                 </FoldCard>
               </>
             )}

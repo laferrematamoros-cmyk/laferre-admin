@@ -1,7 +1,7 @@
 'use client';
 
 import { DAY_NAMES, STATUSES, STATUS_LABEL, type DayReport, type Status } from '@/lib/reports';
-import { TipBody, useTip, useWidth } from './ui';
+import { TipBody, useInView, useTip, useWidth } from './ui';
 import s from './reportes.module.css';
 
 const FILL: Record<Status, string> = { ok: s.fOk, late: s.fLate, miss: s.fMiss, todo: s.fTodo };
@@ -22,7 +22,9 @@ const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 export default function DailyChart({ days }: { days: DayReport[] }) {
   const { ref, w } = useWidth<HTMLDivElement>();
+  const view = useInView<HTMLDivElement>();
   const tip = useTip();
+  const STEP = 110; // ms entre un día y el siguiente
   const H = 256, pt = 46, pb = 44, pl = 30, pr = 6;
   const tot = (d: DayReport) => d.ok + d.late + d.miss + d.todo;
   const maxV = niceMax(Math.max(1, ...days.map(tot)));
@@ -31,13 +33,13 @@ export default function DailyChart({ days }: { days: DayReport[] }) {
   const y = (v: number) => pt + plotH - (v / maxV) * plotH;
 
   return (
-    <div>
+    <div ref={view.ref} className={view.seen ? s.play : undefined}>
       <div className={s.legend}>
         {STATUSES.map(k => <span key={k}><i className={`${s.sw} ${SW[k]}`} />{STATUS_LABEL[k]}</span>)}
       </div>
       <div ref={ref} className={s.chart}>
         {w > 0 && (
-          <svg width={w} height={H} viewBox={`0 0 ${w} ${H}`} className={s.anim} role="img" aria-label="Actividades de cada día de la semana">
+          <svg width={w} height={H} viewBox={`0 0 ${w} ${H}`} role="img" aria-label="Actividades de cada día de la semana">
             {days.map((d, i) => d.isToday && (
               <g key={`hoy${i}`}>
                 <rect x={pl + band * i + 3} y={2} width={band - 6} height={H - 4} rx={16} className={s.todayBand} />
@@ -61,7 +63,7 @@ export default function DailyChart({ days }: { days: DayReport[] }) {
               let acc = 0;
               return (
                 <g key={i}>
-                  <g className={s.bars} style={{ animationDelay: `${i * 70}ms` }}>
+                  <g className={s.bars} style={{ animationDelay: `${i * STEP}ms` }}>
                     {segs.map((k, si) => {
                       const h = (d[k] / maxV) * plotH;
                       const yTop = pt + plotH - acc - h;
@@ -72,7 +74,8 @@ export default function DailyChart({ days }: { days: DayReport[] }) {
                         : <rect key={k} x={x} y={yTop} width={bw} height={hh} className={FILL[k]} />;
                     })}
                   </g>
-                  <text x={cx} y={(total > 0 ? y(total) : y(0)) - 8} textAnchor="middle" className={total > 0 && !future ? s.tVal : s.tMuted}>
+                  <text x={cx} y={(total > 0 ? y(total) : y(0)) - 8} textAnchor="middle"
+                    className={`${total > 0 && !future ? s.tVal : s.tMuted} ${s.fadeIn}`} style={{ animationDelay: `${i * STEP + 650}ms` }}>
                     {total > 0 ? `${done}/${total}` : '—'}
                   </text>
                   <text x={cx} y={H - 24} textAnchor="middle" className={`${s.tDay} ${d.isToday ? s.tDayToday : ''}`}>{d.label}</text>

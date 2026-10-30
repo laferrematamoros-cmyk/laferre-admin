@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { ratingOf, type Rating, type TrendPoint } from '@/lib/reports';
-import { TipBody, useTip, useWidth } from './ui';
+import { TipBody, useInView, useTip, useWidth } from './ui';
 import s from './reportes.module.css';
 
 const FILL: Record<Rating, string> = { ok: s.fOk, late: s.fLate, miss: s.fMiss };
@@ -14,8 +14,10 @@ export default function TrendChart({ points, current, onSelect }: {
   points: TrendPoint[]; current: boolean; onSelect: (start: Date) => void;
 }) {
   const { ref, w: vw } = useWidth<HTMLDivElement>();
+  const view = useInView<HTMLDivElement>();
   const tip = useTip();
   const [hover, setHover] = useState<number | null>(null);
+  const DRAW = 1400; // ms que tarda la línea en dibujarse de izquierda a derecha
 
   const n = points.length;
   const lastI = n - 1;
@@ -41,7 +43,7 @@ export default function TrendChart({ points, current, onSelect }: {
   const every = step < 52 ? 2 : 1;
 
   return (
-    <div>
+    <div ref={view.ref} className={view.seen ? s.play : undefined}>
       <div className={s.legend}>
         <span><i className={`${s.sw} ${s.dotSw} ${s.ok}`} />90% o más</span>
         <span><i className={`${s.sw} ${s.dotSw} ${s.late}`} />70 a 89%</span>
@@ -64,26 +66,32 @@ export default function TrendChart({ points, current, onSelect }: {
               </g>
             ))}
             <text x={pl + 8} y={y(95) + 3.5} className={s.tMeta}>Meta</text>
-            {area && <path d={area} fill="url(#rp-area)" />}
+            {area && <path d={area} fill="url(#rp-area)" className={s.fadeIn} style={{ animationDelay: `${DRAW / 3}ms` }} />}
             {hover !== null && <line x1={x(hover)} x2={x(hover)} y1={pt} y2={pt + plotH} className={s.xhair} />}
-            {solid.length > 0 && <path d={pathOf(solid)} className={s.trendLine} />}
+            {solid.length > 0 && (
+              <path d={pathOf(solid)} pathLength={1} className={`${s.trendLine} ${s.draw}`}
+                style={{ animationDuration: `${DRAW * (dashed ? (lastI - 1) / Math.max(1, lastI) : 1)}ms` }} />
+            )}
             {dashed && (
               <path
                 d={`M${x(valid[valid.length - 2].i).toFixed(1)} ${y(valid[valid.length - 2].pct).toFixed(1)} L${x(lastI).toFixed(1)} ${y(lastPct!).toFixed(1)}`}
-                className={`${s.trendLine} ${s.dash}`}
+                className={`${s.trendLine} ${s.dash} ${s.fadeIn}`} style={{ animationDelay: `${DRAW * 0.9}ms` }}
               />
             )}
+            {/* Cada punto aparece cuando la línea llega a él. */}
             {valid.map(p => (
-              <circle key={p.i} cx={x(p.i)} cy={y(p.pct)} r={p.i === lastI ? 6 : 4.5} className={`${s.dot} ${FILL[ratingOf(p.pct)]}`} />
+              <circle key={p.i} cx={x(p.i)} cy={y(p.pct)} r={p.i === lastI ? 6 : 4.5}
+                className={`${s.dot} ${FILL[ratingOf(p.pct)]} ${s.pop}`} style={{ animationDelay: `${(p.i / Math.max(1, lastI)) * DRAW}ms` }} />
             ))}
             {lastPct !== null && (
               <>
-                <text x={x(lastI) + 12} y={y(lastPct) + 1} className={s.tVal} style={{ fontSize: 14 }}>{lastPct}%</text>
-                {current && <text x={x(lastI) + 12} y={y(lastPct) + 15} className={s.tMuted} style={{ fontSize: 10.5 }}>en curso</text>}
+                <text x={x(lastI) + 12} y={y(lastPct) + 1} className={`${s.tVal} ${s.fadeIn}`} style={{ fontSize: 14, animationDelay: `${DRAW}ms` }}>{lastPct}%</text>
+                {current && <text x={x(lastI) + 12} y={y(lastPct) + 15} className={`${s.tMuted} ${s.fadeIn}`} style={{ fontSize: 10.5, animationDelay: `${DRAW}ms` }}>en curso</text>}
               </>
             )}
             {minP && minP.i !== lastI && (
-              <text x={x(minP.i)} y={minP.pct < 15 ? y(minP.pct) - 12 : y(minP.pct) + 20} textAnchor="middle" className={s.tVal}>{minP.pct}%</text>
+              <text x={x(minP.i)} y={minP.pct < 15 ? y(minP.pct) - 12 : y(minP.pct) + 20} textAnchor="middle"
+                className={`${s.tVal} ${s.fadeIn}`} style={{ animationDelay: `${(minP.i / Math.max(1, lastI)) * DRAW + 200}ms` }}>{minP.pct}%</text>
             )}
             {points.map((p, i) => (i === lastI || (lastI - i) % every === 0) && (
               <text key={`l${i}`} x={x(i)} y={H - 10} textAnchor="middle" className={s.tDate}

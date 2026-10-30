@@ -126,7 +126,7 @@
 .pn small { font-size: 11.5px; color: var(--muted); }
 .pbar { position: relative; height: 10px; }
 .pbar::before { content: ""; position: absolute; inset: 0; border-radius: 999px; background: var(--track); }
-.pfill { position: relative; display: flex; gap: 3px; height: 100%; transform-origin: 0 50%; animation: growX .8s cubic-bezier(.2, .7, .2, 1) both; }
+.pfill { position: relative; display: flex; gap: 3px; height: 100%; }
 .pfill i { flex-basis: 0; min-width: 3px; border-radius: 999px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28); }
 .nums { display: flex; justify-content: flex-end; gap: 14px; font-size: 12.5px; white-space: nowrap; color: var(--muted); }
 .nums b { font-size: 14px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
@@ -182,7 +182,6 @@
 .dot { stroke: var(--ring); stroke-width: 2; }
 .xhair { stroke: var(--faint); stroke-width: 1; opacity: .6; }
 .hit { fill: transparent; cursor: pointer; }
-.anim .bars { transform-box: fill-box; transform-origin: 50% 100%; animation: grow .8s cubic-bezier(.2, .7, .2, 1) both; }
 
 /* ── Globo de ayuda ── */
 .tip {
@@ -198,9 +197,23 @@
 .tipRow b { margin-left: auto; padding-left: 14px; font-variant-numeric: tabular-nums; }
 .tipFoot { margin-top: 5px; color: var(--muted); }
 
-@keyframes grow { from { transform: scaleY(.04); } }
-@keyframes growX { from { transform: scaleX(.03); } }
+/* ── Animación de carga ──
+   Cada gráfica arranca en cero y crece hasta su valor, frenando al final.
+   Esperan en pausa hasta que su tarjeta aparece en pantalla (useInView pone .play). */
+.seg { transform-origin: 0 50%; animation: growX .55s cubic-bezier(.2, .7, .2, 1) both paused; }
+.pfill { transform-origin: 0 50%; animation: growX 1.1s cubic-bezier(.2, .7, .2, 1) both paused; }
+.bars { transform-box: fill-box; transform-origin: 50% 100%; animation: grow .9s cubic-bezier(.2, .7, .2, 1) both paused; }
+.draw { stroke-dasharray: 1; animation: draw 1.4s linear both paused; }
+.pop { transform-box: fill-box; transform-origin: center; animation: pop .35s cubic-bezier(.2, .8, .3, 1.3) both paused; }
+.fadeIn { animation: fadeIn .45s ease-out both paused; }
+.play .seg, .play .pfill, .play .bars, .play .draw, .play .pop, .play .fadeIn { animation-play-state: running; }
+
+@keyframes grow { from { transform: scaleY(0); } }
+@keyframes growX { from { transform: scaleX(0); } }
 @keyframes ringIn { from { stroke-dashoffset: var(--C); } }
+@keyframes draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes pop { from { transform: scale(0); opacity: 0; } }
+@keyframes fadeIn { from { opacity: 0; } }
 
 @media (max-width: 1080px) {
   .bento { grid-template-columns: minmax(0, 1fr); }
@@ -217,7 +230,8 @@
   .foldBody { padding: 0 18px 18px; }
   .headline { font-size: 19px; }
 }
+/* Si el sistema pide menos movimiento: se llenan igual, pero en medio segundo y todas a la vez. */
 @media (prefers-reduced-motion: reduce) {
-  .ringArc, .pfill, .anim .bars { animation: none; }
+  .ringArc, .seg, .pfill, .bars, .draw, .pop, .fadeIn { animation-duration: .5s !important; animation-delay: 0s !important; }
   .tip, .chev, .prow, .ins li, .seg, .content { transition: none; }
 }
