@@ -6,7 +6,6 @@ import AdminShell from '@/components/AdminShell';
 import { supabase } from '@/lib/supabase';
 import { useCompany } from '@/lib/company-context';
 import { loadActivities, type LiveActivity } from '@/lib/load-activities';
-import { joinEs } from '@/lib/report-insights';
 import { archiveActivity, restoreActivity, setActivityActive } from './actions';
 import { IconBell, IconCamera, IconChevronDown, IconPlus, IconUsers } from '@/components/panel/icons';
 import s from '@/components/panel/panel.module.css';
@@ -23,13 +22,9 @@ function monthText(w: number): string {
   return w === -1 ? 'Sólo la última semana del mes' : `Sólo la ${w}ª semana del mes`;
 }
 
+/** La app de empleados sólo pide foto (nombre/nota/firma existen en la base pero no se usan). */
 function evidenceText(x: LiveActivity): string | null {
-  const parts: string[] = [];
-  if (x.evidence_photo) parts.push('foto');
-  if (x.evidence_note) parts.push('nota');
-  if (x.evidence_signature) parts.push('firma');
-  if (x.evidence_name) parts.push('nombre');
-  return parts.length ? `Pide ${joinEs(parts)}` : null;
+  return x.evidence_photo ? 'Pide foto' : null;
 }
 
 function shortDate(iso: string): string {
