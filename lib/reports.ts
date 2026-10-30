@@ -1,14 +1,10 @@
 import type { Activity, Completion, Employee } from './supabase';
 
-export interface EmployeeStat { name: string; done: number; missed: number; rate: number; }
-export interface MissedItem   { title: string; date: string; assignee: string; }
-export interface DayBar       { d: string; done: number; missed: number; late: number; }
-export interface ReportData {
-  done: number; missed: number; late: number; total: number;
-  byEmployee: EmployeeStat[]; missed_list: MissedItem[]; daily: DayBar[];
-}
-
+// ── Nombres de días y meses ─────────────────────────────────────────────────────
 const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+export const DAY_NAMES = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+const MONTHS_SHORT = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const MONTHS_LONG = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
 // ── Semana del mes ──────────────────────────────────────────────────────────────
 /** Semana del mes (1..): la semana que contiene el día 1 es la 1ª (base lunes). */
@@ -36,6 +32,7 @@ export function activityRunsOn(a: { days_of_week: number[]; week_of_month?: numb
   return wom == null ? true : matchesWeekOfMonth(wom, d);
 }
 
+// ── Fechas ──────────────────────────────────────────────────────────────────────
 export function toDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
@@ -52,140 +49,194 @@ export function mondayOf(d: Date): Date {
 /** Lunes de la semana actual. */
 export function currentMonday(): Date { return mondayOf(new Date()); }
 
-/** "YYYY-Www" (valor de <input type="week">) → lunes de esa semana ISO. */
-export function weekStartFromInput(value: string): Date {
-  const [y, w] = value.split('-W').map(Number);
-  const jan4 = new Date(y, 0, 4);
-  const jan4Dow = (jan4.getDay() + 6) % 7;            // 0=Lun..6=Dom
-  const week1Mon = new Date(jan4);
-  week1Mon.setDate(jan4.getDate() - jan4Dow);          // lunes de la semana 1 ISO
-  const mon = new Date(week1Mon);
-  mon.setDate(week1Mon.getDate() + (w - 1) * 7);
-  mon.setHours(0, 0, 0, 0);
-  return mon;
+function addDays(d: Date, n: number): Date {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
 }
 
-/** Lunes → "YYYY-Www" (para el value del <input type="week">). */
-export function weekInputValue(monday: Date): string {
-  const d = new Date(monday);
-  d.setHours(0, 0, 0, 0);
-  const dow = (d.getDay() + 6) % 7;
-  d.setDate(d.getDate() - dow + 3);                    // jueves de esta semana
-  const year = d.getFullYear();
-  const firstThu = new Date(year, 0, 4);
-  const ftDow = (firstThu.getDay() + 6) % 7;
-  firstThu.setDate(firstThu.getDate() - ftDow + 3);    // jueves de la semana 1
-  const week = 1 + Math.round((d.getTime() - firstThu.getTime()) / (7 * 24 * 3600 * 1000));
-  return `${year}-W${String(week).padStart(2, '0')}`;
+/** El lunes `n` semanas antes (n < 0) o después (n > 0). */
+export function addWeeks(monday: Date, n: number): Date {
+  const x = addDays(monday, n * 7);
+  x.setHours(0, 0, 0, 0);
+  return x;
 }
 
-/** Etiqueta "X al Y de mes". */
+/** "26 de octubre al 1 de noviembre" · "2 al 8 de noviembre". */
 export function weekLabel(monday: Date): string {
-  const sun = new Date(monday); sun.setDate(monday.getDate() + 6);
-  return `${monday.getDate()} al ${sun.getDate()} de ${monday.toLocaleString('es-MX', { month: 'long' })}`;
+  const sun = addDays(monday, 6);
+  if (monday.getMonth() === sun.getMonth()) {
+    return `${monday.getDate()} al ${sun.getDate()} de ${MONTHS_LONG[sun.getMonth()]}`;
+  }
+  return `${monday.getDate()} de ${MONTHS_LONG[monday.getMonth()]} al ${sun.getDate()} de ${MONTHS_LONG[sun.getMonth()]}`;
 }
 
-/** Reporte de una semana (lunes→domingo). Solo cuenta actividades que ya
- *  existían cada día (created_at <= fin de ese día). `now` decide qué días
- *  "pasados" entran en la lista de no realizadas. */
-export function computeWeek(
+/** "26 oct – 1 nov" · "2 – 8 nov" (para el selector de semana). */
+export function weekShortLabel(monday: Date): string {
+  const sun = addDays(monday, 6);
+  if (monday.getMonth() === sun.getMonth()) {
+    return `${monday.getDate()} – ${sun.getDate()} ${MONTHS_SHORT[sun.getMonth()]}`;
+  }
+  return `${monday.getDate()} ${MONTHS_SHORT[monday.getMonth()]} – ${sun.getDate()} ${MONTHS_SHORT[sun.getMonth()]}`;
+}
+
+/** "19 oct". */
+export function dayMonthShort(d: Date): string {
+  return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`;
+}
+
+/** Fechas que necesita la pantalla: 12 semanas que terminan en la elegida. */
+export function reportRange(monday: Date): { from: string; to: string } {
+  return { from: toDateStr(addWeeks(monday, -11)), to: toDateStr(addDays(monday, 6)) };
+}
+
+// ── Estados ─────────────────────────────────────────────────────────────────────
+export type Status = 'ok' | 'late' | 'miss' | 'todo';
+export const STATUSES: Status[] = ['ok', 'late', 'miss', 'todo'];
+export const STATUS_LABEL: Record<Status, string> = { ok: 'A tiempo', late: 'Tarde', miss: 'Sin hacer', todo: 'Por hacer' };
+export type Counts = Record<Status, number>;
+
+export type ReportActivity = Pick<Activity, 'id' | 'title' | 'limit_time' | 'days_of_week' | 'week_of_month' | 'assigned_employee_ids' | 'created_at'>;
+export type ReportCompletion = Pick<Completion, 'activity_id' | 'employee_id' | 'scheduled_date' | 'was_late'>;
+export type ReportEmployee = Pick<Employee, 'id' | 'name' | 'initials'>;
+
+export interface DayReport extends Counts { date: Date; label: string; isToday: boolean; }
+export interface PersonRow { id: string; name: string; initials: string; done: number; late: number; miss: number; }
+export interface MissedItem { title: string; date: Date; limit: string; assignee: string; general: boolean; }
+export interface WeekReport {
+  weekStart: Date;
+  counts: Counts;
+  /** a tiempo + tarde */
+  done: number;
+  /** hechas + sin hacer (lo que ya tocaba) */
+  due: number;
+  /** hechas ÷ lo que ya tocaba; null si todavía no vence nada */
+  pct: number | null;
+  days: DayReport[];
+  /** ordenadas: más sin hacer, más tarde, más hechas, nombre; sin actividad al final */
+  people: PersonRow[];
+  /** generales (sin asignados) que vencieron sin hacerse */
+  generalMiss: number;
+  missed: MissedItem[];
+}
+export interface TrendPoint { start: Date; label: string; pct: number | null; }
+
+export function emptyCounts(): Counts { return { ok: 0, late: 0, miss: 0, todo: 0 }; }
+
+export function pctOf(done: number, due: number): number | null {
+  return due > 0 ? Math.round(done / due * 100) : null;
+}
+
+export type Rating = 'ok' | 'late' | 'miss';
+export function ratingOf(pct: number): Rating { return pct >= 90 ? 'ok' : pct >= 70 ? 'late' : 'miss'; }
+export const RATING_LABEL: Record<Rating, string> = { ok: 'Vamos bien', late: 'Vamos regular', miss: 'Vamos mal' };
+
+/** Momento en que vence: la fecha a la hora límite, en hora local. */
+export function dueAt(day: Date, limitTime: string): Date {
+  const [h, m, s] = limitTime.split(':').map(Number);
+  return new Date(day.getFullYear(), day.getMonth(), day.getDate(), h || 0, m || 0, s || 0);
+}
+
+/** Estado de una actividad programada en `day`, visto en el momento `now`. */
+export function activityStatus(comp: ReportCompletion | undefined, day: Date, limitTime: string, now: Date): Status {
+  if (comp) return comp.was_late ? 'late' : 'ok';
+  return now.getTime() > dueAt(day, limitTime).getTime() ? 'miss' : 'todo';
+}
+
+// ── Reporte de una semana ───────────────────────────────────────────────────────
+/** Reporte de la semana que empieza en `weekStart` (lunes), visto en el momento `now`.
+ *  Sólo cuenta actividades que ya existían cada día (created_at ≤ fin del día). */
+export function buildWeekReport(
   weekStart: Date,
-  activities: Activity[],
-  completions: Completion[],
-  employees: Employee[],
+  activities: ReportActivity[],
+  completions: ReportCompletion[],
+  employees: ReportEmployee[],
   now: Date = new Date(),
-): ReportData {
-  const empMap = Object.fromEntries(employees.map(e => [e.id, e]));
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(weekStart); d.setDate(weekStart.getDate() + i); return d;
-  });
-
-  let totalScheduled = 0, totalDone = 0, totalLate = 0;
-  const byEmpMap: Record<string, { done: number; missed: number }> = {};
-  const missedList: MissedItem[] = [];
-  const daily: DayBar[] = [];
-
-  for (const dayDate of days) {
-    const dateStr = toDateStr(dayDate);
-    const dow = dayDate.getDay();
-    const dayEnd = new Date(dayDate); dayEnd.setHours(23, 59, 59, 999);
-
-    const dayActs = activities.filter(a =>
-      activityRunsOn(a, dayDate) &&
-      new Date(a.created_at) <= dayEnd,
-    );
-    const dayComps = completions.filter(c => c.scheduled_date === dateStr);
-    const doneIds = new Set(dayComps.map(c => c.activity_id));
-    let dayDone = 0, dayMissed = 0, dayLate = 0;
-
-    for (const act of dayActs) {
-      totalScheduled++;
-      const isDone = doneIds.has(act.id);
-      const comp = dayComps.find(c => c.activity_id === act.id);
-      const ids = (act.assigned_employee_ids as string[]).length > 0
-        ? (act.assigned_employee_ids as string[])
-        : ['general'];
-      const assigneeNames = (act.assigned_employee_ids as string[])
-        .map(id => empMap[id]?.name ?? '?').join(', ') || 'General';
-
-      for (const eid of ids) {
-        if (!byEmpMap[eid]) byEmpMap[eid] = { done: 0, missed: 0 };
-        if (isDone) byEmpMap[eid].done++; else byEmpMap[eid].missed++;
-      }
-
-      if (isDone) {
-        totalDone++; dayDone++;
-        if (comp?.was_late) { totalLate++; dayLate++; }
-      } else {
-        dayMissed++;
-        if (dayEnd < now) {
-          missedList.push({
-            title: act.title,
-            date: dayDate.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' }),
-            assignee: assigneeNames,
-          });
-        }
-      }
-    }
-    daily.push({ d: DAY_LABELS[dow], done: dayDone, missed: dayMissed, late: dayLate });
+): WeekReport {
+  const emp = new Map(employees.map(e => [e.id, e]));
+  const compByKey = new Map<string, ReportCompletion>();
+  for (const c of completions) {
+    const k = `${c.activity_id}|${c.scheduled_date}`;
+    if (!compByKey.has(k)) compByKey.set(k, c); // un registro repetido cuenta una vez
   }
 
-  const byEmployee = employees.map(e => {
-    const s = byEmpMap[e.id] ?? { done: 0, missed: 0 };
-    const tot = s.done + s.missed;
-    return { name: e.name, done: s.done, missed: s.missed, rate: tot > 0 ? Math.round(s.done / tot * 100) : 100 };
-  }).sort((a, b) => b.rate - a.rate);
-
-  return {
-    done: totalDone, missed: totalScheduled - totalDone, late: totalLate, total: totalScheduled,
-    byEmployee, missed_list: missedList, daily,
+  const counts = emptyCounts();
+  const per = new Map<string, { done: number; late: number; miss: number }>();
+  const bump = (id: string) => {
+    let p = per.get(id);
+    if (!p) { p = { done: 0, late: 0, miss: 0 }; per.set(id, p); }
+    return p;
   };
-}
+  const days: DayReport[] = [];
+  const missed: MissedItem[] = [];
+  let generalMiss = 0;
+  const todayStr = toDateStr(now);
 
-export function pctOf(r: ReportData): number {
-  return r.total > 0 ? Math.round(r.done / r.total * 100) : 0;
-}
+  for (let i = 0; i < 7; i++) {
+    const day = addDays(weekStart, i);
+    day.setHours(0, 0, 0, 0);
+    const dateStr = toDateStr(day);
+    const dayEnd = new Date(day); dayEnd.setHours(23, 59, 59, 999);
+    const dc = emptyCounts();
 
-/** Cumplimiento (realizadas / programadas) en un rango de días [start, end]. */
-export function rangeStats(
-  start: Date, end: Date,
-  activities: Activity[], completions: Completion[],
-): { done: number; total: number } {
-  let total = 0, done = 0;
-  const d = new Date(start); d.setHours(12, 0, 0, 0);
-  const stop = new Date(end); stop.setHours(12, 0, 0, 0);
-  while (d <= stop) {
-    const dateStr = toDateStr(d);
-    const dayDate = new Date(d);
-    const dayEnd = new Date(d); dayEnd.setHours(23, 59, 59, 999);
-    const doneIds = new Set(completions.filter(c => c.scheduled_date === dateStr).map(c => c.activity_id));
     for (const a of activities) {
-      if (activityRunsOn(a, dayDate) && new Date(a.created_at) <= dayEnd) {
-        total++;
-        if (doneIds.has(a.id)) done++;
+      if (!activityRunsOn(a, day) || new Date(a.created_at) > dayEnd) continue;
+      const comp = compByKey.get(`${a.id}|${dateStr}`);
+      const st = activityStatus(comp, day, a.limit_time, now);
+      dc[st]++;
+      counts[st]++;
+      const assigned = (a.assigned_employee_ids ?? []) as string[];
+
+      if (comp) {
+        if (emp.has(comp.employee_id)) {
+          const p = bump(comp.employee_id);
+          p.done++;
+          if (comp.was_late) p.late++;
+        }
+      } else if (st === 'miss') {
+        if (assigned.length === 0) generalMiss++;
+        for (const id of assigned) if (emp.has(id)) bump(id).miss++;
+        missed.push({
+          title: a.title,
+          date: day,
+          limit: a.limit_time.slice(0, 5),
+          assignee: assigned.length ? assigned.map(id => emp.get(id)?.name ?? '?').join(', ') : 'General',
+          general: assigned.length === 0,
+        });
       }
     }
-    d.setDate(d.getDate() + 1);
+    days.push({ ...dc, date: day, label: DAY_LABELS[day.getDay()], isToday: dateStr === todayStr });
   }
-  return { done, total };
+
+  const people: PersonRow[] = employees
+    .map(e => {
+      const p = per.get(e.id) ?? { done: 0, late: 0, miss: 0 };
+      return { id: e.id, name: e.name, initials: e.initials || e.name.slice(0, 2).toUpperCase(), ...p };
+    })
+    .sort((a, b) => {
+      const idleA = a.done + a.miss === 0, idleB = b.done + b.miss === 0;
+      if (idleA !== idleB) return idleA ? 1 : -1;
+      return b.miss - a.miss || b.late - a.late || b.done - a.done || a.name.localeCompare(b.name, 'es');
+    });
+
+  missed.sort((x, y) => x.date.getTime() - y.date.getTime() || x.limit.localeCompare(y.limit));
+
+  const done = counts.ok + counts.late;
+  const due = done + counts.miss;
+  return { weekStart, counts, done, due, pct: pctOf(done, due), days, people, generalMiss, missed };
+}
+
+/** Porcentaje de las `n` semanas que terminan en `selected` (la última es la elegida). */
+export function buildTrend(
+  selected: Date,
+  activities: ReportActivity[],
+  completions: ReportCompletion[],
+  employees: ReportEmployee[],
+  now: Date = new Date(),
+  n = 12,
+): TrendPoint[] {
+  return Array.from({ length: n }, (_, i) => {
+    const start = addWeeks(selected, i - (n - 1));
+    return { start, label: dayMonthShort(start), pct: buildWeekReport(start, activities, completions, employees, now).pct };
+  });
 }
