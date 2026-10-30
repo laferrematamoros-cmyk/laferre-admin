@@ -1,8 +1,8 @@
 'use client';
 
 import { addWeeks, currentMonday, weekShortLabel } from '@/lib/reports';
-import { IconLeft, IconRight } from './icons';
-import s from './reportes.module.css';
+import { IconLeft, IconRight } from '@/components/panel/icons';
+import s from '@/components/panel/panel.module.css';
 
 export default function WeekPicker({ weekStart, onChange }: { weekStart: Date; onChange: (monday: Date) => void }) {
   const thisMonday = currentMonday();

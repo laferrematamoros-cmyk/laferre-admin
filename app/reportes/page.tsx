@@ -12,7 +12,7 @@ import {
 import { buildInsights, dailyPeek, trendPeek } from '@/lib/report-insights';
 import { fetchAllPages } from '@/lib/fetch-all';
 import { downloadReportPdf } from '@/lib/report-pdf';
-import { FoldCard, TipProvider } from '@/components/reportes/ui';
+import { FoldCard, TipProvider } from '@/components/panel/ui';
 import WeekPicker from '@/components/reportes/WeekPicker';
 import SummaryCard from '@/components/reportes/SummaryCard';
 import InsightsCard from '@/components/reportes/InsightsCard';
@@ -20,8 +20,8 @@ import PeopleCard from '@/components/reportes/PeopleCard';
 import MissedCard from '@/components/reportes/MissedCard';
 import DailyChart from '@/components/reportes/DailyChart';
 import TrendChart from '@/components/reportes/TrendChart';
-import { IconBars, IconDownload, IconTrend } from '@/components/reportes/icons';
-import s from '@/components/reportes/reportes.module.css';
+import { IconBars, IconDownload, IconTrend } from '@/components/panel/icons';
+import s from '@/components/panel/panel.module.css';
 
 interface Loaded {
   key: string;

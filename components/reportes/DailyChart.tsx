@@ -1,8 +1,8 @@
 'use client';
 
 import { DAY_NAMES, STATUSES, STATUS_LABEL, type DayReport, type Status } from '@/lib/reports';
-import { TipBody, useInView, useTip, useWidth } from './ui';
-import s from './reportes.module.css';
+import { TipBody, useInView, useTip, useWidth } from '@/components/panel/ui';
+import s from '@/components/panel/panel.module.css';
 
 const FILL: Record<Status, string> = { ok: s.fOk, late: s.fLate, miss: s.fMiss, todo: s.fTodo };
 const SW: Record<Status, string> = { ok: s.ok, late: s.late, miss: s.miss, todo: s.todo };

@@ -1,6 +1,6 @@
 import type { Insight } from '@/lib/report-insights';
-import { IconCheck, IconClock, IconDown, IconEqual, IconSpark, IconUp, IconX } from './icons';
-import s from './reportes.module.css';
+import { IconCheck, IconClock, IconDown, IconEqual, IconSpark, IconUp, IconX } from '@/components/panel/icons';
+import s from '@/components/panel/panel.module.css';
 
 const ICON = { check: IconCheck, x: IconX, clock: IconClock, up: IconUp, down: IconDown, equal: IconEqual };
 const TONE = { ok: s.okPill, late: s.latePill, miss: s.missPill };

@@ -1,6 +1,6 @@
 import { toDateStr, type MissedItem } from '@/lib/reports';
-import { IconCheck, IconXCircle } from './icons';
-import s from './reportes.module.css';
+import { IconCheck, IconXCircle } from '@/components/panel/icons';
+import s from '@/components/panel/panel.module.css';
 
 const DAY = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 

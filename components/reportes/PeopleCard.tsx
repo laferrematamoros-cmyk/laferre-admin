@@ -1,9 +1,9 @@
 'use client';
 
 import type { PersonRow } from '@/lib/reports';
-import { CountUp, TipBody, useInView, useTip } from './ui';
-import { IconCheck, IconUsers, IconX } from './icons';
-import s from './reportes.module.css';
+import { CountUp, TipBody, useInView, useTip } from '@/components/panel/ui';
+import { IconCheck, IconUsers, IconX } from '@/components/panel/icons';
+import s from '@/components/panel/panel.module.css';
 
 export default function PeopleCard({ people, generalMiss, showCounts }: {
   people: PersonRow[]; generalMiss: number; showCounts: boolean;

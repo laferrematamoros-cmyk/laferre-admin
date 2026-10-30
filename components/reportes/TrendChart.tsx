@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { ratingOf, type Rating, type TrendPoint } from '@/lib/reports';
-import { TipBody, useInView, useTip, useWidth } from './ui';
-import s from './reportes.module.css';
+import { TipBody, useInView, useTip, useWidth } from '@/components/panel/ui';
+import s from '@/components/panel/panel.module.css';
 
 const FILL: Record<Rating, string> = { ok: s.fOk, late: s.fLate, miss: s.fMiss };
 const WORD: Record<Rating, string> = { ok: 'Bien', late: 'Regular', miss: 'Bajo' };

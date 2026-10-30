@@ -6,7 +6,7 @@ import {
 } from 'react';
 import { STATUSES, STATUS_LABEL, type Status } from '@/lib/reports';
 import { IconChevronDown } from './icons';
-import s from './reportes.module.css';
+import s from './panel.module.css';
 
 // ── Globo de ayuda ──────────────────────────────────────────────────────────────
 type TipState = { content: ReactNode; x: number; y: number } | null;

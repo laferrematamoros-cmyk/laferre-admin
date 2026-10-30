@@ -2,9 +2,9 @@
 
 import type { CSSProperties } from 'react';
 import { STATUSES, STATUS_LABEL, RATING_LABEL, ratingOf, type Status, type WeekReport } from '@/lib/reports';
-import { CountUp, TipBody, useInView, useTip } from './ui';
-import { IconCaretDown, IconCaretUp, IconCheck, IconClock, IconX } from './icons';
-import s from './reportes.module.css';
+import { CountUp, TipBody, useInView, useTip } from '@/components/panel/ui';
+import { IconCaretDown, IconCaretUp, IconCheck, IconClock, IconX } from '@/components/panel/icons';
+import s from '@/components/panel/panel.module.css';
 
 const SEG: Record<Status, string> = { ok: s.ok, late: s.late, miss: s.miss, todo: s.todo };
 const PILL = { ok: s.okPill, late: s.latePill, miss: s.missPill };
