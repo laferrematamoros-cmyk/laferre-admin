@@ -91,12 +91,12 @@ export function useInView<T extends Element>(threshold = 0.25) {
 }
 
 /** Número que cuenta de 0 hasta `value` cuando `play` se vuelve true. */
-export function CountUp({ value, play = true, delay = 0 }: { value: number; play?: boolean; delay?: number }) {
+export function CountUp({ value, play = true, delay = 0, duration = 1900 }: { value: number; play?: boolean; delay?: number; duration?: number }) {
   const [shown, setShown] = useState(value);
   useLayoutEffect(() => {
     if (!play) { setShown(0); return; }
     const reduced = reducedMotion();
-    const dur = reduced ? 500 : 1100;
+    const dur = reduced ? 500 : duration;
     const t0 = performance.now() + (reduced ? 0 : delay);
     let raf = 0;
     const tick = (t: number) => {
@@ -107,7 +107,7 @@ export function CountUp({ value, play = true, delay = 0 }: { value: number; play
     setShown(0);
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [value, play, delay]);
+  }, [value, play, delay, duration]);
   return <>{shown}</>;
 }
 

@@ -29,7 +29,7 @@ function Ring({ pct }: { pct: number | null }) {
         )}
       </svg>
       <div className={s.ringVal}>
-        <b>{pct === null ? '—' : <><CountUp value={pct} />%</>}</b>
+        <b>{pct === null ? '—' : <><CountUp value={pct} duration={2200} />%</>}</b>
         <span>{pct === null ? 'sin datos' : 'hecho'}</span>
       </div>
     </div>
@@ -60,7 +60,7 @@ export default function SummaryCard({ report, prevPct, isCurrent }: { report: We
         <p className={s.headline}>
           {pct === null
             ? <>Todavía no toca nada esta semana.</>
-            : <>Se hizo el <b><CountUp value={pct} />%</b> de lo que {isCurrent ? 'ya ' : ''}tocaba: <b><CountUp value={done} /> de {due}</b>.</>}
+            : <>Se hizo el <b><CountUp value={pct} duration={2200} />%</b> de lo que {isCurrent ? 'ya ' : ''}tocaba: <b><CountUp value={done} duration={2200} /> de {due}</b>.</>}
         </p>
         {delta !== null && (
           <p className={s.delta}>
@@ -74,13 +74,13 @@ export default function SummaryCard({ report, prevPct, isCurrent }: { report: We
             <div className={s.weekBar} aria-label={`Las ${total} actividades de la semana`}>
               {/* Se llena de izquierda a derecha: un color tras otro. */}
               {STATUSES.filter(k => counts[k] > 0).map((k, i) => (
-                <i key={k} className={`${s.seg} ${SEG[k]}`} style={{ flexGrow: counts[k], animationDelay: `${i * 380}ms` }}
+                <i key={k} className={`${s.seg} ${SEG[k]}`} style={{ flexGrow: counts[k], animationDelay: `${i * 650}ms` }}
                   {...tip(<TipBody title={STATUS_LABEL[k]} line={`${counts[k]} de ${total} actividades de la semana`} />)} />
               ))}
             </div>
             <div className={s.legendRow}>
               {legend.map((k, i) => (
-                <span key={k}><i className={`${s.sw} ${SEG[k]}`} /><b><CountUp value={counts[k]} play={seen} delay={i * 380} /></b>{STATUS_LABEL[k].toLowerCase()}</span>
+                <span key={k}><i className={`${s.sw} ${SEG[k]}`} /><b><CountUp value={counts[k]} play={seen} delay={i * 650} duration={1000} /></b>{STATUS_LABEL[k].toLowerCase()}</span>
               ))}
               <span className={s.muted}>de {total} en la semana</span>
             </div>

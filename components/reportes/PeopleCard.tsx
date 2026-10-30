@@ -10,7 +10,7 @@ export default function PeopleCard({ people, generalMiss, showCounts }: {
 }) {
   const tip = useTip();
   const { ref, seen } = useInView<HTMLElement>();
-  const STEP = 140; // ms entre una barra y la siguiente
+  const STEP = 240; // ms entre una barra y la siguiente
   const active = people.filter(p => p.done + p.miss > 0);
   const idle = people.filter(p => p.done + p.miss === 0);
   const max = Math.max(1, generalMiss, ...active.map(p => p.done + p.miss));

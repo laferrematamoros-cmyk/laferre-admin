@@ -84,7 +84,7 @@
 .ringWrap { position: relative; width: 156px; height: 156px; }
 .ringWrap svg { display: block; }
 .ringTrack { fill: none; stroke: var(--track); stroke-width: 13; }
-.ringArc { fill: none; stroke-width: 13; stroke-linecap: round; animation: ringIn 1.2s cubic-bezier(.2, .7, .2, 1) both; }
+.ringArc { fill: none; stroke-width: 13; stroke-linecap: round; animation: ringIn 2.2s cubic-bezier(.2, .7, .2, 1) both; }
 .arcOk { stroke: url(#rp-arc-ok); }
 .arcLate { stroke: var(--late); }
 .arcMiss { stroke: var(--miss); }
@@ -200,12 +200,12 @@
 /* ── Animación de carga ──
    Cada gráfica arranca en cero y crece hasta su valor, frenando al final.
    Esperan en pausa hasta que su tarjeta aparece en pantalla (useInView pone .play). */
-.seg { transform-origin: 0 50%; animation: growX .55s cubic-bezier(.2, .7, .2, 1) both paused; }
-.pfill { transform-origin: 0 50%; animation: growX 1.1s cubic-bezier(.2, .7, .2, 1) both paused; }
-.bars { transform-box: fill-box; transform-origin: 50% 100%; animation: grow .9s cubic-bezier(.2, .7, .2, 1) both paused; }
-.draw { stroke-dasharray: 1; animation: draw 1.4s linear both paused; }
-.pop { transform-box: fill-box; transform-origin: center; animation: pop .35s cubic-bezier(.2, .8, .3, 1.3) both paused; }
-.fadeIn { animation: fadeIn .45s ease-out both paused; }
+.seg { transform-origin: 0 50%; animation: growX 1s cubic-bezier(.2, .7, .2, 1) both paused; }
+.pfill { transform-origin: 0 50%; animation: growX 1.9s cubic-bezier(.2, .7, .2, 1) both paused; }
+.bars { transform-box: fill-box; transform-origin: 50% 100%; animation: grow 1.5s cubic-bezier(.2, .7, .2, 1) both paused; }
+.draw { stroke-dasharray: 1; animation: draw 2.4s linear both paused; }
+.pop { transform-box: fill-box; transform-origin: center; animation: pop .5s cubic-bezier(.2, .8, .3, 1.3) both paused; }
+.fadeIn { animation: fadeIn .6s ease-out both paused; }
 .play .seg, .play .pfill, .play .bars, .play .draw, .play .pop, .play .fadeIn { animation-play-state: running; }
 
 @keyframes grow { from { transform: scaleY(0); } }

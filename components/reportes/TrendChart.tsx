@@ -17,7 +17,7 @@ export default function TrendChart({ points, current, onSelect }: {
   const view = useInView<HTMLDivElement>();
   const tip = useTip();
   const [hover, setHover] = useState<number | null>(null);
-  const DRAW = 1400; // ms que tarda la línea en dibujarse de izquierda a derecha
+  const DRAW = 2400; // ms que tarda la línea en dibujarse de izquierda a derecha
 
   const n = points.length;
   const lastI = n - 1;
