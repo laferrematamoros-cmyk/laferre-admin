@@ -1,242 +1,144 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import AdminShell from '@/components/AdminShell';
-import UsersSection from '@/components/UsersSection';
+import { supabase } from '@/lib/supabase';
+import { useSession } from '@/lib/session-context';
+import Usuarios, { companyLabel, initials, ROLE, type CompanyOpt } from '@/components/ajustes/Usuarios';
+import { IconCheck } from '@/components/panel/icons';
+import s from '@/components/panel/panel.module.css';
+import a from '@/components/ajustes/aj.module.css';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-interface Settings {
-  storeName: string;
-  adminName: string;
-  adminInitials: string;
-  workStart: string;
-  workEnd: string;
-  lateThreshold: number;
-  timezone: string;
-}
+// Nombre e iniciales con que aparece la contraseña maestra en el menú. Viven en
+// este navegador; los lee AdminShell (misma llave).
+const SETTINGS_KEY = 'lf_admin_settings';
+const DEFAULT_NAME = 'Administrador';
+const DEFAULT_INITIALS = 'AD';
 
-const DEFAULT: Settings = {
-  storeName: 'La Ferre',
-  adminName: 'Don Beto',
-  adminInitials: 'RB',
-  workStart: '08:00',
-  workEnd: '20:00',
-  lateThreshold: 15,
-  timezone: 'America/Matamoros',
-};
-
-const STORAGE_KEY = 'lf_admin_settings';
-
-function load(): Settings {
+function readLocal(): { name: string; initials: string } {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? { ...DEFAULT, ...JSON.parse(raw) } : DEFAULT;
-  } catch { return DEFAULT; }
+    const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}');
+    return { name: raw.adminName || DEFAULT_NAME, initials: raw.adminInitials || DEFAULT_INITIALS };
+  } catch {
+    return { name: DEFAULT_NAME, initials: DEFAULT_INITIALS };
+  }
 }
 
-function save(s: Settings) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
-  window.dispatchEvent(new Event('storage'));
+function writeLocal(name: string, inits: string): boolean {
+  try {
+    const prev = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}');
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...prev, adminName: name, adminInitials: inits }));
+    window.dispatchEvent(new Event('storage'));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-// ── Components ────────────────────────────────────────────────────────────────
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl border p-4 md:p-[22px]" style={{ background: '#fff', borderColor: '#E4E4E7' }}>
-      <h2 className="mb-4 text-[13px] font-bold">{title}</h2>
-      <div className="flex flex-col gap-4">{children}</div>
-    </div>
-  );
-}
-
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div className="grid items-start gap-1.5 sm:grid-cols-[200px_1fr] sm:gap-2">
-      <div>
-        <p className="text-[13px] font-semibold">{label}</p>
-        {hint && <p className="mt-0.5 text-[11px]" style={{ color: '#6E6E73' }}>{hint}</p>}
-      </div>
-      <div>{children}</div>
-    </div>
-  );
-}
-
-function TextInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
-  return (
-    <input
-      className="w-full rounded-[9px] border px-3 py-2 text-[13px] outline-none focus:border-gray-400"
-      style={{ borderColor: '#E4E4E7' }}
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      placeholder={placeholder}
-    />
-  );
-}
-
-function TimeInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return (
-    <input
-      type="time"
-      className="rounded-[9px] border px-3 py-2 text-[13px] outline-none"
-      style={{ borderColor: '#E4E4E7' }}
-      value={value}
-      onChange={e => onChange(e.target.value)}
-    />
-  );
-}
-
-// ── Page ──────────────────────────────────────────────────────────────────────
 export default function AjustesPage() {
-  const [settings, setSettings] = useState<Settings>(DEFAULT);
-  const [saved, setSaved]       = useState(false);
-  const [hydrated, setHydrated] = useState(false);
+  const { role, name, company } = useSession();
+  const [companies, setCompanies] = useState<CompanyOpt[] | null>(null);
 
   useEffect(() => {
-    setSettings(load());
-    setHydrated(true);
+    supabase.from('companies').select('id, name, slug').order('name')
+      .then(({ data }) => setCompanies((data ?? []) as CompanyOpt[]));
   }, []);
 
-  function set<K extends keyof Settings>(key: K, value: Settings[K]) {
-    setSettings(prev => ({ ...prev, [key]: value }));
-    setSaved(false);
-  }
+  const ownCompany = company && companies ? companies.find(c => c.slug === company) ?? null : null;
+  const isMaster = role === 'admin' && !name;
 
-  function handleSave() {
-    save(settings);
+  return (
+    <AdminShell>
+      <div className={s.page}>
+        <header className={s.top}>
+          <div>
+            <div className={s.eyebrow}><i />Panel de actividades</div>
+            <h1 className={s.title}>Ajustes</h1>
+            <div className={s.sub}>Quién entra al panel y qué ve cada quien.</div>
+          </div>
+        </header>
+
+        <div className={s.content}>
+          <section className={a.block}>
+            <p className={a.secLbl}>Tu sesión</p>
+            {isMaster ? (
+              <MasterCard />
+            ) : (
+              <div className={`${s.card} ${a.me}`}>
+                <div className={a.meWho}>
+                  <span className={`${a.av} ${role === 'admin' ? a.avAdmin : a.avPrac}`}>{initials(name ?? '?')}</span>
+                  <div className={a.meText}>
+                    <b>{name}</b>
+                    <p>
+                      {role ? ROLE[role].label : ''} · {company ? (ownCompany ? companyLabel(ownCompany) : company) : 'las dos empresas'}
+                    </p>
+                  </div>
+                </div>
+                <p className={a.hint}>Para cambiar tu nombre o tu contraseña, edítate en la lista de abajo.</p>
+              </div>
+            )}
+          </section>
+
+          {role === 'admin' && companies && (
+            <Usuarios companies={companies} own={company ? ownCompany?.id ?? null : null} />
+          )}
+        </div>
+      </div>
+    </AdminShell>
+  );
+}
+
+/** Contraseña maestra: no está en la tabla de usuarios; su nombre es sólo de este navegador. */
+function MasterCard() {
+  const [shown, setShown] = useState({ name: DEFAULT_NAME, initials: DEFAULT_INITIALS });
+  const [form, setForm] = useState({ name: '', initials: '' });
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    const l = readLocal();
+    setShown(l);
+    setForm(l);
+  }, []);
+
+  const dirty = form.name.trim() !== shown.name || form.initials.trim().toUpperCase() !== shown.initials;
+
+  function save(n: string, i: string) {
+    const nm = n.trim() || DEFAULT_NAME;
+    const ini = (i.trim() || initials(nm)).toUpperCase().slice(0, 2);
+    if (!writeLocal(nm, ini)) return;
+    setShown({ name: nm, initials: ini });
+    setForm({ name: nm, initials: ini });
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   }
 
-  function handleReset() {
-    setSettings(DEFAULT);
-    save(DEFAULT);
-    setSaved(false);
-  }
-
-  // Secciones que se guardan pero todavía NO afectan nada (negocio, horario,
-  // minutos de gracia, zona horaria). Ocultas hasta conectarlas de verdad.
-  // Cambiar a true para volver a mostrarlas.
-  const SHOW_WIP_SETTINGS = false;
-
-  if (!hydrated) return <AdminShell><div /></AdminShell>;
-
   return (
-    <AdminShell>
-      {/* Topbar */}
-      <div className="flex items-center justify-between gap-3 border-b px-4 py-4 md:px-7 md:py-5" style={{ borderColor: '#E4E4E7', background: '#fff' }}>
-        <div className="min-w-0">
-          <h1 className="text-[18px] md:text-[22px] font-extrabold tracking-tight">Ajustes</h1>
-          <p className="mt-0.5 text-[11px] md:text-[12px]" style={{ color: '#6E6E73' }}>Configuración general del panel</p>
-        </div>
-        <div className="flex shrink-0 items-center gap-[10px]">
-          {saved && (
-            <span className="rounded-full px-2.5 py-1 text-[11px] md:text-[12px] font-semibold" style={{ background: '#E5F4EC', color: '#0F9D58' }}>
-              ✓ Guardado
-            </span>
-          )}
-          <button
-            onClick={handleSave}
-            className="shrink-0 whitespace-nowrap rounded-[9px] px-3 py-2 md:px-[14px] md:py-[9px] text-[12px] md:text-[13px] font-semibold text-white"
-            style={{ background: 'var(--accent)' }}
-          >
-            Guardar cambios
-          </button>
+    <div className={`${s.card} ${a.me}`}>
+      <div className={a.meWho}>
+        <span className={`${a.av} ${a.avAdmin}`}>{shown.initials}</span>
+        <div className={a.meText}>
+          <b>{shown.name}</b>
+          <p>Entraste con la contraseña maestra: ves las dos empresas y todo el panel.</p>
         </div>
       </div>
-
-      <div className="flex-1 overflow-auto p-4 md:p-7">
-        <div className="mx-auto flex max-w-2xl flex-col gap-5">
-
-          {/* Negocio — oculto: aún no afecta el PDF (usa "LA FERRE" fijo) */}
-          {SHOW_WIP_SETTINGS && (
-          <Section title="Negocio">
-            <Field label="Nombre del negocio" hint="Se muestra en reportes PDF">
-              <TextInput value={settings.storeName} onChange={v => set('storeName', v)} placeholder="La Ferre" />
-            </Field>
-          </Section>
-          )}
-
-          {/* Administrador */}
-          <Section title="Administrador">
-            <Field label="Nombre" hint="Visible en la barra lateral">
-              <TextInput value={settings.adminName} onChange={v => set('adminName', v)} placeholder="Don Beto" />
-            </Field>
-            <Field label="Iniciales" hint="Máximo 2 caracteres">
-              <input
-                className="w-16 rounded-[9px] border px-3 py-2 text-[13px] text-center uppercase outline-none"
-                style={{ borderColor: '#E4E4E7' }}
-                value={settings.adminInitials}
-                maxLength={2}
-                onChange={e => set('adminInitials', e.target.value.toUpperCase())}
-              />
-            </Field>
-          </Section>
-
-          {/* Horario — oculto: no se usa en ningún cálculo todavía */}
-          {SHOW_WIP_SETTINGS && (
-          <Section title="Horario de operación">
-            <Field label="Inicio de jornada">
-              <TimeInput value={settings.workStart} onChange={v => set('workStart', v)} />
-            </Field>
-            <Field label="Fin de jornada">
-              <TimeInput value={settings.workEnd} onChange={v => set('workEnd', v)} />
-            </Field>
-            <Field label="Minutos de gracia" hint="Margen antes de marcar como atrasado">
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min={0}
-                  max={60}
-                  step={5}
-                  value={settings.lateThreshold}
-                  onChange={e => set('lateThreshold', Number(e.target.value))}
-                  className="w-40"
-                />
-                <span className="text-[13px] font-semibold w-16">{settings.lateThreshold} min</span>
-              </div>
-            </Field>
-          </Section>
-          )}
-
-          {/* Zona horaria — oculto: no se aplica (recordatorios usan zona fija) */}
-          {SHOW_WIP_SETTINGS && (
-          <Section title="Región">
-            <Field label="Zona horaria">
-              <select
-                className="w-full max-w-full rounded-[9px] border px-3 py-2 text-[13px] outline-none"
-                style={{ borderColor: '#E4E4E7' }}
-                value={settings.timezone}
-                onChange={e => set('timezone', e.target.value)}
-              >
-                <option value="America/Matamoros">America/Matamoros (CST)</option>
-                <option value="America/Mexico_City">America/Mexico_City (CST)</option>
-                <option value="America/Monterrey">America/Monterrey (CST)</option>
-                <option value="America/Tijuana">America/Tijuana (PST)</option>
-                <option value="America/Hermosillo">America/Hermosillo (MST)</option>
-                <option value="America/Cancun">America/Cancun (EST)</option>
-              </select>
-            </Field>
-          </Section>
-          )}
-
-          {/* Usuarios del panel (solo visible para administradores) */}
-          <UsersSection />
-
-          {/* Danger zone */}
-          <div className="rounded-xl border p-4 md:p-[22px]" style={{ borderColor: '#FCE7E9', background: '#FFFAFA' }}>
-            <h2 className="mb-1 text-[13px] font-bold" style={{ color: 'var(--accent)' }}>Restablecer ajustes</h2>
-            <p className="mb-4 text-[12px]" style={{ color: '#6E6E73' }}>Regresa todos los ajustes a sus valores predeterminados. No afecta datos de empleados ni actividades.</p>
-            <button
-              onClick={handleReset}
-              className="rounded-[9px] border px-[14px] py-[9px] text-[13px] font-semibold"
-              style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}
-            >
-              Restablecer
-            </button>
-          </div>
-
+      <div className={a.meForm}>
+        <label className={a.label} htmlFor="me-name">Cómo apareces en el menú</label>
+        <div className={a.meRow}>
+          <input id="me-name" className={a.input} value={form.name} maxLength={40} placeholder={DEFAULT_NAME}
+            onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+          <input className={a.input} value={form.initials} maxLength={2} aria-label="Iniciales" placeholder="AD"
+            style={{ textAlign: 'center', textTransform: 'uppercase' }}
+            onChange={e => setForm(f => ({ ...f, initials: e.target.value }))} />
         </div>
+        <div className={a.meBtns}>
+          <button type="button" className={`${a.btn} ${a.dark}`} disabled={!dirty} onClick={() => save(form.name, form.initials)}>Guardar</button>
+          {shown.name !== DEFAULT_NAME && (
+            <button type="button" className={a.btn} onClick={() => save(DEFAULT_NAME, DEFAULT_INITIALS)}>Volver a “{DEFAULT_NAME}”</button>
+          )}
+          {saved && <span className={a.saved} role="status"><IconCheck size={12} />Guardado</span>}
+        </div>
+        <p className={a.hint}>Sólo en esta computadora: en otra se verá “{DEFAULT_NAME}”.</p>
       </div>
-    </AdminShell>
+    </div>
   );
 }
