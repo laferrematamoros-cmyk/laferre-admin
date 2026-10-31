@@ -56,19 +56,19 @@ export default function DoneSheet({ row, needsPhoto, onClose, onDone }: {
   async function save() {
     if (needsPhoto && !file) { setErr('Esta actividad pide una foto. Tómala para poder marcarla.'); return; }
     setErr(null);
-    let photoUrl: string | null = null;
+    let photoPath: string | null = null;
     if (file) {
       setStage('foto');
       const blob = await toJpeg(file);
       const path = `${row.id}/${Date.now()}.jpg`;
       const up = await supabase.storage.from('evidence').upload(path, blob, { contentType: 'image/jpeg', upsert: false });
       if (up.error) { setStage(null); setErr('No se pudo subir la foto. Revisa tu conexión e intenta otra vez.'); return; }
-      photoUrl = supabase.storage.from('evidence').getPublicUrl(up.data.path).data.publicUrl;
+      photoPath = up.data.path;
     }
     setStage('guardando');
     let r: DoneResult;
     try {
-      r = await completeActivity(row.id, photoUrl);
+      r = await completeActivity(row.id, photoPath);
     } catch {
       r = { ok: false, error: 'No se pudo guardar. Revisa tu conexión e intenta otra vez.' };
     }

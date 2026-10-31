@@ -1,4 +1,21 @@
-import { shopClock, mine, groupMine, fitWithin, niceName } from '../my-day';
+import { shopClock, mine, groupMine, fitWithin, niceName, evidenceFile } from '../my-day';
+
+describe('evidenceFile', () => {
+  const ACT = 'b6c65d00-f88e-41cc-a47b-436c9b668ef7';
+  it('acepta la ruta que arma la pantalla', () => {
+    expect(evidenceFile(`${ACT}/1793473055123.jpg`, ACT)).toBe('1793473055123.jpg');
+  });
+  it('rechaza la foto de otra actividad', () => {
+    expect(evidenceFile('abb797d2-79a6-4fe2-bf69-76d792f48334/1793473055123.jpg', ACT)).toBeNull();
+  });
+  it('rechaza enlaces completos, rutas con ".." y otros nombres', () => {
+    expect(evidenceFile(`https://x.supabase.co/storage/v1/object/public/evidence/${ACT}/1793473055123.jpg`, ACT)).toBeNull();
+    expect(evidenceFile(`${ACT}/../otra/1793473055123.jpg`, ACT)).toBeNull();
+    expect(evidenceFile(`${ACT}/foto.jpg`, ACT)).toBeNull();
+    expect(evidenceFile(`${ACT}/1793473055123.png`, ACT)).toBeNull();
+    expect(evidenceFile(null, ACT)).toBeNull();
+  });
+});
 import type { TodayRow } from '../today';
 
 describe('shopClock', () => {

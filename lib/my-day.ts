@@ -42,6 +42,17 @@ export function groupMine(rows: TodayRow[]) {
   return { now, later, done };
 }
 
+/**
+ * La ruta de la foto en el almacén `evidence` debe ser `<id de la actividad>/<13 dígitos>.jpg`
+ * (como la arma la pantalla). Devuelve el nombre del archivo, o null si no cuadra:
+ * así no se puede colar la foto de otra actividad ni rutas con "..".
+ */
+export function evidenceFile(path: unknown, activityId: string): string | null {
+  if (typeof path !== 'string') return null;
+  const m = /^([0-9a-f-]{36})\/(\d{13}\.jpg)$/i.exec(path);
+  return m && m[1].toLowerCase() === activityId.toLowerCase() ? m[2] : null;
+}
+
 /** Medidas para achicar una foto sin deformarla: el lado mayor queda en `max` como mucho. */
 export function fitWithin(w: number, h: number, max: number): { w: number; h: number } {
   if (w <= 0 || h <= 0) return { w: 0, h: 0 };
