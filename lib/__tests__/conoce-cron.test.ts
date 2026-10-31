@@ -41,9 +41,10 @@ describe('conocePathOf', () => {
 
 describe('cronKeyOk', () => {
   const S = 'clave-larga-de-prueba-123';
-  it('sin clave puesta en Vercel deja pasar (transición)', () => {
-    expect(cronKeyOk(undefined, null)).toBe(true);
-    expect(cronKeyOk('   ', null)).toBe(true);
+  it('sin clave puesta en Vercel no deja pasar a nadie', () => {
+    expect(cronKeyOk(undefined, null)).toBe(false);
+    expect(cronKeyOk('   ', 'Bearer    ')).toBe(false);
+    expect(cronKeyOk('', 'Bearer ')).toBe(false);
   });
   it('con clave puesta, exige la misma en el encabezado Authorization', () => {
     expect(cronKeyOk(S, `Bearer ${S}`)).toBe(true);

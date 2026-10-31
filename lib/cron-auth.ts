@@ -1,7 +1,7 @@
-// Clave de los crons (/api/reminders y /api/cleanup), que llama cron-job.org.
-// Mientras CRON_SECRET no esté puesta en Vercel, quedan abiertas como antes: así
-// se puede subir el código primero, poner la clave en cron-job.org y al final
-// activarla en Vercel sin que los recordatorios se apaguen ni un minuto.
+// Clave de los crons (/api/reminders y /api/cleanup), que llama cron-job.org con
+// el encabezado "Authorization: Bearer <CRON_SECRET>" (puesto el 2026-10-31).
+// Si la variable falta en Vercel, quedan CERRADAS: mejor sin avisos (y se nota
+// en cron-job.org, que manda correo) que abiertas para cualquiera.
 
 /** Compara sin revelar por el tiempo cuántas letras coinciden. */
 function sameText(a: string, b: string): boolean {
@@ -18,7 +18,7 @@ function sameText(a: string, b: string): boolean {
  */
 export function cronKeyOk(secret: string | undefined, authHeader: string | null): boolean {
   const s = (secret ?? '').trim();
-  if (!s) return true;
+  if (!s) return false;
   const bearer = authHeader?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim() ?? '';
   return sameText(bearer, s);
 }
