@@ -9,7 +9,8 @@ import { fitWithin } from '@/lib/my-day';
 import { IconCamera, IconPlus } from '@/components/panel/icons';
 import s from '@/components/panel/panel.module.css';
 import c from '@/components/conoce/co.module.css';
-import { createConoceItem, updateConoceItem, setConoceActive, deleteConoceItem, type Result } from './actions';
+import { CONOCE_BUCKET, conoceExt } from '@/lib/conoce-image';
+import { conoceUploadTicket, createConoceItem, updateConoceItem, setConoceActive, deleteConoceItem, type Result } from './actions';
 
 type ItemType = 'instruccion' | 'ayuda_visual';
 
@@ -30,39 +31,36 @@ const TYPES: Record<ItemType, { label: string; plural: string; hint: string }> =
 };
 const ORDER: ItemType[] = ['instruccion', 'ayuda_visual'];
 
-/** Las imágenes de más de 2 MB se achican a 2400 px (se sigue leyendo la letra); las demás van tal cual. */
-async function shrink(file: File): Promise<Blob> {
-  if (file.size <= 2_000_000) return file;
-  try {
-    const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
-    const { w, h } = fitWithin(bmp.width, bmp.height, 2400);
-    const cv = document.createElement('canvas');
-    cv.width = w; cv.height = h;
-    cv.getContext('2d')!.drawImage(bmp, 0, 0, w, h);
-    bmp.close();
-    const blob = await new Promise<Blob | null>(res => cv.toBlob(res, 'image/jpeg', 0.88));
-    return blob && blob.size < file.size ? blob : file;
-  } catch {
-    return file;
-  }
+/**
+ * Las imágenes de más de 2 MB (o en un formato que el almacén no acepta, como
+ * HEIC) se pasan a JPEG de 2400 px como máximo: se sigue leyendo la letra.
+ */
+async function prepare(file: File): Promise<Blob> {
+  if (file.size <= 2_000_000 && conoceExt(file.type)) return file;
+  const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  const { w, h } = fitWithin(bmp.width, bmp.height, 2400);
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  cv.getContext('2d')!.drawImage(bmp, 0, 0, w, h);
+  bmp.close();
+  const blob = await new Promise<Blob | null>(res => cv.toBlob(res, 'image/jpeg', 0.88));
+  if (!blob) throw new Error('jpeg');
+  return conoceExt(file.type) && blob.size >= file.size ? file : blob;
 }
 
-/** Sube a ImgBB (donde ya viven las imágenes de Conoce) y devuelve el enlace. */
-async function uploadImage(file: File): Promise<string> {
-  const blob = await shrink(file);
-  const base64 = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-  const form = new FormData();
-  form.append('key', process.env.NEXT_PUBLIC_IMGBB_KEY ?? '');
-  form.append('image', base64);
-  const res = await fetch('https://api.imgbb.com/1/upload', { method: 'POST', body: form });
-  const json = await res.json().catch(() => null);
-  if (!json?.success) throw new Error('imgbb');
-  return json.data.url as string;
+/** Sube al almacén "conoce" de Supabase (con permiso de un solo uso del servidor) y devuelve el enlace. */
+async function uploadImage(file: File, companyId: string): Promise<string> {
+  let blob: Blob;
+  try {
+    blob = await prepare(file);
+  } catch {
+    throw new Error('Ese formato de imagen no se puede abrir aquí. Usa una JPG o PNG.');
+  }
+  const t = await conoceUploadTicket(companyId, blob.type);
+  if (!t.ok) throw new Error(t.error);
+  const up = await supabase.storage.from(CONOCE_BUCKET).uploadToSignedUrl(t.path, t.token, blob, { contentType: blob.type });
+  if (up.error) throw new Error('No se pudo subir la imagen. Revisa tu conexión e intenta otra vez.');
+  return supabase.storage.from(CONOCE_BUCKET).getPublicUrl(t.path).data.publicUrl;
 }
 
 export default function ConocePage() {
@@ -73,7 +71,7 @@ export default function ConocePage() {
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ item: ConoceItem | null; type: ItemType } | null>(null);
   const [viewer, setViewer] = useState<{ url: string; title: string } | null>(null);
-  // Imágenes que ImgBB no entregó (a veces responde 503): se avisa en lugar de dejar la tarjeta en blanco.
+  // Imágenes que no cargaron (las viejas de ImgBB llegaron a dar 503): se avisa en lugar de dejar la tarjeta en blanco.
   const [broken, setBroken] = useState<Record<string, number>>({});
   const [retry, setRetry] = useState<Record<string, number>>({});
 
@@ -157,7 +155,7 @@ export default function ConocePage() {
                           {img && broken[it.id] === n ? (
                             <div className={c.noImg}>
                               <span className={c.broken}>
-                                La imagen no cargó (ImgBB no respondió).
+                                La imagen no cargó.
                                 <button type="button" className={c.btn} onClick={() => setRetry(r => ({ ...r, [it.id]: n + 1 }))}>Reintentar</button>
                               </span>
                             </div>
@@ -277,10 +275,10 @@ function ItemDialog({ item, initialType, companyId, onClose, onSaved }: {
     if (file) {
       setStage('imagen');
       try {
-        imageUrl = await uploadImage(file);
-      } catch {
+        imageUrl = await uploadImage(file, companyId);
+      } catch (e) {
         setStage(null);
-        setErr('No se pudo subir la imagen. Revisa tu conexión e intenta otra vez.');
+        setErr(e instanceof Error ? e.message : 'No se pudo subir la imagen.');
         return;
       }
     }

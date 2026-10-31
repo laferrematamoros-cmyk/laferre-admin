@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { cronAllowed } from '@/lib/cron-auth';
 import { createClient } from '@supabase/supabase-js';
 
 // Called once per day by cron-job.org
@@ -7,7 +8,10 @@ import { createClient } from '@supabase/supabase-js';
 
 const DAYS = 21;
 
-export async function GET() {
+export async function GET(req: Request) {
+  // Sólo cron-job.org (con la clave CRON_SECRET; ver lib/cron-auth.ts).
+  if (!cronAllowed(req)) return NextResponse.json({ ok: false, error: 'no autorizado' }, { status: 401 });
+
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { cronAllowed } from '@/lib/cron-auth';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { matchesWeekOfMonth } from '@/lib/reports';
 
@@ -52,7 +53,10 @@ async function push(tokens: string[], title: string, body: string) {
   });
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  // Sólo cron-job.org (con la clave CRON_SECRET; ver lib/cron-auth.ts).
+  if (!cronAllowed(req)) return NextResponse.json({ ok: false, error: 'no autorizado' }, { status: 401 });
+
   const mxNow    = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Matamoros' }));
   const nowMin   = mxNow.getHours() * 60 + mxNow.getMinutes();
   const todayDow = mxNow.getDay();
