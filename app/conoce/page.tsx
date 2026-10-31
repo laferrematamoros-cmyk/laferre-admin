@@ -1,10 +1,15 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import AdminShell from '@/components/AdminShell';
 import { supabase } from '@/lib/supabase';
 import { useCompany } from '@/lib/company-context';
-import { createConoceItem, updateConoceItem, setConoceActive, deleteConoceItem } from './actions';
+import { safeHttps } from '@/lib/safe-url';
+import { fitWithin } from '@/lib/my-day';
+import { IconCamera, IconPlus } from '@/components/panel/icons';
+import s from '@/components/panel/panel.module.css';
+import c from '@/components/conoce/co.module.css';
+import { createConoceItem, updateConoceItem, setConoceActive, deleteConoceItem, type Result } from './actions';
 
 type ItemType = 'instruccion' | 'ayuda_visual';
 
@@ -19,354 +24,341 @@ interface ConoceItem {
   created_at: string;
 }
 
-const TYPE_LABELS: Record<ItemType, string> = {
-  instruccion:  'Instrucción de trabajo',
-  ayuda_visual: 'Ayuda visual',
+const TYPES: Record<ItemType, { label: string; plural: string; hint: string }> = {
+  instruccion:  { label: 'Instrucción de trabajo', plural: 'Instrucciones de trabajo', hint: 'Cómo se hace algo, paso a paso.' },
+  ayuda_visual: { label: 'Ayuda visual', plural: 'Ayudas visuales', hint: 'Una imagen para reconocer o ubicar algo.' },
 };
+const ORDER: ItemType[] = ['instruccion', 'ayuda_visual'];
 
-const TYPE_COLORS: Record<ItemType, { bg: string; text: string; border: string }> = {
-  instruccion:  { bg: '#FEF2F2', text: '#E11D2E', border: '#FECACA' },
-  ayuda_visual: { bg: '#F0FBF6', text: '#0F9D58', border: '#BBF7D0' },
-};
+/** Las imágenes de más de 2 MB se achican a 2400 px (se sigue leyendo la letra); las demás van tal cual. */
+async function shrink(file: File): Promise<Blob> {
+  if (file.size <= 2_000_000) return file;
+  try {
+    const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const { w, h } = fitWithin(bmp.width, bmp.height, 2400);
+    const cv = document.createElement('canvas');
+    cv.width = w; cv.height = h;
+    cv.getContext('2d')!.drawImage(bmp, 0, 0, w, h);
+    bmp.close();
+    const blob = await new Promise<Blob | null>(res => cv.toBlob(res, 'image/jpeg', 0.88));
+    return blob && blob.size < file.size ? blob : file;
+  } catch {
+    return file;
+  }
+}
+
+/** Sube a ImgBB (donde ya viven las imágenes de Conoce) y devuelve el enlace. */
+async function uploadImage(file: File): Promise<string> {
+  const blob = await shrink(file);
+  const base64 = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+  const form = new FormData();
+  form.append('key', process.env.NEXT_PUBLIC_IMGBB_KEY ?? '');
+  form.append('image', base64);
+  const res = await fetch('https://api.imgbb.com/1/upload', { method: 'POST', body: form });
+  const json = await res.json().catch(() => null);
+  if (!json?.success) throw new Error('imgbb');
+  return json.data.url as string;
+}
 
 export default function ConocePage() {
-  const { current } = useCompany();
-  const [items, setItems]       = useState<ConoceItem[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editItem, setEditItem] = useState<ConoceItem | null>(null);
-
-  const [type, setType]               = useState<ItemType>('instruccion');
-  const [title, setTitle]             = useState('');
-  const [body, setBody]               = useState('');
-  const [imageFile, setImageFile]     = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [saving, setSaving]           = useState(false);
-  const [uploadError, setUploadError] = useState(false);
-  const [error, setError]             = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { current: company } = useCompany();
+  const [items, setItems] = useState<ConoceItem[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<{ item: ConoceItem | null; type: ItemType } | null>(null);
+  const [viewer, setViewer] = useState<{ url: string; title: string } | null>(null);
+  // Imágenes que ImgBB no entregó (a veces responde 503): se avisa en lugar de dejar la tarjeta en blanco.
+  const [broken, setBroken] = useState<Record<string, number>>({});
+  const [retry, setRetry] = useState<Record<string, number>>({});
 
   const load = useCallback(async () => {
-    setLoading(true);
-    let q = supabase.from('conoce_items').select('*').order('type').order('sort_order').order('created_at');
-    if (current?.id) q = q.eq('company_id', current.id);
-    const { data } = await q;
-    setItems(data ?? []);
-    setLoading(false);
-  }, [current?.id]);
+    if (!company) return;
+    const { data, error: e } = await supabase.from('conoce_items').select('*')
+      .eq('company_id', company.id).order('sort_order').order('created_at');
+    if (e) { setError(e.message); return; }
+    setItems((data ?? []) as ConoceItem[]);
+  }, [company]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { setItems(null); load(); }, [load]);
 
-  function openNew() {
-    setEditItem(null);
-    setType('instruccion');
-    setTitle('');
-    setBody('');
-    setImageFile(null);
-    setImagePreview(null);
-    setUploadError(false);
-    setShowForm(true);
-  }
+  useEffect(() => {
+    if (!viewer) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setViewer(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [viewer]);
 
-  function openEdit(item: ConoceItem) {
-    setEditItem(item);
-    setType(item.type);
-    setTitle(item.title);
-    setBody(item.body ?? '');
-    setImageFile(null);
-    setImagePreview(item.image_url);
-    setUploadError(false);
-    setShowForm(true);
-  }
-
-  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] ?? null;
-    setImageFile(file);
-    if (file) {
-      setImagePreview(URL.createObjectURL(file));
-    }
-  }
-
-  function removeImage() {
-    setImageFile(null);
-    setImagePreview(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  }
-
-  async function handleSave() {
-    if (!title.trim()) return;
-    setSaving(true);
-
-    let imageUrl: string | null = editItem?.image_url ?? null;
-
-    if (imageFile) {
-      try {
-        const base64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const result = reader.result as string;
-            resolve(result.split(',')[1]);
-          };
-          reader.onerror = reject;
-          reader.readAsDataURL(imageFile);
-        });
-        const form = new FormData();
-        form.append('key', process.env.NEXT_PUBLIC_IMGBB_KEY ?? '');
-        form.append('image', base64);
-        const res = await fetch('https://api.imgbb.com/1/upload', { method: 'POST', body: form });
-        const json = await res.json();
-        if (!json.success) throw new Error('imgbb error');
-        imageUrl = json.data.url as string;
-      } catch {
-        setUploadError(true);
-        setSaving(false);
-        return;
-      }
-    } else if (!imagePreview) {
-      imageUrl = null;
-    }
-
-    const r = editItem
-      ? await updateConoceItem(editItem.id, {
-          type, title: title.trim(), body: body.trim() || null, image_url: imageUrl,
-        })
-      : await createConoceItem({
-          type, title: title.trim(), body: body.trim() || null,
-          image_url: imageUrl,
-          company_id: current?.id ?? null,
-        });
-
-    setSaving(false);
-    if (!r.ok) { setError(`No se pudo guardar: ${r.error}`); return; }
+  async function run(id: string, fn: () => Promise<Result>) {
+    setBusy(id);
     setError(null);
-    setShowForm(false);
-    load();
+    const r = await fn();
+    if (!r.ok) setError(r.error);
+    await load();
+    setBusy(null);
+    setConfirmId(null);
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm('¿Eliminar este elemento?')) return;
-    const r = await deleteConoceItem(id);
-    setError(r.ok ? null : `No se pudo eliminar: ${r.error}`);
-    load();
-  }
-
-  async function handleToggle(item: ConoceItem) {
-    const r = await setConoceActive(item.id, !item.is_active);
-    setError(r.ok ? null : `No se pudo cambiar: ${r.error}`);
-    load();
-  }
-
-  const instrucciones = items.filter(i => i.type === 'instruccion');
-  const ayudaVisual   = items.filter(i => i.type === 'ayuda_visual');
+  const visible = (items ?? []).filter(i => i.is_active).length;
+  const hidden = (items ?? []).length - visible;
 
   return (
     <AdminShell>
-      <div className="flex flex-1 flex-col overflow-y-auto p-4 gap-6 md:p-8 md:gap-8">
-        {/* Header */}
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 flex-1 basis-56">
-            <h1 className="text-[22px] font-extrabold" style={{ color: '#0F0F10', letterSpacing: -0.4 }}>Conoce</h1>
-            <p className="text-[13px] mt-1" style={{ color: '#6E6E73' }}>
-              Gestiona las instrucciones de trabajo y ayuda visual para tus empleados.
-            </p>
+      <div className={s.page}>
+        <header className={s.top}>
+          <div>
+            <div className={s.eyebrow}><i />{company?.name ?? 'Actividades'} · Conoce</div>
+            <h1 className={s.title}>Conoce</h1>
+            <div className={s.sub}>
+              {items
+                ? `Lo que los empleados consultan en su app · ${visible} visible${visible === 1 ? '' : 's'}${hidden ? ` · ${hidden} oculto${hidden === 1 ? '' : 's'}` : ''}`
+                : 'Instrucciones y ayudas visuales para los empleados.'}
+            </div>
           </div>
-          <button
-            onClick={openNew}
-            className="shrink-0 rounded-xl px-5 py-2.5 text-[13px] font-bold text-white"
-            style={{ background: '#E11D2E' }}
-          >
-            + Nuevo elemento
-          </button>
+          <div className={s.tools}>
+            <button type="button" className={`${s.btn} ${s.btnPrimary}`} onClick={() => setDialog({ item: null, type: 'instruccion' })} disabled={!company}>
+              <IconPlus />Nuevo
+            </button>
+          </div>
+        </header>
+
+        <div className={s.content}>
+          {error && <div className={s.error} role="alert">{error}</div>}
+          {!company ? (
+            <p className={s.foot}>Escoge una empresa en el menú.</p>
+          ) : !items ? (
+            !error && <p className={s.loading}>Cargando…</p>
+          ) : ORDER.map(t => {
+            const list = items.filter(i => i.type === t);
+            return (
+              <section key={t} className={c.block}>
+                <div className={c.secHead}>
+                  <p className={c.secLbl}>{TYPES[t].plural} ({list.length})</p>
+                  <p className={c.secHint}>{TYPES[t].hint} Los empleados las ven en este orden.</p>
+                </div>
+                {list.length === 0 ? (
+                  <div className={c.empty}>
+                    Todavía no hay {TYPES[t].plural.toLowerCase()}.{' '}
+                    <button type="button" className={c.btn} onClick={() => setDialog({ item: null, type: t })}>Agregar</button>
+                  </div>
+                ) : (
+                  <div className={c.grid}>
+                    {list.map(it => {
+                      const img = safeHttps(it.image_url);
+                      const n = retry[it.id] ?? 0;
+                      const src = img && n ? `${img}${img.includes('?') ? '&' : '?'}r=${n}` : img;
+                      return (
+                        <article key={it.id} className={`${s.card} ${c.item} ${it.is_active ? '' : c.off}`}>
+                          {img && broken[it.id] === n ? (
+                            <div className={c.noImg}>
+                              <span className={c.broken}>
+                                La imagen no cargó (ImgBB no respondió).
+                                <button type="button" className={c.btn} onClick={() => setRetry(r => ({ ...r, [it.id]: n + 1 }))}>Reintentar</button>
+                              </span>
+                            </div>
+                          ) : img && src ? (
+                            <button type="button" className={c.thumb} onClick={() => setViewer({ url: src, title: it.title })} aria-label={`Ver en grande: ${it.title}`}>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img key={src} src={src} alt="" loading="lazy" onError={() => setBroken(b => ({ ...b, [it.id]: n }))} />
+                              <span className={c.zoom}>Ver en grande</span>
+                            </button>
+                          ) : (
+                            <div className={c.noImg}>Sin imagen</div>
+                          )}
+                          <div className={c.itemBody}>
+                            <h3>{it.title}</h3>
+                            {it.body && <p className={c.text}>{it.body}</p>}
+                            <div className={c.chips}>
+                              <span className={`${c.chip} ${it.is_active ? c.chipOn : c.chipOff}`}>
+                                {it.is_active ? 'Lo ven los empleados' : 'Oculto'}
+                              </span>
+                            </div>
+                            {confirmId === it.id ? (
+                              <div className={c.confirm} role="alert">
+                                <span><b>¿Eliminar &ldquo;{it.title}&rdquo;?</b> Deja de verse en la app. Si sólo quieres quitarlo un tiempo, mejor ocúltalo.</span>
+                                <div className={c.confirmBtns}>
+                                  <button type="button" className={`${c.btn} ${c.danger}`} disabled={busy === it.id} onClick={() => run(it.id, () => deleteConoceItem(it.id))}>
+                                    {busy === it.id ? 'Eliminando…' : 'Sí, eliminar'}
+                                  </button>
+                                  <button type="button" className={c.btn} onClick={() => setConfirmId(null)}>Cancelar</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className={c.actions}>
+                                <button type="button" className={c.btn} disabled={busy === it.id} onClick={() => run(it.id, () => setConoceActive(it.id, !it.is_active))}>
+                                  {busy === it.id ? '…' : it.is_active ? 'Ocultar' : 'Mostrar'}
+                                </button>
+                                <button type="button" className={`${c.btn} ${c.dark}`} onClick={() => setDialog({ item: it, type: it.type })}>Editar</button>
+                                <button type="button" className={`${c.btn} ${c.danger}`} onClick={() => setConfirmId(it.id)}>Eliminar</button>
+                              </div>
+                            )}
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            );
+          })}
         </div>
 
-        {error && (
-          <p role="alert" className="text-[13px] font-semibold rounded-xl px-4 py-3" style={{ background: '#FEF2F2', color: '#E11D2E', border: '1px solid #FECACA' }}>
-            {error}
-          </p>
-        )}
-
-        {/* Form */}
-        {showForm && (
-          <div className="rounded-2xl p-4 md:p-6 flex flex-col gap-4" style={{ background: '#fff', border: '1px solid #E5E5EA' }}>
-            <p className="text-[13px] font-bold uppercase tracking-wider" style={{ color: '#6E6E73' }}>
-              {editItem ? 'Editar elemento' : 'Nuevo elemento'}
-            </p>
-
-            {/* Type selector */}
-            <div className="flex flex-wrap gap-2">
-              {(['instruccion', 'ayuda_visual'] as ItemType[]).map(t => (
-                <button
-                  key={t}
-                  onClick={() => setType(t)}
-                  className="rounded-lg px-4 py-2 text-[13px] font-semibold transition-all"
-                  style={{
-                    background: type === t ? TYPE_COLORS[t].bg : '#F5F5F7',
-                    color:      type === t ? TYPE_COLORS[t].text : '#6E6E73',
-                    border:     `1.5px solid ${type === t ? TYPE_COLORS[t].border : 'transparent'}`,
-                  }}
-                >
-                  {TYPE_LABELS[t]}
-                </button>
-              ))}
+        {viewer && (
+          <div className={c.viewer} role="dialog" aria-modal="true" aria-label={viewer.title} onClick={() => setViewer(null)}>
+            <div className={c.vTop} onClick={e => e.stopPropagation()}>
+              <b>{viewer.title}</b>
+              <button type="button" className={c.btn} onClick={() => setViewer(null)} autoFocus>Cerrar</button>
             </div>
-
-            <input
-              type="text"
-              placeholder="Título…"
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              className="rounded-xl px-4 py-3 text-base md:text-[14px] outline-none"
-              style={{ border: '1.5px solid #E5E5EA', color: '#0F0F10', background: '#FAFAFA' }}
-            />
-            <textarea
-              placeholder="Descripción o instrucciones detalladas… (opcional)"
-              value={body}
-              onChange={e => setBody(e.target.value)}
-              rows={4}
-              className="rounded-xl px-4 py-3 text-base md:text-[14px] outline-none resize-none"
-              style={{ border: '1.5px solid #E5E5EA', color: '#0F0F10', background: '#FAFAFA' }}
-            />
-
-            {/* Image upload */}
-            <div className="flex flex-col gap-2">
-              <p className="text-[12px] font-semibold" style={{ color: '#6E6E73' }}>Imagen (opcional)</p>
-              {imagePreview ? (
-                <div className="relative w-full max-w-sm">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={imagePreview}
-                    alt="Preview"
-                    className="rounded-xl object-contain w-full"
-                    style={{ maxHeight: 220, border: '1.5px solid #E5E5EA', background: '#F5F5F7' }}
-                  />
-                  <button
-                    onClick={removeImage}
-                    aria-label="Quitar imagen"
-                    className="absolute top-2 right-2 rounded-full w-9 h-9 flex items-center justify-center text-[13px] font-bold"
-                    style={{ background: 'rgba(0,0,0,0.55)', color: '#fff' }}
-                  >
-                    ✕
-                  </button>
-                </div>
-              ) : (
-                <label
-                  className="flex flex-col items-center justify-center rounded-xl cursor-pointer transition-colors"
-                  style={{ border: '1.5px dashed #D1D1D6', background: '#FAFAFA', padding: '28px 20px' }}
-                >
-                  <span style={{ fontSize: 28 }}>🖼️</span>
-                  <span className="text-[13px] font-semibold mt-2" style={{ color: '#6E6E73' }}>
-                    Subir imagen
-                  </span>
-                  <span className="text-[11px] mt-1" style={{ color: '#A8A8AD' }}>
-                    JPG, PNG, WEBP — máx. 5 MB
-                  </span>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleImageChange}
-                  />
-                </label>
-              )}
-            </div>
-
-            {uploadError && (
-              <p className="text-[13px] font-semibold rounded-xl px-4 py-3" style={{ background: '#FEF2F2', color: '#E11D2E', border: '1px solid #FECACA' }}>
-                ⚠️ No se pudo subir la imagen. Asegúrate de haber creado la política de Storage en Supabase.
-              </p>
-            )}
-
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
-              <button
-                onClick={() => setShowForm(false)}
-                className="rounded-xl px-5 py-2.5 text-[13px] font-semibold"
-                style={{ border: '1px solid #E5E5EA', color: '#6E6E73' }}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving || !title.trim()}
-                className="rounded-xl px-5 py-2.5 text-[13px] font-bold text-white disabled:opacity-40"
-                style={{ background: '#E11D2E' }}
-              >
-                {saving ? 'Guardando…' : 'Guardar'}
-              </button>
+            <div className={c.vImg}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={viewer.url} alt={viewer.title} onClick={e => e.stopPropagation()} />
             </div>
           </div>
         )}
 
-        {loading ? (
-          <p className="text-[13px] text-center mt-12" style={{ color: '#A8A8AD' }}>Cargando…</p>
-        ) : (
-          <>
-            <ItemSection title="Instrucciones de trabajo" items={instrucciones} type="instruccion" onEdit={openEdit} onDelete={handleDelete} onToggle={handleToggle} />
-            <ItemSection title="Ayuda visual" items={ayudaVisual} type="ayuda_visual" onEdit={openEdit} onDelete={handleDelete} onToggle={handleToggle} />
-          </>
+        {dialog && company && (
+          <ItemDialog
+            item={dialog.item}
+            initialType={dialog.type}
+            companyId={company.id}
+            onClose={() => setDialog(null)}
+            onSaved={async () => { setDialog(null); await load(); }}
+          />
         )}
       </div>
     </AdminShell>
   );
 }
 
-function ItemSection({ title, items, type, onEdit, onDelete, onToggle }: {
-  title: string; items: ConoceItem[]; type: ItemType;
-  onEdit: (i: ConoceItem) => void;
-  onDelete: (id: string) => void;
-  onToggle: (i: ConoceItem) => void;
+function ItemDialog({ item, initialType, companyId, onClose, onSaved }: {
+  item: ConoceItem | null;
+  initialType: ItemType;
+  companyId: string;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
 }) {
-  const c = TYPE_COLORS[type];
+  const [type, setType] = useState<ItemType>(item?.type ?? initialType);
+  const [title, setTitle] = useState(item?.title ?? '');
+  const [body, setBody] = useState(item?.body ?? '');
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(safeHttps(item?.image_url));
+  const [tried, setTried] = useState(false);
+  const [stage, setStage] = useState<null | 'imagen' | 'guardando'>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
+  const busy = stage !== null;
+
+  useEffect(() => {
+    titleRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose, busy]);
+
+  useEffect(() => () => { if (preview?.startsWith('blob:')) URL.revokeObjectURL(preview); }, [preview]);
+
+  function pick(f: File | null) {
+    setErr(null);
+    setFile(f);
+    setPreview(f ? URL.createObjectURL(f) : null);
+  }
+
+  async function save() {
+    setTried(true);
+    if (!title.trim()) return;
+    setErr(null);
+    let imageUrl: string | null = preview && !file ? (item?.image_url ?? null) : null;
+    if (file) {
+      setStage('imagen');
+      try {
+        imageUrl = await uploadImage(file);
+      } catch {
+        setStage(null);
+        setErr('No se pudo subir la imagen. Revisa tu conexión e intenta otra vez.');
+        return;
+      }
+    }
+    setStage('guardando');
+    const fields = { type, title: title.trim(), body: body.trim() || null, image_url: imageUrl };
+    const r = item ? await updateConoceItem(item.id, fields) : await createConoceItem({ ...fields, company_id: companyId });
+    setStage(null);
+    if (!r.ok) { setErr(`No se pudo guardar: ${r.error}`); return; }
+    await onSaved();
+  }
+
   return (
-    <div className="flex flex-col gap-3">
-      <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: '#6E6E73' }}>{title}</p>
-      {items.length === 0 ? (
-        <p className="text-[13px]" style={{ color: '#A8A8AD' }}>Sin elementos registrados.</p>
-      ) : (
-        items.map(item => (
-          <div
-            key={item.id}
-            className="rounded-2xl p-5 flex flex-col gap-2"
-            style={{ background: item.is_active ? c.bg : '#F5F5F7', border: `1.5px solid ${item.is_active ? c.border : '#E5E5EA'}`, opacity: item.is_active ? 1 : 0.6 }}
-          >
-            {/* En celular: título arriba y botones abajo. En pantallas anchas: lado a lado. */}
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
-              <div className="flex-1 min-w-0">
-                <p className="text-[15px] font-bold break-words" style={{ color: '#0F0F10' }}>{item.title}</p>
-                {/* En celular la etiqueta va bajo el título para que los tres botones quepan en una fila. */}
-                <span className="mt-2 inline-flex items-center rounded-full px-3 py-1 text-[11px] font-bold md:hidden" style={{ background: item.is_active ? c.bg : '#E5E5EA', color: item.is_active ? c.text : '#6E6E73', border: `1px solid ${item.is_active ? c.border : '#E5E5EA'}` }}>
-                  {item.is_active ? 'Visible' : 'Oculto'}
-                </span>
-                {item.body && <p className="text-[13px] mt-1 break-words" style={{ color: '#6E6E73' }}>{item.body}</p>}
-                {item.image_url && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={item.image_url}
-                    alt={item.title}
-                    className="rounded-xl mt-3 object-contain"
-                    style={{ maxHeight: 160, maxWidth: 'min(260px, 100%)', border: '1px solid rgba(0,0,0,.06)' }}
-                  />
-                )}
-              </div>
-              <div className="grid grid-cols-3 gap-2 md:flex md:items-center md:shrink-0">
-                <span className="hidden items-center rounded-full px-3 py-1 text-[11px] font-bold md:inline-flex" style={{ background: item.is_active ? c.bg : '#E5E5EA', color: item.is_active ? c.text : '#6E6E73', border: `1px solid ${item.is_active ? c.border : '#E5E5EA'}` }}>
-                  {item.is_active ? 'Visible' : 'Oculto'}
-                </span>
-                {/* Botones de 40 px de alto en celular (tamaño cómodo para el dedo); compactos en escritorio. */}
-                <button onClick={() => onToggle(item)} className="inline-flex min-h-10 items-center justify-center rounded-full px-2 text-[12px] font-bold md:min-h-0 md:px-3 md:py-1 md:text-[11px]" style={{ background: '#fff', border: '1px solid #E5E5EA', color: '#6E6E73' }}>
-                  {item.is_active ? 'Ocultar' : 'Mostrar'}
+    <>
+      <div className={c.overlay} onClick={() => !busy && onClose()} />
+      <div className={c.dialog} role="dialog" aria-modal="true" aria-label={item ? 'Editar' : 'Nuevo en Conoce'}>
+        <div className={c.dHead}>
+          <h2>{item ? 'Editar' : 'Nuevo en Conoce'}</h2>
+          <button type="button" className={c.btn} onClick={onClose} disabled={busy}>Cerrar</button>
+        </div>
+        <div className={c.dBody}>
+          <div className={c.field}>
+            <span className={c.label}>Qué es</span>
+            <div className={c.seg}>
+              {ORDER.map(t => (
+                <button key={t} type="button" aria-pressed={type === t} onClick={() => setType(t)}>
+                  <b>{TYPES[t].label}</b><span>{TYPES[t].hint}</span>
                 </button>
-                <button onClick={() => onEdit(item)} className="inline-flex min-h-10 items-center justify-center rounded-full px-2 text-[12px] font-bold md:min-h-0 md:px-3 md:py-1 md:text-[11px]" style={{ background: '#fff', border: '1px solid #E5E5EA', color: '#6E6E73' }}>
-                  Editar
-                </button>
-                <button onClick={() => onDelete(item.id)} className="inline-flex min-h-10 items-center justify-center rounded-full px-2 text-[12px] font-bold md:min-h-0 md:px-3 md:py-1 md:text-[11px]" style={{ background: '#fff', border: '1px solid #FECACA', color: '#E11D2E' }}>
-                  Eliminar
-                </button>
-              </div>
+              ))}
             </div>
           </div>
-        ))
-      )}
-    </div>
+
+          <div className={c.field}>
+            <label className={c.label} htmlFor="co-title">Título</label>
+            <input id="co-title" ref={titleRef} className={`${c.input} ${tried && !title.trim() ? c.invalid : ''}`} value={title} maxLength={120}
+              placeholder="Ej. Cómo medir mangueras" onChange={e => setTitle(e.target.value)} />
+            {tried && !title.trim() && <p className={c.hint} style={{ color: 'var(--st-miss-ink)', fontWeight: 600 }}>Escribe el título.</p>}
+          </div>
+
+          <div className={c.field}>
+            <label className={c.label} htmlFor="co-body">Texto (opcional)</label>
+            <textarea id="co-body" className={c.input} value={body} maxLength={2000} rows={4}
+              placeholder="Pasos o explicación. Si la imagen ya lo dice todo, déjalo vacío." onChange={e => setBody(e.target.value)} />
+          </div>
+
+          <div className={c.field}>
+            <span className={c.label}>Imagen (opcional)</span>
+            <input ref={input} className={c.hidden} type="file" accept="image/*" tabIndex={-1} aria-hidden
+              onChange={e => { pick(e.target.files?.[0] ?? null); e.target.value = ''; }} />
+            {preview ? (
+              <>
+                <div className={c.preview}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={preview} alt="Vista previa" />
+                </div>
+                <div className={c.previewBtns}>
+                  <button type="button" className={c.btn} disabled={busy} onClick={() => input.current?.click()}>Cambiar imagen</button>
+                  <button type="button" className={c.btn} disabled={busy} onClick={() => pick(null)}>Quitar</button>
+                </div>
+              </>
+            ) : (
+              <button type="button" className={c.drop} disabled={busy} onClick={() => input.current?.click()}>
+                <IconCamera size={24} />
+                <b>Subir imagen</b>
+                <span>Foto o imagen (JPG, PNG). Si pesa mucho, se achica sola.</span>
+              </button>
+            )}
+          </div>
+
+          {err && <p className={c.err} role="alert">{err}</p>}
+          <div className={c.dFoot}>
+            <button type="button" className={c.btn} onClick={onClose} disabled={busy}>Cancelar</button>
+            <button type="button" className={`${c.btn} ${c.dark}`} onClick={save} disabled={busy}>
+              {stage === 'imagen' ? 'Subiendo imagen…' : stage === 'guardando' ? 'Guardando…' : item ? 'Guardar cambios' : 'Agregar'}
+            </button>
+          </div>
+          <p className={c.hint}>Se ve en la app de los empleados, en la sección Conoce{item && !item.is_active ? ' (cuando lo vuelvas a mostrar)' : ''}.</p>
+        </div>
+      </div>
+    </>
   );
 }
