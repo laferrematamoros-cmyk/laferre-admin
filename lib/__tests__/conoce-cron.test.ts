@@ -42,19 +42,18 @@ describe('conocePathOf', () => {
 describe('cronKeyOk', () => {
   const S = 'clave-larga-de-prueba-123';
   it('sin clave puesta en Vercel deja pasar (transición)', () => {
-    expect(cronKeyOk(undefined, null, null)).toBe(true);
-    expect(cronKeyOk('   ', null, null)).toBe(true);
+    expect(cronKeyOk(undefined, null)).toBe(true);
+    expect(cronKeyOk('   ', null)).toBe(true);
   });
-  it('con clave puesta, exige la misma en el encabezado o en ?key=', () => {
-    expect(cronKeyOk(S, `Bearer ${S}`, null)).toBe(true);
-    expect(cronKeyOk(S, `bearer   ${S}  `, null)).toBe(true);
-    expect(cronKeyOk(S, null, S)).toBe(true);
+  it('con clave puesta, exige la misma en el encabezado Authorization', () => {
+    expect(cronKeyOk(S, `Bearer ${S}`)).toBe(true);
+    expect(cronKeyOk(S, `bearer   ${S}  `)).toBe(true);
   });
-  it('rechaza sin clave, con otra o casi igual', () => {
-    expect(cronKeyOk(S, null, null)).toBe(false);
-    expect(cronKeyOk(S, 'Bearer otra', null)).toBe(false);
-    expect(cronKeyOk(S, `Bearer ${S}x`, null)).toBe(false);
-    expect(cronKeyOk(S, S, null)).toBe(false); // sin "Bearer"
-    expect(cronKeyOk(S, null, '')).toBe(false);
+  it('rechaza sin clave, con otra, casi igual o sin "Bearer"', () => {
+    expect(cronKeyOk(S, null)).toBe(false);
+    expect(cronKeyOk(S, 'Bearer otra')).toBe(false);
+    expect(cronKeyOk(S, `Bearer ${S}x`)).toBe(false);
+    expect(cronKeyOk(S, S)).toBe(false);
+    expect(cronKeyOk(S, '')).toBe(false);
   });
 });

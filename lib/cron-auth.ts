@@ -12,17 +12,18 @@ function sameText(a: string, b: string): boolean {
 }
 
 /**
- * ¿Puede pasar la llamada? Acepta la clave en el encabezado
- * "Authorization: Bearer <clave>" (lo recomendado) o en "?key=<clave>".
+ * ¿Puede pasar la llamada? Sólo con el encabezado "Authorization: Bearer <clave>".
+ * No se acepta en la dirección (?key=): ahí quedaría escrita en los registros
+ * de Vercel y de cron-job.org.
  */
-export function cronKeyOk(secret: string | undefined, authHeader: string | null, queryKey: string | null): boolean {
+export function cronKeyOk(secret: string | undefined, authHeader: string | null): boolean {
   const s = (secret ?? '').trim();
   if (!s) return true;
   const bearer = authHeader?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim() ?? '';
-  return sameText(bearer, s) || sameText((queryKey ?? '').trim(), s);
+  return sameText(bearer, s);
 }
 
 /** Para las rutas: lee la petición y la variable de entorno. */
 export function cronAllowed(req: Request): boolean {
-  return cronKeyOk(process.env.CRON_SECRET, req.headers.get('authorization'), new URL(req.url).searchParams.get('key'));
+  return cronKeyOk(process.env.CRON_SECRET, req.headers.get('authorization'));
 }
