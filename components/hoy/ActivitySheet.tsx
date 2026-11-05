@@ -50,6 +50,7 @@ export default function ActivitySheet({ row, remind, onClose, dateLabel, isToday
             {dateLabel && <Fact k="Fecha" v={dateLabel} />}
             <Fact k="Horario" v={`${row.start} – ${row.limit}`} />
             <Fact k="Asignada a" v={row.assignee} />
+            {row.optional && <Fact k="Tipo" v="Opcional: no cuenta en el porcentaje" />}
             {row.doneBy && <Fact k="La hizo" v={row.doneBy} />}
             {registered && <Fact k="Hora de registro" v={registered} />}
             {isToday && row.status === 'overdue' && row.minutesLate !== null && <Fact k="Atraso" v={fmtMin(row.minutesLate)} />}

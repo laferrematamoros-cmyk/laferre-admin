@@ -28,9 +28,11 @@ export function useRemind(companyId: string | undefined): Remind {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: `🔔 ${r.title}`,
-          body: r.status === 'overdue'
-            ? `Ya pasó la hora límite (${r.limit}). Márcala en cuanto la hagas.`
-            : `Vence a las ${r.limit}. Que no se te pase.`,
+          body: r.optional
+            ? 'Si hoy hubo, no olvides marcarla.'
+            : r.status === 'overdue'
+              ? `Ya pasó la hora límite (${r.limit}). Márcala en cuanto la hagas.`
+              : `Vence a las ${r.limit}. Que no se te pase.`,
           companyId,
           employeeIds: r.assignedIds,
         }),

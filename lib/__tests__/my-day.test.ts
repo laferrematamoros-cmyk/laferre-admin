@@ -78,6 +78,20 @@ describe('groupMine', () => {
   });
 });
 
+describe('groupMine con opcionales', () => {
+  it('las opcionales sin marcar van en su propio grupo; hechas, con las hechas', () => {
+    const g = groupMine([
+      row({ id: 'opc', status: 'optional', optional: true }),
+      row({ id: 'run', status: 'running', minutesLeft: 5 }),
+      row({ id: 'opc-hecha', status: 'done', optional: true, completion: { completed_at: '2026-10-31T15:00:00Z' } as TodayRow['completion'] }),
+    ]);
+    expect(g.optional.map(r => r.id)).toEqual(['opc']);
+    expect(g.now.map(r => r.id)).toEqual(['run']);
+    expect(g.later).toEqual([]);
+    expect(g.done.map(r => r.id)).toEqual(['opc-hecha']);
+  });
+});
+
 describe('fitWithin', () => {
   it('achica el lado mayor y conserva la proporción', () => {
     expect(fitWithin(4032, 3024, 1600)).toEqual({ w: 1600, h: 1200 });

@@ -37,6 +37,7 @@
 .eDoneLate { background: var(--st-late-soft); border-left-color: var(--st-late); }
 .eRunning { background: var(--st-run-soft); border-left-color: var(--st-run); }
 .eUpcoming { background: #F2F2F5; border-left-color: #B9B9C1; }
+.eOptional { background: var(--st-opt-soft); border-left-color: var(--st-opt); }
 .eOverdue { background: var(--st-miss-soft); border-left-color: var(--st-miss); }
 
 /* ── Agenda por día (celular) ── */
@@ -61,6 +62,7 @@
 .bDoneLate { border-left-color: var(--st-late); }
 .bRunning { border-left-color: var(--st-run); }
 .bUpcoming { border-left-color: #B9B9C1; }
+.bOptional { border-left-color: var(--st-opt); }
 .bOverdue { border-left-color: var(--st-miss); }
 .ctime { display: flex; flex-direction: column; gap: 2px; font-variant-numeric: tabular-nums; }
 .ctime b { font-size: 14px; font-weight: 700; }

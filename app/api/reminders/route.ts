@@ -94,6 +94,19 @@ export async function GET(req: Request) {
     const limitMin  = timeToMin(act.limit_time);
     const limitLbl  = act.limit_time.slice(0, 5);
 
+    // Opcional: avisa al inicio y a la hora límite, y ya no insiste (si ese día no
+    // hubo nada, nadie la va a marcar y los teléfonos sonarían toda la tarde).
+    if (act.is_optional) {
+      if (inWindow(nowMin, startMin)) {
+        await push(tokens, act.title, `Si hoy hubo, márcala · hasta las ${limitLbl}`);
+        sent.push(`${act.title} → inicio (opcional)`);
+      } else if (inWindow(nowMin, limitMin)) {
+        await push(tokens, act.title, 'Último aviso · si hoy hubo, márcala');
+        sent.push(`${act.title} → límite (opcional)`);
+      }
+      continue;
+    }
+
     // 1. Al inicio
     if (inWindow(nowMin, startMin)) {
       await push(tokens, act.title, `▶ Empieza ahora · límite ${limitLbl}`);

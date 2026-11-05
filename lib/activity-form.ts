@@ -12,13 +12,15 @@ export interface ActivityValues {
   assigned: string[];
   reminder: number;         // minutos
   photo: boolean;
+  /** Avisa y se puede marcar, pero si no se hace no cuenta. */
+  optional: boolean;
 }
 export type FormErrors = Partial<Record<'title' | 'days' | 'limit', string>>;
 
 export const REMINDERS = [5, 10, 15, 30];
 export const EMPTY_VALUES: ActivityValues = {
   title: '', description: '', start: '09:00', limit: '10:00', days: [1, 2, 3, 4, 5],
-  weekOfMonth: null, assigned: [], reminder: 10, photo: true,
+  weekOfMonth: null, assigned: [], reminder: 10, photo: true, optional: false,
 };
 
 const DAY_NAME = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
@@ -53,7 +55,7 @@ export function recurrenceLabel(days: number[]): string {
 
 export function summaryText(v: ActivityValues): string {
   const month = v.weekOfMonth == null ? '' : `, sólo la ${v.weekOfMonth === -1 ? 'última' : `${v.weekOfMonth}ª`} semana del mes`;
-  return `${daysText(v.days)}, de ${v.start} a ${v.limit}${month}`;
+  return `${daysText(v.days)}, de ${v.start} a ${v.limit}${month}${v.optional ? ' (opcional)' : ''}`;
 }
 
 /** Columnas que el formulario controla. No toca is_urgent ni evidence_name/note/signature
@@ -70,10 +72,11 @@ export function toRow(v: ActivityValues) {
     assigned_employee_ids: v.assigned,
     reminder_minutes: v.reminder,
     evidence_photo: v.photo,
+    is_optional: v.optional,
   };
 }
 
-type Editable = Pick<Activity, 'title' | 'description' | 'start_time' | 'limit_time' | 'days_of_week' | 'week_of_month' | 'assigned_employee_ids' | 'reminder_minutes' | 'evidence_photo'>;
+type Editable = Pick<Activity, 'title' | 'description' | 'start_time' | 'limit_time' | 'days_of_week' | 'week_of_month' | 'assigned_employee_ids' | 'reminder_minutes' | 'evidence_photo' | 'is_optional'>;
 
 export function fromActivity(a: Editable): ActivityValues {
   return {
@@ -86,5 +89,6 @@ export function fromActivity(a: Editable): ActivityValues {
     assigned: [...(a.assigned_employee_ids ?? [])],
     reminder: a.reminder_minutes || 10,
     photo: !!a.evidence_photo,
+    optional: !!a.is_optional,
   };
 }

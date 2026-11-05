@@ -9,16 +9,19 @@
 .bgRunning { background: var(--st-run); }
 .bgUpcoming { background: var(--st-todo); }
 .bgOverdue { background: var(--st-miss); }
+.bgOptional { background: var(--st-opt); }
 .fDone { fill: var(--st-ok); }
 .fDoneLate { fill: var(--st-late); }
 .fRunning { fill: var(--st-run); }
 .fUpcoming { fill: var(--st-todo); }
 .fOverdue { fill: var(--st-miss); }
+.fOptional { fill: var(--st-opt); }
 .pDone { background: var(--st-ok-soft); color: var(--st-ok-ink); }
 .pDoneLate { background: var(--st-late-soft); color: var(--st-late-ink); }
 .pRunning { background: var(--st-run-soft); color: var(--st-run-ink); }
 .pUpcoming { background: #F0F0F3; color: #55555B; }
 .pOverdue { background: var(--st-miss-soft); color: var(--st-miss-ink); }
+.pOptional { background: var(--st-opt-soft); color: var(--st-opt-ink); }
 .sw { display: inline-block; width: 10px; height: 10px; flex: none; border-radius: 3px; }
 .statusPill { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
 

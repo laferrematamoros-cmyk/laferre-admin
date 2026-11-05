@@ -8,7 +8,7 @@ function day(i: number, c: Partial<DayReport> = {}): DayReport {
 function report(o: Partial<WeekReport>): WeekReport {
   return {
     weekStart: MON, counts: { ok: 0, late: 0, miss: 0, todo: 0 }, done: 0, due: 0, pct: null,
-    days: [0, 1, 2, 3, 4, 5, 6].map(i => day(i)), people: [], generalMiss: 0, missed: [], ...o,
+    days: [0, 1, 2, 3, 4, 5, 6].map(i => day(i)), people: [], generalMiss: 0, missed: [], optional: [], ...o,
   };
 }
 const person = (name: string, miss: number): PersonRow => ({ id: name, name, initials: name.slice(0, 2), done: 3, late: 0, miss });

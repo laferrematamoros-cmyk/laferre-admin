@@ -29,17 +29,18 @@ export function mine(rows: TodayRow[], employeeId: string): TodayRow[] {
   return rows.filter(r => r.general || r.assignedIds.includes(employeeId));
 }
 
-/** Para la pantalla: primero lo urgente, luego lo que viene y al final lo hecho. */
+/** Para la pantalla: primero lo urgente, luego lo que viene, las opcionales sin marcar y al final lo hecho. */
 export function groupMine(rows: TodayRow[]) {
   const now = [
     ...rows.filter(r => r.status === 'overdue').sort((a, b) => (b.minutesLate ?? 0) - (a.minutesLate ?? 0)),
     ...rows.filter(r => r.status === 'running').sort((a, b) => (a.minutesLeft ?? 0) - (b.minutesLeft ?? 0)),
   ];
   const later = rows.filter(r => r.status === 'upcoming');
+  const optional = rows.filter(r => r.status === 'optional');
   const done = rows
     .filter(r => r.status === 'done' || r.status === 'doneLate')
     .sort((a, b) => (b.completion?.completed_at ?? '').localeCompare(a.completion?.completed_at ?? ''));
-  return { now, later, done };
+  return { now, later, optional, done };
 }
 
 /**

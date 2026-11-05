@@ -19,6 +19,7 @@ import SummaryCard from '@/components/reportes/SummaryCard';
 import InsightsCard from '@/components/reportes/InsightsCard';
 import PeopleCard from '@/components/reportes/PeopleCard';
 import MissedCard from '@/components/reportes/MissedCard';
+import OptionalCard from '@/components/reportes/OptionalCard';
 import DailyChart from '@/components/reportes/DailyChart';
 import TrendChart from '@/components/reportes/TrendChart';
 import { IconBars, IconDownload, IconTrend } from '@/components/panel/icons';
@@ -143,6 +144,7 @@ export default function ReportesPage() {
                 </div>
                 <PeopleCard key={`p${weekKey}`} people={shown.people} generalMiss={shown.generalMiss} showCounts={isAdmin} />
                 <MissedCard missed={shown.missed} hasDue={shown.due > 0} today={toDateStr(data!.loadedAt)} />
+                <OptionalCard rows={shown.optional} />
                 <div className={s.divider}>Más detalle</div>
                 <FoldCard storageKey="lf_rep_open_daily" icon={<IconBars />} title="Día por día" peek={dailyPeek(shown)}>
                   <DailyChart key={weekKey} days={shown.days} />

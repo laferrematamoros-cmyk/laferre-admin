@@ -18,10 +18,11 @@ const CHIP_TXT: Record<TodayStatus, [string, string]> = {
   upcoming: ['por hacer', 'por hacer'],
   doneLate: ['hecha tarde', 'hechas tarde'],
   done: ['hecha a tiempo', 'hechas a tiempo'],
+  optional: ['opcional', 'opcionales'],
 };
 
 export default function DaySummary({ report, now, onOpen }: { report: TodayReport; now: Date; onOpen: (r: TodayRow) => void }) {
-  const { pct, done, due, counts, rows } = report;
+  const { pct, done, due, counts, rows, optional } = report;
   const rating = pct === null ? null : ratingOf(pct);
   return (
     <section className={`${s.card} ${h.summary}`} aria-label="Cómo va el día">
@@ -45,6 +46,11 @@ export default function DaySummary({ report, now, onOpen }: { report: TodayRepor
             {CHIPS.filter(k => counts[k] > 0).map(k => (
               <span key={k}><i className={`${h.sw} ${BG[k]}`} /><b>{counts[k]}</b>{CHIP_TXT[k][counts[k] === 1 ? 0 : 1]}</span>
             ))}
+            {optional.total > 0 && (
+              <span title="No cuentan en el porcentaje">
+                <i className={`${h.sw} ${BG.optional}`} /><b>{optional.done} de {optional.total}</b>{CHIP_TXT.optional[optional.total === 1 ? 0 : 1]}
+              </span>
+            )}
           </div>
         )}
       </div>

@@ -17,6 +17,7 @@
 .chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; background: var(--chip); color: var(--chip-ink); }
 .chipGeneral { background: var(--st-ok-soft); color: var(--st-ok-ink); }
 .chipMonth { background: #EFE9FE; color: #5B21B6; }
+.chipOptional { background: var(--st-opt-soft); color: var(--st-opt-ink); }
 .chipUrgent { background: var(--st-miss-soft); color: var(--st-miss-ink); }
 .chipPaused { background: #ECECF0; color: #4A4A50; }
 

@@ -43,6 +43,8 @@ export interface Activity {
   is_urgent: boolean;
   reminder_minutes: number;
   evidence_photo: boolean;
+  /** Opcional: avisa y se puede marcar, pero si no se hace no cuenta (supabase/006). */
+  is_optional?: boolean;
   evidence_name: boolean;
   evidence_note: boolean;
   evidence_signature: boolean;

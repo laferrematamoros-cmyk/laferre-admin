@@ -56,7 +56,7 @@ describe('buildToday', () => {
     expect(by.a1.minutesLate).toBeNull();
   });
   it('el porcentaje sólo cuenta lo que ya venció (igual que Reportes)', () => {
-    expect(r.counts).toEqual({ done: 1, doneLate: 1, running: 1, upcoming: 1, overdue: 1 });
+    expect(r.counts).toEqual({ done: 1, doneLate: 1, running: 1, upcoming: 1, overdue: 1, optional: 0 });
     expect([r.done, r.due, r.pct]).toEqual([2, 3, 67]);
   });
   it('necesita atención: atrasadas primero, luego lo que vence en 30 min o menos', () => {
@@ -122,5 +122,53 @@ describe('línea del día', () => {
   it('el rango va de 7 am a 7 pm como mínimo y se estira si hace falta', () => {
     expect(dayRange([row('a', 480, 540)])).toEqual({ from: 420, to: 1140 });
     expect(dayRange([row('a', 390, 540), row('b', 1100, 1215)])).toEqual({ from: 360, to: 1260 });
+  });
+});
+
+describe('actividades opcionales', () => {
+  const normal = act({ id: 'n', start_time: '08:00:00', limit_time: '09:00:00', assigned_employee_ids: ['e1'] });
+  const dev = act({ id: 'o', start_time: '08:00:00', limit_time: '09:00:00', assigned_employee_ids: ['e2'], is_optional: true });
+
+  it('pasada su hora y sin marcar queda "opcional", nunca atrasada', () => {
+    const r = buildToday([dev], [], EMP, WED_3PM);
+    expect(r.rows[0]).toMatchObject({ id: 'o', status: 'optional', optional: true, minutesLate: null });
+    expect(r.counts.overdue).toBe(0);
+    expect(r.attention).toEqual([]);
+    expect(r.pct).toBeNull();
+    expect(r.people.find(p => p.id === 'e2')).toMatchObject({ overdue: 0, pending: 0, done: 0 });
+    expect(r.generalOverdue).toBe(0);
+  });
+
+  it('antes de su hora tampoco cuenta como por hacer', () => {
+    const r = buildToday([dev], [], EMP, new Date(2026, 9, 28, 7, 0));
+    expect(r.rows[0].status).toBe('optional');
+    expect(r.counts.upcoming).toBe(0);
+  });
+
+  it('marcada se ve hecha aunque fuera tarde, y no entra al porcentaje', () => {
+    const r = buildToday([normal, dev], [comp('n', 'e1'), comp('o', 'e2', true)], EMP, WED_3PM);
+    expect(r.rows.find(x => x.id === 'o')).toMatchObject({ status: 'done', doneBy: 'BETO' });
+    expect(r.done).toBe(1);
+    expect(r.due).toBe(1);
+    expect(r.pct).toBe(100);
+    expect(r.counts.done).toBe(1);
+    expect(r.people.find(p => p.id === 'e2')).toMatchObject({ done: 0, late: 0 });
+  });
+
+  it('una normal sin hacer sigue bajando el porcentaje', () => {
+    const r = buildToday([normal, dev], [comp('o', 'e2')], EMP, WED_3PM);
+    expect(r.pct).toBe(0);
+    expect(r.counts.overdue).toBe(1);
+  });
+
+  it('lleva su cuenta aparte', () => {
+    const otra = act({ id: 'o2', is_optional: true });
+    expect(buildToday([dev, otra], [comp('o', 'e2')], EMP, WED_3PM).optional).toEqual({ done: 1, total: 2 });
+    expect(buildToday([normal], [], EMP, WED_3PM).optional).toEqual({ done: 0, total: 0 });
+  });
+
+  it('statusLabel: en días pasados dice que no se marcó', () => {
+    expect(statusLabel('optional', false)).toBe('Opcional');
+    expect(statusLabel('optional', true)).toBe('Opcional, sin marcar');
   });
 });

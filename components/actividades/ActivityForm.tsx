@@ -108,7 +108,7 @@ export default function ActivityForm({ mode, initial = EMPTY_VALUES, employees, 
               </div>
               {errs.limit
                 ? <p id="e-limit" className={f.err}>{errs.limit}</p>
-                : <p id="e-limit" className={f.hint}>Si a la hora límite no se ha hecho, cuenta como atrasada.</p>}
+                : <p id="e-limit" className={f.hint}>{v.optional ? 'Hasta esta hora se le recuerda. Si no se marca, no pasa nada.' : 'Si a la hora límite no se ha hecho, cuenta como atrasada.'}</p>}
 
               <div className={f.field}>
                 <span className={f.label} id="l-days">Días</span>
@@ -178,6 +178,19 @@ export default function ActivityForm({ mode, initial = EMPTY_VALUES, employees, 
                 </span>
                 <span className={`${f.switch} ${v.photo ? f.switchOn : ''}`} aria-hidden />
               </button>
+              <button type="button" className={f.switchRow} role="switch" aria-checked={v.optional} onClick={() => set('optional', !v.optional)}>
+                <span>
+                  <b>Actividad opcional</b>
+                  <small>{v.optional ? 'Avisa y se puede marcar, pero si ese día no se hace no cuenta como sin hacer ni baja el porcentaje.' : 'Si no se hace, cuenta como sin hacer.'}</small>
+                </span>
+                <span className={`${f.switch} ${v.optional ? f.switchOn : ''}`} aria-hidden />
+              </button>
+              {v.optional ? (
+                <p className={f.hint}>
+                  Avisa al empezar y a la hora límite, y ya no insiste. <b>Pon la hora límite al cierre:</b> la app de los teléfonos todavía no conoce las opcionales,
+                  así que al pasar esa hora la muestra en rojo como atrasada y manda un aviso. El panel y los reportes sí la tratan como opcional.
+                </p>
+              ) : (
               <div className={f.field}>
                 <span className={f.label}>Recordatorio después de la hora límite</span>
                 <div className={f.seg}>
@@ -187,6 +200,7 @@ export default function ActivityForm({ mode, initial = EMPTY_VALUES, employees, 
                 </div>
                 <p className={f.hint}>Si pasa la hora límite y no se ha hecho, la app avisa cada {v.reminder} minutos hasta terminar la jornada.</p>
               </div>
+              )}
             </div>
           </section>
         </div>
@@ -209,7 +223,7 @@ export default function ActivityForm({ mode, initial = EMPTY_VALUES, employees, 
           </section>
           {mode === 'edit' && (
             <p className={f.hint}>
-              Si cambias los días o el horario, Reportes recalcula las semanas pasadas con lo nuevo.
+              Si cambias los días, el horario o si es opcional, Reportes recalcula las semanas pasadas con lo nuevo.
               Si la actividad cambió de verdad, conviene archivarla y crear una nueva.
             </p>
           )}

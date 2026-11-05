@@ -4,15 +4,17 @@ import { activityRunsOn, dueAt, liveAt, pctOf, toDateStr, type Lifecycle, type R
 // ── Estados de una actividad HOY ────────────────────────────────────────────────
 // Mismas reglas que Reportes (lo hecho tarde cuenta, lo que no vence no baja el %),
 // más "en curso": ya empezó y todavía no vence.
-export type TodayStatus = 'done' | 'doneLate' | 'running' | 'upcoming' | 'overdue';
-export const TODAY_STATUSES: TodayStatus[] = ['done', 'doneLate', 'running', 'upcoming', 'overdue'];
+// "optional": actividad opcional sin marcar. No está atrasada ni pendiente: si ese día
+// no hubo nada que hacer, no pasa nada. Las opcionales nunca entran al porcentaje.
+export type TodayStatus = 'done' | 'doneLate' | 'running' | 'upcoming' | 'overdue' | 'optional';
+export const TODAY_STATUSES: TodayStatus[] = ['done', 'doneLate', 'running', 'upcoming', 'overdue', 'optional'];
 export const TODAY_LABEL: Record<TodayStatus, string> = {
-  done: 'Hecha', doneLate: 'Hecha tarde', running: 'En curso', upcoming: 'Por hacer', overdue: 'Atrasada',
+  done: 'Hecha', doneLate: 'Hecha tarde', running: 'En curso', upcoming: 'Por hacer', overdue: 'Atrasada', optional: 'Opcional',
 };
 /** "Por vencer": en curso y le quedan estos minutos o menos. */
 export const SOON_MIN = 30;
 
-export type TodayActivity = Pick<Activity, 'id' | 'title' | 'description' | 'start_time' | 'limit_time' | 'days_of_week' | 'week_of_month' | 'assigned_employee_ids' | 'created_at'> & Lifecycle;
+export type TodayActivity = Pick<Activity, 'id' | 'title' | 'description' | 'start_time' | 'limit_time' | 'days_of_week' | 'week_of_month' | 'assigned_employee_ids' | 'created_at' | 'is_optional'> & Lifecycle;
 export type TodayCompletion = Pick<Completion, 'activity_id' | 'employee_id' | 'scheduled_date' | 'was_late' | 'completed_at' | 'photo_url' | 'note'>;
 
 export interface TodayRow {
@@ -31,6 +33,7 @@ export interface TodayRow {
   /** "ANA, BETO" · "General" · "Sin responsable activo" */
   assignee: string;
   general: boolean;
+  optional: boolean;
   completion: TodayCompletion | null;
   doneBy: string | null;
 }
@@ -49,6 +52,8 @@ export interface TodayReport {
   people: TodayPerson[];
   /** atrasadas sin responsable activo (generales o asignadas a alguien dado de baja) */
   generalOverdue: number;
+  /** opcionales de hoy: cuántas se marcaron de cuántas había (aparte del porcentaje) */
+  optional: { done: number; total: number };
 }
 
 export function minutesOf(t: string): number {
@@ -65,7 +70,9 @@ export function todayStatus(comp: TodayCompletion | undefined, start: Date, limi
 
 /** En un día ya pasado, "atrasada" se lee como "sin hacer" (ya no hay tiempo de hacerla). */
 export function statusLabel(s: TodayStatus, past: boolean): string {
-  return past && s === 'overdue' ? 'Sin hacer' : TODAY_LABEL[s];
+  if (past && s === 'overdue') return 'Sin hacer';
+  if (past && s === 'optional') return 'Opcional, sin marcar';
+  return TODAY_LABEL[s];
 }
 
 /** El día de hoy, visto en el momento `now`. */
@@ -101,7 +108,9 @@ export function buildDay(
       const start = dueAt(day, a.start_time);
       const limit = dueAt(day, a.limit_time);
       const comp = compByAct.get(a.id);
-      const status = todayStatus(comp, start, limit, now);
+      const optional = !!a.is_optional;
+      // Una opcional no tiene "tarde": hecha o sin marcar.
+      const status: TodayStatus = optional ? (comp ? 'done' : 'optional') : todayStatus(comp, start, limit, now);
       const assigned = (a.assigned_employee_ids ?? []) as string[];
       const owners = assigned.filter(id => emp.has(id));
       return {
@@ -120,13 +129,15 @@ export function buildDay(
           : owners.length === 0 ? 'Sin responsable activo'
           : owners.map(id => emp.get(id)!.name).join(', '),
         general: assigned.length === 0,
+        optional,
         completion: comp ?? null,
         doneBy: comp ? emp.get(comp.employee_id)?.name ?? null : null,
       };
     })
     .sort((x, y) => x.startMin - y.startMin || x.limitMin - y.limitMin || x.title.localeCompare(y.title, 'es'));
 
-  const counts: Record<TodayStatus, number> = { done: 0, doneLate: 0, running: 0, upcoming: 0, overdue: 0 };
+  const counts: Record<TodayStatus, number> = { done: 0, doneLate: 0, running: 0, upcoming: 0, overdue: 0, optional: 0 };
+  const optional = { done: 0, total: 0 };
   const per = new Map<string, { done: number; late: number; overdue: number; pending: number }>();
   const bump = (id: string) => {
     let p = per.get(id);
@@ -136,6 +147,11 @@ export function buildDay(
   let generalOverdue = 0;
 
   for (const r of rows) {
+    if (r.optional) {
+      optional.total++;
+      if (r.completion) optional.done++; else counts.optional++;
+      continue;
+    }
     counts[r.status]++;
     if (r.completion) {
       if (emp.has(r.completion.employee_id)) {
@@ -166,7 +182,7 @@ export function buildDay(
 
   const done = counts.done + counts.doneLate;
   const due = done + counts.overdue;
-  return { rows, counts, done, due, pct: pctOf(done, due), attention, people, generalOverdue };
+  return { rows, counts, done, due, pct: pctOf(done, due), attention, people, generalOverdue, optional };
 }
 
 // ── Línea del día ───────────────────────────────────────────────────────────────

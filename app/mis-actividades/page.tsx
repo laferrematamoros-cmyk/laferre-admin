@@ -23,6 +23,7 @@ const TONE: Record<TodayStatus, { edge: string; bg: string; ink: string }> = {
   upcoming: { edge: 'var(--st-todo)', bg: '#F0F0F3',             ink: '#55555B' },
   done:     { edge: 'var(--st-ok)',   bg: 'var(--st-ok-soft)',   ink: 'var(--st-ok-ink)' },
   doneLate: { edge: 'var(--st-late)', bg: 'var(--st-late-soft)', ink: 'var(--st-late-ink)' },
+  optional: { edge: 'var(--st-opt)',  bg: 'var(--st-opt-soft)',  ink: 'var(--st-opt-ink)' },
 };
 const BAR_ORDER: TodayStatus[] = ['done', 'doneLate', 'overdue', 'running', 'upcoming'];
 
@@ -34,7 +35,7 @@ const hhmm = (iso: string) => new Date(iso).toLocaleTimeString('es-MX', { hour: 
 /** Para la leyenda: "1 hecha", "5 hechas", "2 por hacer". */
 const COUNT_LABEL: Record<TodayStatus, [string, string]> = {
   done: ['hecha', 'hechas'], doneLate: ['hecha tarde', 'hechas tarde'], overdue: ['atrasada', 'atrasadas'],
-  running: ['en curso', 'en curso'], upcoming: ['por hacer', 'por hacer'],
+  running: ['en curso', 'en curso'], upcoming: ['por hacer', 'por hacer'], optional: ['opcional', 'opcionales'],
 };
 
 function pillText(r: TodayRow, nowMin: number): string {
@@ -121,16 +122,18 @@ export default function MisActividadesPage() {
     const rows = mine(buildDay(new Date(`${day.date}T00:00:00`), day.acts, day.comps, day.emps, now).rows, employeeId);
     const photo = new Map(day.acts.map(a => [a.id, !!a.evidence_photo]));
     const me = day.emps.find(e => e.id === employeeId);
-    const counts = { done: 0, doneLate: 0, running: 0, upcoming: 0, overdue: 0 } as Record<TodayStatus, number>;
-    rows.forEach(r => counts[r.status]++);
-    return { rows, ...groupMine(rows), photo, me, counts };
+    const counts = { done: 0, doneLate: 0, running: 0, upcoming: 0, overdue: 0, optional: 0 } as Record<TodayStatus, number>;
+    // Las opcionales no entran al resumen del día: se ven en su propia sección.
+    const required = rows.filter(r => !r.optional);
+    required.forEach(r => counts[r.status]++);
+    return { rows, required, ...groupMine(rows), photo, me, counts };
   }, [day, now, employeeId]);
 
   // Avisos: empieza, llega a la hora límite y cada 15 min de retraso (una vez cada uno).
   useEffect(() => {
     if (!view) return;
     const nowMin = now.getHours() * 60 + now.getMinutes();
-    for (const r of [...view.now, ...view.later]) {
+    for (const r of [...view.now, ...view.later, ...view.optional]) {
       const fire = (key: string, body: string, urgent: boolean) => {
         if (shown.current.has(key)) return false;
         shown.current.add(key);
@@ -138,6 +141,12 @@ export default function MisActividadesPage() {
         beep(urgent);
         return true;
       };
+      if (r.optional) {
+        // Opcional: avisa al inicio y a la hora límite, sin alarma ni retrasos.
+        if (nowMin >= r.startMin && nowMin < r.startMin + 2) { if (fire(`${r.id}-s`, `Si hoy hubo, márcala · hasta las ${r.limit}`, false)) break; }
+        else if (nowMin >= r.limitMin && nowMin < r.limitMin + 2) { if (fire(`${r.id}-l`, 'Último aviso · si hoy hubo, márcala', false)) break; }
+        continue;
+      }
       if (nowMin >= r.startMin && nowMin < r.startMin + 2) { if (fire(`${r.id}-s`, `Empieza ahora · límite ${r.limit}`, false)) break; }
       else if (nowMin >= r.limitMin && nowMin < r.limitMin + 2) { if (fire(`${r.id}-l`, `Llegó la hora límite (${r.limit}) y no está hecha`, true)) break; }
       else if (nowMin > r.limitMin) {
@@ -153,7 +162,7 @@ export default function MisActividadesPage() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  const total = view?.rows.length ?? 0;
+  const total = view?.required.length ?? 0;
   const doneN = view ? view.counts.done + view.counts.doneLate : 0;
   const next = view ? view.now[0] ?? view.later[0] ?? null : null;
   const dateLabel = now.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -209,13 +218,14 @@ export default function MisActividadesPage() {
             </div>
           ) : !company ? (
             <div className={`${s.card} ${m.empty}`}><b>Escoge una empresa en el menú</b></div>
-          ) : view && total === 0 ? (
+          ) : view && view.rows.length === 0 ? (
             <div className={`${s.card} ${m.empty}`}>
               <b>Hoy no tienes actividades</b>
               <p>No hay actividades generales ni a tu nombre para hoy.</p>
             </div>
           ) : view && (
             <>
+              {total > 0 && (
               <section className={`${s.card} ${m.hero}`}>
                 <div>
                   <div className={m.count}><b>{doneN}</b><span>de {total}</span></div>
@@ -245,6 +255,7 @@ export default function MisActividadesPage() {
                   )}
                 </div>
               </section>
+              )}
 
               {view.now.length > 0 && (
                 <section className={m.block}>
@@ -257,6 +268,14 @@ export default function MisActividadesPage() {
                 <section className={m.block}>
                   <p className={m.secLbl}>Más tarde ({view.later.length})</p>
                   <div className={m.list}>{view.later.map(card)}</div>
+                </section>
+              )}
+
+              {view.optional.length > 0 && (
+                <section className={m.block}>
+                  <p className={m.secLbl}>Opcionales ({view.optional.length})</p>
+                  <p className={m.secHint}>Márcalas sólo si hoy hubo. Si no hubo, no pasa nada: no cuentan en tus resultados.</p>
+                  <div className={m.list}>{view.optional.map(card)}</div>
                 </section>
               )}
 
@@ -276,6 +295,7 @@ export default function MisActividadesPage() {
                               <small>
                                 {r.completion ? `${r.status === 'doneLate' ? 'Hecha tarde' : 'Hecha'} a las ${hhmm(r.completion.completed_at)}` : 'Hecha'}
                                 {r.doneBy ? ` · ${niceName(r.doneBy)}` : ''}
+                                {r.optional ? ' · opcional' : ''}
                               </small>
                             </div>
                             {photo && (

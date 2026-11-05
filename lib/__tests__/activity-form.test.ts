@@ -42,7 +42,7 @@ describe('guardar y leer', () => {
     expect(row).toEqual({
       title: 'Encender radios', description: null, start_time: '09:00', limit_time: '09:15',
       recurrence: 'personalizado', days_of_week: [1, 5], week_of_month: null,
-      assigned_employee_ids: [], reminder_minutes: 10, evidence_photo: true,
+      assigned_employee_ids: [], reminder_minutes: 10, evidence_photo: true, is_optional: false,
     });
     expect('is_urgent' in row || 'evidence_name' in row).toBe(false);
   });
@@ -51,7 +51,27 @@ describe('guardar y leer', () => {
       title: 'X', description: null, start_time: '08:00:00', limit_time: '08:15:00', days_of_week: [6],
       week_of_month: null, assigned_employee_ids: ['e1'], reminder_minutes: 20, evidence_photo: false,
     });
-    expect(v).toEqual({ title: 'X', description: '', start: '08:00', limit: '08:15', days: [6], weekOfMonth: null, assigned: ['e1'], reminder: 20, photo: false });
+    expect(v).toEqual({ title: 'X', description: '', start: '08:00', limit: '08:15', days: [6], weekOfMonth: null, assigned: ['e1'], reminder: 20, photo: false, optional: false });
     expect(REMINDERS).toEqual([5, 10, 15, 30]);
+  });
+});
+
+describe('actividad opcional en el formulario', () => {
+  it('por defecto no es opcional', () => {
+    expect(EMPTY_VALUES.optional).toBe(false);
+    expect(toRow(base).is_optional).toBe(false);
+  });
+  it('se guarda y se lee de vuelta', () => {
+    expect(toRow({ ...base, optional: true }).is_optional).toBe(true);
+    const a = {
+      title: 'Devoluciones', description: null, start_time: '18:00:00', limit_time: '19:30:00', days_of_week: [1],
+      week_of_month: null, assigned_employee_ids: [], reminder_minutes: 10, evidence_photo: true,
+    };
+    expect(fromActivity({ ...a, is_optional: true }).optional).toBe(true);
+    expect(fromActivity(a).optional).toBe(false); // antes de correr el SQL no viene la columna
+  });
+  it('el resumen dice que es opcional', () => {
+    expect(summaryText({ ...base, optional: true })).toContain('opcional');
+    expect(summaryText(base)).not.toContain('opcional');
   });
 });

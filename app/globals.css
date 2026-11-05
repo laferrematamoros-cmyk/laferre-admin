@@ -8,6 +8,7 @@
   --st-late: #E8930C;  --st-late-soft: #FDF0DB;  --st-late-ink: #8A5100;
   --st-miss: #E11D2E;  --st-miss-soft: #FDE8EA;  --st-miss-ink: #A50F1C;
   --st-todo: #DEDEE4;
+  --st-opt:  #7C3AED;  --st-opt-soft:  #EFE9FE;  --st-opt-ink:  #5B21B6;  /* opcional sin marcar */
   --st-run:  #2563EB;  --st-run-soft:  #E6EEFD;  --st-run-ink:  #1D4ED8;  /* en curso (Dashboard) */
 }
 

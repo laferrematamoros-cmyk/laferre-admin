@@ -5,8 +5,8 @@ import c from './cal.module.css';
 export interface CalDay { date: Date; report: TodayReport; isToday: boolean; past: boolean; }
 
 export const DAY_SHORT = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-export const EV: Record<TodayStatus, string> = { done: c.eDone, doneLate: c.eDoneLate, running: c.eRunning, upcoming: c.eUpcoming, overdue: c.eOverdue };
-export const EDGE: Record<TodayStatus, string> = { done: c.bDone, doneLate: c.bDoneLate, running: c.bRunning, upcoming: c.bUpcoming, overdue: c.bOverdue };
+export const EV: Record<TodayStatus, string> = { done: c.eDone, doneLate: c.eDoneLate, running: c.eRunning, upcoming: c.eUpcoming, overdue: c.eOverdue, optional: c.eOptional };
+export const EDGE: Record<TodayStatus, string> = { done: c.bDone, doneLate: c.bDoneLate, running: c.bRunning, upcoming: c.bUpcoming, overdue: c.bOverdue, optional: c.bOptional };
 /** Orden de los colores en la barrita de cada día. */
 export const MINI_ORDER: TodayStatus[] = ['done', 'doneLate', 'overdue', 'running', 'upcoming'];
 

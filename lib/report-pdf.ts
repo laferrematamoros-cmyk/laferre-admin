@@ -118,5 +118,16 @@ export async function downloadReportPdf(o: { report: WeekReport; insights: Insig
     }
   }
 
+  // Opcionales: aparte, no cuentan en el porcentaje
+  if (r.optional.length) {
+    section('Opcionales (no cuentan en el porcentaje)');
+    for (const op of r.optional) {
+      ensure(7);
+      ink(INK); doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.text(op.title, M, y + 3);
+      ink(MUTED); doc.setFontSize(8.5); doc.text(`${op.done} de ${op.days} día${op.days === 1 ? '' : 's'}`, W - M, y + 3, { align: 'right' });
+      y += 7;
+    }
+  }
+
   doc.save(`reporte-${slug(o.companyName) || 'actividades'}-${toDateStr(r.weekStart)}.pdf`);
 }

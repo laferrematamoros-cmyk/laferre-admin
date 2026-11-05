@@ -114,13 +114,15 @@ export function liveAt(a: Lifecycle, t: Date): boolean {
   return true;
 }
 
-export type ReportActivity = Pick<Activity, 'id' | 'title' | 'limit_time' | 'days_of_week' | 'week_of_month' | 'assigned_employee_ids' | 'created_at'> & Lifecycle;
+export type ReportActivity = Pick<Activity, 'id' | 'title' | 'limit_time' | 'days_of_week' | 'week_of_month' | 'assigned_employee_ids' | 'created_at' | 'is_optional'> & Lifecycle;
 export type ReportCompletion = Pick<Completion, 'activity_id' | 'employee_id' | 'scheduled_date' | 'was_late'>;
 export type ReportEmployee = Pick<Employee, 'id' | 'name' | 'initials'>;
 
 export interface DayReport extends Counts { date: Date; label: string; isToday: boolean; }
 export interface PersonRow { id: string; name: string; initials: string; done: number; late: number; miss: number; }
 export interface MissedItem { title: string; date: Date; limit: string; assignee: string; general: boolean; }
+/** Una actividad opcional en la semana: `done` días hecha de los `days` que ya pasaron. */
+export interface OptionalRow { id: string; title: string; done: number; days: number; }
 export interface WeekReport {
   weekStart: Date;
   counts: Counts;
@@ -136,6 +138,8 @@ export interface WeekReport {
   /** generales (sin asignados) que vencieron sin hacerse */
   generalMiss: number;
   missed: MissedItem[];
+  /** Opcionales: nunca entran a lo de arriba, se ven aparte. */
+  optional: OptionalRow[];
 }
 export interface TrendPoint { start: Date; label: string; pct: number | null; }
 
@@ -188,6 +192,7 @@ export function buildWeekReport(
   const days: DayReport[] = [];
   const missed: MissedItem[] = [];
   let generalMiss = 0;
+  const optional = new Map<string, OptionalRow>();
   const todayStr = toDateStr(now);
 
   for (let i = 0; i < 7; i++) {
@@ -200,6 +205,16 @@ export function buildWeekReport(
     for (const a of activities) {
       if (!activityRunsOn(a, day) || new Date(a.created_at) > dayEnd || !liveAt(a, dueAt(day, a.limit_time))) continue;
       const comp = compByKey.get(`${a.id}|${dateStr}`);
+      if (a.is_optional) {
+        // Se haga o no, no toca el porcentaje ni a las personas: sólo se lleva su cuenta.
+        if (comp || now.getTime() > dueAt(day, a.limit_time).getTime()) {
+          const o = optional.get(a.id) ?? { id: a.id, title: a.title, done: 0, days: 0 };
+          o.days++;
+          if (comp) o.done++;
+          optional.set(a.id, o);
+        }
+        continue;
+      }
       const st = activityStatus(comp, day, a.limit_time, now);
       dc[st]++;
       counts[st]++;
@@ -246,7 +261,7 @@ export function buildWeekReport(
 
   const done = counts.ok + counts.late;
   const due = done + counts.miss;
-  return { weekStart, counts, done, due, pct: pctOf(done, due), days, people, generalMiss, missed };
+  return { weekStart, counts, done, due, pct: pctOf(done, due), days, people, generalMiss, missed, optional: [...optional.values()] };
 }
 
 /** Porcentaje de las `n` semanas que terminan en `selected` (la última es la elegida). */

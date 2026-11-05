@@ -11,7 +11,7 @@ export type ActivityInput = Record<string, unknown>;
 // company_id sólo al crear y siempre de una empresa permitida; al editar no se mueve.
 const EDITABLE = [
   'title', 'description', 'start_time', 'limit_time', 'recurrence', 'days_of_week',
-  'week_of_month', 'assigned_employee_ids', 'reminder_minutes', 'evidence_photo', 'is_active',
+  'week_of_month', 'assigned_employee_ids', 'reminder_minutes', 'evidence_photo', 'is_active', 'is_optional',
 ] as const;
 const ON_CREATE = [...EDITABLE, 'is_urgent', 'evidence_name', 'evidence_note', 'evidence_signature', 'company_id'] as const;
 

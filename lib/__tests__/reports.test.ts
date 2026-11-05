@@ -203,3 +203,42 @@ describe('tendencia y semáforo', () => {
     expect(pctOf(0, 0)).toBeNull();
   });
 });
+
+describe('actividades opcionales', () => {
+  const week = (acts: ReportActivity[], comps: ReportCompletion[]) => buildWeekReport(MON, acts, comps, EMP, FRI_430PM);
+  const normal = act({ id: 'radios', assigned_employee_ids: ['e1'] });
+  const dev = act({ id: 'dev', title: 'Devoluciones', is_optional: true, assigned_employee_ids: ['e2'] });
+  const base = [comp('radios', '2026-10-26'), comp('radios', '2026-10-27'), comp('radios', '2026-10-28'), comp('radios', '2026-10-29'), comp('radios', '2026-10-30')];
+
+  it('sin hacer no baja el porcentaje ni aparece en "lo que no se hizo"', () => {
+    const r = week([normal, dev], base);
+    expect(r.pct).toBe(100);
+    expect(r.counts.miss).toBe(0);
+    expect(r.missed).toEqual([]);
+    expect(r.people.find(p => p.id === 'e2')).toMatchObject({ done: 0, miss: 0 });
+  });
+
+  it('hecha tampoco sube el porcentaje ni cuenta a la persona', () => {
+    const sinOpcional = week([normal], base.slice(0, 4));
+    const conOpcional = week([normal, dev], [...base.slice(0, 4), comp('dev', '2026-10-27', 'e2', true)]);
+    expect(conOpcional.pct).toBe(sinOpcional.pct);
+    expect(conOpcional.done).toBe(sinOpcional.done);
+    expect(conOpcional.counts.late).toBe(0);
+    expect(conOpcional.people.find(p => p.id === 'e2')).toMatchObject({ done: 0, late: 0 });
+  });
+
+  it('se cuenta aparte: cuántos días se hizo de los que ya pasaron', () => {
+    const r = week([normal, dev], [...base, comp('dev', '2026-10-27', 'e2'), comp('dev', '2026-10-29', 'e2')]);
+    expect(r.optional).toEqual([{ id: 'dev', title: 'Devoluciones', done: 2, days: 5 }]);
+  });
+
+  it('una semana sin opcionales trae la lista vacía', () => {
+    expect(week([normal], base).optional).toEqual([]);
+  });
+
+  it('no cuenta en los días de la gráfica', () => {
+    const r = week([dev], [comp('dev', '2026-10-27', 'e2')]);
+    expect(r.days.every(d => d.ok + d.late + d.miss + d.todo === 0)).toBe(true);
+    expect(r.pct).toBeNull();
+  });
+});

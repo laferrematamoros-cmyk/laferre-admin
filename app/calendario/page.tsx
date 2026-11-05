@@ -33,7 +33,7 @@ interface Loaded {
 }
 
 const REFRESH_MS = 60_000;
-const LEGEND: Record<string, string> = { done: 'Hecha', doneLate: 'Hecha tarde', running: 'En curso', upcoming: 'Por hacer', overdue: 'Atrasada o sin hacer' };
+const LEGEND: Record<string, string> = { done: 'Hecha', doneLate: 'Hecha tarde', running: 'En curso', upcoming: 'Por hacer', overdue: 'Atrasada o sin hacer', optional: 'Opcional (no cuenta)' };
 
 function plusDays(d: Date, n: number): Date {
   const x = new Date(d);
