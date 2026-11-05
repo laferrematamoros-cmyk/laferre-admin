@@ -2,11 +2,13 @@
 
 import { randomUUID } from 'node:crypto';
 import { supabaseAdmin as admin } from '@/lib/supabase';
-import { adminAccess, ownsRow, fail, OK, type Result } from '@/lib/admin-access';
+import { adminAccess, ownsRow, fail, OK, type Result as ActionResult } from '@/lib/admin-access';
 import { allows, isUuid, pick } from '@/lib/access-rules';
 import { CONOCE_BUCKET, conoceExt, conocePathOf } from '@/lib/conoce-image';
 
-export type { Result };
+// Con `export type Result = …`, no `export type { Result }`: en un archivo 'use server'
+// la compilación de producción lo vuelve un export real y el archivo truena al cargar.
+export type Result = ActionResult;
 export type ConoceInput = Record<string, unknown>;
 
 // Antes bastaba con tener sesión (el practicante podía escribir). Ahora sólo

@@ -2,11 +2,13 @@
 
 import { hashPassword, verifyPassword } from '@/lib/password';
 import { supabaseAdmin } from '@/lib/supabase';
-import { adminAccess, fail, OK, type Result } from '@/lib/admin-access';
+import { adminAccess, fail, OK, type Result as ActionResult } from '@/lib/admin-access';
 import { allows, isUuid } from '@/lib/access-rules';
 
 export type Role = 'admin' | 'practicante';
-export type { Result };
+// Con `export type Result = …`, no `export type { Result }`: en un archivo 'use server'
+// la compilación de producción lo vuelve un export real y el archivo truena al cargar.
+export type Result = ActionResult;
 
 export interface AdminUser {
   id: string;

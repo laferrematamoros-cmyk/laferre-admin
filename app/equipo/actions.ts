@@ -1,10 +1,12 @@
 'use server';
 
 import { supabaseAdmin as admin } from '@/lib/supabase';
-import { adminAccess, ownsRow, fail, OK, type Result } from '@/lib/admin-access';
+import { adminAccess, ownsRow, fail, OK, type Result as ActionResult } from '@/lib/admin-access';
 import { allows, pick } from '@/lib/access-rules';
 
-export type { Result };
+// Con `export type Result = …`, no `export type { Result }`: en un archivo 'use server'
+// la compilación de producción lo vuelve un export real y el archivo truena al cargar.
+export type Result = ActionResult;
 
 export interface EmployeeInput {
   name: string;
