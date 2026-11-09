@@ -129,7 +129,7 @@ export default function ActividadesPage() {
                         <b>{x.title}</b>
                         {x.is_urgent && <span className={`${a.chip} ${a.chipUrgent}`}>Urgente</span>}
                         {paused && <span className={`${a.chip} ${a.chipPaused}`}>Pausada</span>}
-                        {x.is_optional && <span className={`${a.chip} ${a.chipOptional}`} title="Avisa y se puede marcar, pero si no se hace no cuenta">Opcional</span>}
+                        {x.is_optional && <span className={`${a.chip} ${a.chipOptional}`} title="Si no se hace, no cuenta en tus reportes. Los empleados la ven como cualquier otra.">Opcional</span>}
                       </div>
                       {x.description && <p className={a.desc}>{x.description}</p>}
                       <div className={a.meta}>
@@ -142,9 +142,7 @@ export default function ActividadesPage() {
                         {who
                           ? <span className={a.chip}><IconUsers size={13} />{who}</span>
                           : <span className={`${a.chip} ${a.chipGeneral}`}>General</span>}
-                        {x.is_optional
-                          ? <span className={a.chip}><IconBell size={13} />Avisa al inicio y al límite</span>
-                          : x.reminder_minutes ? <span className={a.chip}><IconBell size={13} />Avisa cada {x.reminder_minutes} min</span> : null}
+                        {x.reminder_minutes ? <span className={a.chip}><IconBell size={13} />Avisa cada {x.reminder_minutes} min</span> : null}
                         {ev && <span className={a.chip}><IconCamera size={13} />{ev}</span>}
                       </div>
                     </div>

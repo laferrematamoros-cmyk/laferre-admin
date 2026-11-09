@@ -119,21 +119,21 @@ export default function MisActividadesPage() {
 
   const view = useMemo(() => {
     if (!day || !employeeId) return null;
-    const rows = mine(buildDay(new Date(`${day.date}T00:00:00`), day.acts, day.comps, day.emps, now).rows, employeeId);
+    // La practicante es empleada: las opcionales se le muestran como normales (no debe saber cuáles son).
+    const acts = day.acts.map(a => ({ ...a, is_optional: false }));
+    const rows = mine(buildDay(new Date(`${day.date}T00:00:00`), acts, day.comps, day.emps, now).rows, employeeId);
     const photo = new Map(day.acts.map(a => [a.id, !!a.evidence_photo]));
     const me = day.emps.find(e => e.id === employeeId);
     const counts = { done: 0, doneLate: 0, running: 0, upcoming: 0, overdue: 0, optional: 0 } as Record<TodayStatus, number>;
-    // Las opcionales no entran al resumen del día: se ven en su propia sección.
-    const required = rows.filter(r => !r.optional);
-    required.forEach(r => counts[r.status]++);
-    return { rows, required, ...groupMine(rows), photo, me, counts };
+    rows.forEach(r => counts[r.status]++);
+    return { rows, required: rows, ...groupMine(rows), photo, me, counts };
   }, [day, now, employeeId]);
 
   // Avisos: empieza, llega a la hora límite y cada 15 min de retraso (una vez cada uno).
   useEffect(() => {
     if (!view) return;
     const nowMin = now.getHours() * 60 + now.getMinutes();
-    for (const r of [...view.now, ...view.later, ...view.optional]) {
+    for (const r of [...view.now, ...view.later]) {
       const fire = (key: string, body: string, urgent: boolean) => {
         if (shown.current.has(key)) return false;
         shown.current.add(key);
@@ -141,12 +141,6 @@ export default function MisActividadesPage() {
         beep(urgent);
         return true;
       };
-      if (r.optional) {
-        // Opcional: avisa al inicio y a la hora límite, sin alarma ni retrasos.
-        if (nowMin >= r.startMin && nowMin < r.startMin + 2) { if (fire(`${r.id}-s`, `Si hoy hubo, márcala · hasta las ${r.limit}`, false)) break; }
-        else if (nowMin >= r.limitMin && nowMin < r.limitMin + 2) { if (fire(`${r.id}-l`, 'Último aviso · si hoy hubo, márcala', false)) break; }
-        continue;
-      }
       if (nowMin >= r.startMin && nowMin < r.startMin + 2) { if (fire(`${r.id}-s`, `Empieza ahora · límite ${r.limit}`, false)) break; }
       else if (nowMin >= r.limitMin && nowMin < r.limitMin + 2) { if (fire(`${r.id}-l`, `Llegó la hora límite (${r.limit}) y no está hecha`, true)) break; }
       else if (nowMin > r.limitMin) {
@@ -271,14 +265,6 @@ export default function MisActividadesPage() {
                 </section>
               )}
 
-              {view.optional.length > 0 && (
-                <section className={m.block}>
-                  <p className={m.secLbl}>Opcionales ({view.optional.length})</p>
-                  <p className={m.secHint}>Márcalas sólo si hoy hubo. Si no hubo, no pasa nada: no cuentan en tus resultados.</p>
-                  <div className={m.list}>{view.optional.map(card)}</div>
-                </section>
-              )}
-
               {view.done.length > 0 && (
                 <section className={m.block}>
                   <p className={m.secLbl}>Hechas ({view.done.length})</p>
@@ -295,7 +281,6 @@ export default function MisActividadesPage() {
                               <small>
                                 {r.completion ? `${r.status === 'doneLate' ? 'Hecha tarde' : 'Hecha'} a las ${hhmm(r.completion.completed_at)}` : 'Hecha'}
                                 {r.doneBy ? ` · ${niceName(r.doneBy)}` : ''}
-                                {r.optional ? ' · opcional' : ''}
                               </small>
                             </div>
                             {photo && (

@@ -31,7 +31,7 @@ export async function completeActivity(activityId: string, photoPath: string | n
   const db = admin();
   const [a, e] = await Promise.all([
     db.from('activities')
-      .select('id, company_id, limit_time, days_of_week, week_of_month, assigned_employee_ids, is_active, archived_at, evidence_photo, is_optional')
+      .select('id, company_id, limit_time, days_of_week, week_of_month, assigned_employee_ids, is_active, archived_at, evidence_photo')
       .eq('id', activityId).maybeSingle(),
     db.from('employees').select('id, company_id, is_active').eq('id', session.employeeId).maybeSingle(),
   ]);
@@ -75,8 +75,8 @@ export async function completeActivity(activityId: string, photoPath: string | n
     return fail(`Ya la marcó ${first.employees?.name ?? 'alguien'} a las ${at}.`, true);
   }
 
-  // Una opcional no tiene "tarde": si hubo, se marca cuando se pueda.
-  const wasLate = !act.is_optional && clock.minutes > minutesOf(act.limit_time);
+  // Igual para opcionales: el mensaje de "hecha tarde" no debe delatar cuáles son.
+  const wasLate = clock.minutes > minutesOf(act.limit_time);
   const ins = await db.from('completions')
     .insert({ activity_id: act.id, employee_id: emp.id, scheduled_date: clock.dateStr, photo_url: photo, was_late: wasLate })
     .select('completed_at').single();

@@ -91,9 +91,7 @@ export default function DoneSheet({ row, needsPhoto, onClose, onDone }: {
         </div>
         <div className={m.sBody}>
           <p className={`${m.when} ${late ? m.whenLate : m.whenOk}`}>
-            {row.optional
-              ? `Opcional: márcala sólo si hoy hubo. Se le recuerda hasta las ${row.limit}.`
-              : late
+            {late
               ? `Vas ${fmtMin(row.minutesLate ?? 0)} tarde (límite ${row.limit}). Quedará como hecha tarde.`
               : row.status === 'running'
                 ? `Límite ${row.limit} · faltan ${fmtMin(row.minutesLeft ?? 0)}.`
