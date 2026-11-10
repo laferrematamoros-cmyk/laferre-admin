@@ -239,8 +239,3 @@ create policy "inventario_anon_upload" on storage.objects for insert to anon wit
 );
 
 commit;
-)
-  )
-);
-
-commit;
