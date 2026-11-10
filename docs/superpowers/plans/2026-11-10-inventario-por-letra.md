@@ -296,7 +296,7 @@ create policy "inventario_anon_upload" on storage.objects for insert to anon wit
     select 1 from public.inventory_sections s
     join public.inventory_rounds r on r.id = s.round_id
     where r.closed_at is null and s.status = 'in_progress'
-      and storage.objects.name like s.round_id::text || '/' || s.id::text || '/%'
+      and storage.objects.name like (s.round_id::text || '/' || s.id::text || '/%')
   )
 );
 
