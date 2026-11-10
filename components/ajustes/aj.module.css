@@ -33,6 +33,9 @@
 .chipPrac { background: #EFE9FE; color: #5B21B6; }
 .chipAdmin { background: #0B0B0C; color: #fff; }
 .chipOk { background: var(--st-ok-soft); color: var(--st-ok-ink); }
+.chipLate { background: var(--st-late-soft); color: var(--st-late-ink); }
+.chipMiss { background: var(--st-miss-soft); color: var(--st-miss-ink); }
+.stale { opacity: .55; }
 .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .empty { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
 .empty p { margin: 0; font-size: 13.5px; color: var(--ink2); line-height: 1.5; }
