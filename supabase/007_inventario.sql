@@ -221,10 +221,11 @@ revoke all on function public.inv_finish_section(uuid, uuid, text, text[], text,
 grant execute on function public.inv_claim_section(uuid, uuid, boolean) to anon, authenticated;
 grant execute on function public.inv_finish_section(uuid, uuid, text, text[], text, text, text, text, boolean, boolean, text) to anon, authenticated;
 
--- ── Depósito de fotos del inventario (fuera de la limpieza de 21 días de "evidence") ──
+-- ── Depósito de fotos del inventario: PRIVADO (los reportes de Sicar traen cantidades).
+-- El panel las enseña con enlaces firmados; no le llega la limpieza de 21 días de "evidence". ──
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('inventario', 'inventario', true, 5242880, array['image/jpeg'])
-on conflict (id) do update set public = true, file_size_limit = 5242880, allowed_mime_types = array['image/jpeg'];
+values ('inventario', 'inventario', false, 5242880, array['image/jpeg'])
+on conflict (id) do update set public = false, file_size_limit = 5242880, allowed_mime_types = array['image/jpeg'];
 
 drop policy if exists "inventario_anon_upload" on storage.objects;
 create policy "inventario_anon_upload" on storage.objects for insert to anon with check (

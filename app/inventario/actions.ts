@@ -61,9 +61,17 @@ export async function loadInventory(companyId: string): Promise<{ ok: true; data
     if (error) return { ok: false, error: error.message };
     allSections = (data ?? []) as InvSection[];
   }
-  const url = (p: string | null) => (p ? db.storage.from(BUCKET).getPublicUrl(p).data.publicUrl : null);
+  // El depósito es privado: las fotos se enseñan con enlaces firmados que vencen en una hora.
+  const shown = allSections.filter(s => s.round_id === current?.id || s.round_id === prevRound?.id);
+  const paths = [...new Set(shown.flatMap(s => [s.shelf_photo, ...(s.report_photos ?? [])]).filter((p): p is string => !!p))];
+  const signed = new Map<string, string>();
+  if (paths.length) {
+    const { data: urls } = await db.storage.from(BUCKET).createSignedUrls(paths, 3600);
+    for (const u of urls ?? []) if (u.path && u.signedUrl) signed.set(u.path, u.signedUrl);
+  }
+  const url = (p: string | null) => (p ? signed.get(p) ?? null : null);
   const withUrls = (s: InvSection): InvSection => ({
-    ...s, shelf_photo: url(s.shelf_photo), report_photos: (s.report_photos ?? []).map(p => url(p) as string),
+    ...s, shelf_photo: url(s.shelf_photo), report_photos: (s.report_photos ?? []).map(url).filter((u): u is string => !!u),
   });
 
   const sections = current ? allSections.filter(s => s.round_id === current.id).map(withUrls) : [];

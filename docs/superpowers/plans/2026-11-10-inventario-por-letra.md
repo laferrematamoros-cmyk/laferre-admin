@@ -292,10 +292,11 @@ revoke all on function public.inv_finish_section(uuid, uuid, text, text[], text,
 grant execute on function public.inv_claim_section(uuid, uuid, boolean) to anon, authenticated;
 grant execute on function public.inv_finish_section(uuid, uuid, text, text[], text, text, text, text, boolean, boolean, text) to anon, authenticated;
 
--- ── Depósito de fotos del inventario (fuera de la limpieza de 21 días de "evidence") ──
+-- ── Depósito de fotos del inventario: PRIVADO (los reportes de Sicar traen cantidades).
+-- El panel las enseña con enlaces firmados; no le llega la limpieza de 21 días de "evidence". ──
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('inventario', 'inventario', true, 5242880, array['image/jpeg'])
-on conflict (id) do update set public = true, file_size_limit = 5242880, allowed_mime_types = array['image/jpeg'];
+values ('inventario', 'inventario', false, 5242880, array['image/jpeg'])
+on conflict (id) do update set public = false, file_size_limit = 5242880, allowed_mime_types = array['image/jpeg'];
 
 drop policy if exists "inventario_anon_upload" on storage.objects;
 create policy "inventario_anon_upload" on storage.objects for insert to anon with check (
@@ -862,8 +863,8 @@ Funciones (todas empiezan con `const a = await adminAccess(); if (!a.ok) return 
 | `inventoryPendingCount(companyId)` → `number` | Para el numerito del menú. 0 si no autorizado. | empresa permitida |
 
 - [ ] **Paso 1: escribir el archivo** con `'use server'`, `export type Result = ActionResult;` y las funciones de la tabla.
-  Las fotos guardan ruta (`<ronda>/<ficha>/<n>.jpg`); `loadInventory` las regresa como URL pública con
-  `db.storage.from('inventario').getPublicUrl(path).data.publicUrl` (en `shelf_photo` y `report_photos`).
+  Las fotos guardan ruta (`<ronda>/<ficha>/<n>.jpg`); `loadInventory` las regresa como enlaces firmados de 1 hora
+  (`createSignedUrls`; el depósito es privado) en `shelf_photo` y `report_photos`.
 - [ ] **Paso 2: correr `npx jest lib/__tests__/use-server-exports.test.ts`** — debe pasar (revisa el nuevo archivo).
 - [ ] **Paso 3: `npx tsc --noEmit`** — sin errores nuevos.
 - [ ] **Paso 4: commit** — `git add app/inventario/actions.ts && git commit -m "feat(inventario): acciones del panel"`
@@ -1046,10 +1047,6 @@ export async function uploadInventoryPhoto(roundId: string, sectionId: string, u
   const { error } = await supabase.storage.from(INV_BUCKET).upload(path, buf, { contentType: 'image/jpeg', upsert: false });
   if (error) throw error;
   return path;
-}
-
-export function photoUrl(path: string): string {
-  return supabase.storage.from(INV_BUCKET).getPublicUrl(path).data.publicUrl;
 }
 
 export async function finishSection(sectionId: string, employeeId: string, d: Draft & { shelfPath: string; reportPaths: string[] }): Promise<RpcResult> {
@@ -1671,8 +1668,8 @@ Funciones (todas empiezan con `const a = await adminAccess(); if (!a.ok) return 
 | `inventoryPendingCount(companyId)` → `number` | Para el numerito del menú. 0 si no autorizado. | empresa permitida |
 
 - [ ] **Paso 1: escribir el archivo** con `'use server'`, `export type Result = ActionResult;` y las funciones de la tabla.
-  Las fotos guardan ruta (`<ronda>/<ficha>/<n>.jpg`); `loadInventory` las regresa como URL pública con
-  `db.storage.from('inventario').getPublicUrl(path).data.publicUrl` (en `shelf_photo` y `report_photos`).
+  Las fotos guardan ruta (`<ronda>/<ficha>/<n>.jpg`); `loadInventory` las regresa como enlaces firmados de 1 hora
+  (`createSignedUrls`; el depósito es privado) en `shelf_photo` y `report_photos`.
 - [ ] **Paso 2: correr `npx jest lib/__tests__/use-server-exports.test.ts`** — debe pasar (revisa el nuevo archivo).
 - [ ] **Paso 3: `npx tsc --noEmit`** — sin errores nuevos.
 - [ ] **Paso 4: commit** — `git add app/inventario/actions.ts && git commit -m "feat(inventario): acciones del panel"`
@@ -1855,10 +1852,6 @@ export async function uploadInventoryPhoto(roundId: string, sectionId: string, u
   const { error } = await supabase.storage.from(INV_BUCKET).upload(path, buf, { contentType: 'image/jpeg', upsert: false });
   if (error) throw error;
   return path;
-}
-
-export function photoUrl(path: string): string {
-  return supabase.storage.from(INV_BUCKET).getPublicUrl(path).data.publicUrl;
 }
 
 export async function finishSection(sectionId: string, employeeId: string, d: Draft & { shelfPath: string; reportPaths: string[] }): Promise<RpcResult> {
