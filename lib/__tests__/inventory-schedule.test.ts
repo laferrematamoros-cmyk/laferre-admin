@@ -1,6 +1,6 @@
 import {
   addDays, dueDays, latestScheduled, lastDayOf, zonedToUtc, openingInstant, dueInstant,
-  roundStatus, inventoryActions, monthLabel, dayLabel, type PlanRow, type OpenRoundInfo,
+  roundStatus, inventoryActions, monthLabel, dayLabel, nextOpening, type PlanRow, type OpenRoundInfo,
 } from '../inventory-schedule';
 
 const plan = (o: Partial<PlanRow> = {}): PlanRow => ({
@@ -112,4 +112,12 @@ describe('inventoryActions', () => {
     const acts = inventoryActions({ plan: null, open: open(), lastScheduled: null, now: at('2026-12-01T15:00:00Z') });
     expect(acts[0].kind).toBe('notice');
   });
+});
+
+describe('nextOpening', () => {
+  const p = { company_id: 'c1', every_weeks: 6, first_open_date: '2026-12-01', due_amount: 1, due_unit: 'weeks' as const, is_active: true };
+  test('antes de empezar: la primera fecha', () => { expect(nextOpening(p, '2026-11-10', [])).toBe('2026-12-01'); });
+  test('el día que toca y aún no se abre: ese día', () => { expect(nextOpening(p, '2026-12-01', [])).toBe('2026-12-01'); });
+  test('ya se abrió: la siguiente', () => { expect(nextOpening(p, '2026-12-03', ['2026-12-01'])).toBe('2027-01-12'); });
+  test('se pasó el plazo sin abrir: la siguiente', () => { expect(nextOpening(p, '2026-12-20', [])).toBe('2027-01-12'); });
 });

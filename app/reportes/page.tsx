@@ -82,6 +82,26 @@ export default function ReportesPage() {
     return () => { alive = false; };
   }, [company, key, from, to, weekStart, attempt]);
 
+  // Letras de inventario terminadas por persona en la semana (no entran al %: sólo se enseñan).
+  const [invLetters, setInvLetters] = useState<{ key: string; counts: Record<string, number> }>({ key: '', counts: {} });
+  useEffect(() => {
+    if (!company) return;
+    let alive = true;
+    const start = new Date(weekStart);
+    const end = new Date(weekStart);
+    end.setDate(end.getDate() + 7);
+    supabase.from('inventory_sections').select('done_by')
+      .eq('company_id', company.id).eq('status', 'done')
+      .gte('done_at', start.toISOString()).lt('done_at', end.toISOString())
+      .then(({ data: rows, error: e }) => {
+        if (!alive) return;
+        const counts: Record<string, number> = {};
+        if (!e) for (const r of (rows ?? []) as { done_by: string | null }[]) if (r.done_by) counts[r.done_by] = (counts[r.done_by] ?? 0) + 1;
+        setInvLetters({ key, counts });
+      });
+    return () => { alive = false; };
+  }, [company, key, weekStart]);
+
   const loading = !data || data.key !== key;
   const report = useMemo(
     () => (data ? buildWeekReport(data.weekStart, data.activities, data.completions, data.employees, data.loadedAt) : null),
@@ -142,7 +162,8 @@ export default function ReportesPage() {
                   <SummaryCard key={weekKey} report={shown} prevPct={prevPct} isCurrent={isCurrent} />
                   <InsightsCard insights={insights} />
                 </div>
-                <PeopleCard key={`p${weekKey}`} people={shown.people} generalMiss={shown.generalMiss} showCounts={isAdmin} />
+                <PeopleCard key={`p${weekKey}`} people={shown.people} generalMiss={shown.generalMiss} showCounts={isAdmin}
+                  inventoryLetters={invLetters.key === key ? invLetters.counts : {}} />
                 <MissedCard missed={shown.missed} hasDue={shown.due > 0} today={toDateStr(data!.loadedAt)} />
                 <OptionalCard rows={shown.optional} />
                 <div className={s.divider}>Más detalle</div>

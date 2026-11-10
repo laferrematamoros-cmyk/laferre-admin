@@ -5,8 +5,18 @@ import { CountUp, TipBody, useInView, useTip } from '@/components/panel/ui';
 import { IconCheck, IconUsers, IconX } from '@/components/panel/icons';
 import s from '@/components/panel/panel.module.css';
 
-export default function PeopleCard({ people, generalMiss, showCounts }: {
-  people: PersonRow[]; generalMiss: number; showCounts: boolean;
+/** Etiqueta con las letras de inventario que terminó en la semana (no cuentan en el %). */
+function InvPill({ n }: { n: number | undefined }) {
+  if (!n) return null;
+  return (
+    <span className={s.pill} style={{ background: 'var(--st-run-soft)', color: 'var(--st-run-ink)' }}>
+      {n} {n === 1 ? 'letra' : 'letras'} de inventario
+    </span>
+  );
+}
+
+export default function PeopleCard({ people, generalMiss, showCounts, inventoryLetters = {} }: {
+  people: PersonRow[]; generalMiss: number; showCounts: boolean; inventoryLetters?: Record<string, number>;
 }) {
   const tip = useTip();
   const { ref, seen } = useInView<HTMLElement>();
@@ -39,7 +49,7 @@ export default function PeopleCard({ people, generalMiss, showCounts }: {
               <div key={p.id} className={s.prow}>
                 <div className={s.who}>
                   <span className={s.av}>{p.initials}</span>
-                  <div className={s.pn}><b>{p.name}</b>{pill}</div>
+                  <div className={s.pn}><b>{p.name}</b>{pill}<InvPill n={inventoryLetters[p.id]} /></div>
                 </div>
                 <div className={s.pbar} {...barTip}>
                   <div className={s.pfill} style={{ width: `${(total / max) * 100}%`, animationDelay: `${idx * STEP}ms` }}>
@@ -78,7 +88,7 @@ export default function PeopleCard({ people, generalMiss, showCounts }: {
             <div key={p.id} className={`${s.prow} ${s.idle}`}>
               <div className={s.who}>
                 <span className={s.av}>{p.initials}</span>
-                <div className={s.pn}><b>{p.name}</b><small>Sin actividades esta semana</small></div>
+                <div className={s.pn}><b>{p.name}</b><small>Sin actividades esta semana</small><InvPill n={inventoryLetters[p.id]} /></div>
               </div>
             </div>
           ))}

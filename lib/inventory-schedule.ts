@@ -152,3 +152,11 @@ export function inventoryActions(args: {
   }
   return out;
 }
+
+/** Fecha del próximo inventario programado (para mostrarla en la configuración). */
+export function nextOpening(p: PlanRow, today: string, openedDates: string[]): string {
+  const latest = latestScheduled(p, today);
+  if (!latest) return p.first_open_date;
+  if (!openedDates.includes(latest) && today <= lastDayOf(latest, p)) return latest;
+  return addDays(latest, p.every_weeks * 7);
+}
