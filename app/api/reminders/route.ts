@@ -3,6 +3,8 @@ import { cronAllowed } from '@/lib/cron-auth';
 import { reminderTargets, type DeviceRow, type EmployeeTokenRow } from '@/lib/push-targets';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { matchesWeekOfMonth } from '@/lib/reports';
+import { pushExpo } from '@/lib/expo-push';
+import { runInventoryTick } from '@/lib/inventory-server';
 
 // Cron runs every 5 minutes via cron-job.org
 // Notification rules per activity (if not completed):
@@ -40,20 +42,6 @@ async function syncMonthlyActive(supabase: SupabaseClient, today: Date) {
   }
 }
 
-async function push(tokens: string[], title: string, body: string) {
-  if (tokens.length === 0) return;
-  const messages = tokens.map(to => ({ to, title, body, sound: 'default', channelId: 'actividades', priority: 'high' }));
-  await fetch('https://exp.host/--/api/v2/push/send', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Accept-Encoding': 'gzip, deflate',
-    },
-    body: JSON.stringify(messages),
-  });
-}
-
 export async function GET(req: Request) {
   // Sólo cron-job.org (con la clave CRON_SECRET; ver lib/cron-auth.ts).
   if (!cronAllowed(req)) return NextResponse.json({ ok: false, error: 'no autorizado' }, { status: 401 });
@@ -71,7 +59,12 @@ export async function GET(req: Request) {
   // Corre siempre (aunque sea fuera de jornada) para captar el cambio de semana.
   await syncMonthlyActive(supabase, mxNow);
 
-  if (nowMin > END_OF_DAY) return NextResponse.json({ ok: true, sent: [], reason: 'fuera de jornada' });
+  // Inventario por letra: abrir la ronda que toca y mandar sus avisos (si falla, no tumba los recordatorios).
+  let inventory: string[] = [];
+  try { inventory = await runInventoryTick(supabase, new Date()); }
+  catch (e) { inventory = [`inventario error: ${(e as Error).message}`]; }
+
+  if (nowMin > END_OF_DAY) return NextResponse.json({ ok: true, sent: [], inventory, reason: 'fuera de jornada' });
 
   const [{ data: acts }, { data: comps }, { data: devices }, { data: emps }] = await Promise.all([
     supabase.from('activities').select('*').eq('is_active', true),
@@ -85,7 +78,7 @@ export async function GET(req: Request) {
   const withToken  = (emps ?? []) as EmployeeTokenRow[];
   const sent: string[] = [];
 
-  if (allDevices.length === 0 && withToken.length === 0) return NextResponse.json({ ok: true, sent: [], reason: 'no devices registered' });
+  if (allDevices.length === 0 && withToken.length === 0) return NextResponse.json({ ok: true, sent: [], inventory, reason: 'no devices registered' });
 
   for (const act of (acts ?? []) as any[]) {
     if (!(act.days_of_week as number[]).includes(todayDow)) continue;
@@ -104,21 +97,21 @@ export async function GET(req: Request) {
 
     // 1. Al inicio
     if (inWindow(nowMin, startMin)) {
-      await push(tokens, act.title, `▶ Empieza ahora · límite ${limitLbl}`);
+      await pushExpo(tokens, act.title, `▶ Empieza ahora · límite ${limitLbl}`);
       sent.push(`${act.title} → inicio`);
       continue;
     }
 
     // 2. A los 15 min de iniciada
     if (inWindow(nowMin, startMin + 15)) {
-      await push(tokens, act.title, `⏳ En curso · 15 min transcurridos`);
+      await pushExpo(tokens, act.title, `⏳ En curso · 15 min transcurridos`);
       sent.push(`${act.title} → 15min`);
       continue;
     }
 
     // 3. Al llegar la hora límite
     if (inWindow(nowMin, limitMin)) {
-      await push(tokens, `⚠ ${act.title}`, `Hora límite (${limitLbl}) — aún sin completar`);
+      await pushExpo(tokens, `⚠ ${act.title}`, `Hora límite (${limitLbl}) — aún sin completar`);
       sent.push(`${act.title} → límite`);
       continue;
     }
@@ -129,11 +122,11 @@ export async function GET(req: Request) {
       const elapsed = nowMin - limitMin;
       const every = act.reminder_minutes && act.reminder_minutes >= WINDOW ? act.reminder_minutes : WINDOW;
       if (elapsed >= every && elapsed % every < WINDOW) {
-        await push(tokens, `🔴 ${act.title}`, `${elapsed} min de retraso · pendiente desde ${limitLbl}`);
+        await pushExpo(tokens, `🔴 ${act.title}`, `${elapsed} min de retraso · pendiente desde ${limitLbl}`);
         sent.push(`${act.title} → ${elapsed}min tarde`);
       }
     }
   }
 
-  return NextResponse.json({ ok: true, sent, nowMin, todayStr });
+  return NextResponse.json({ ok: true, sent, inventory, nowMin, todayStr });
 }
