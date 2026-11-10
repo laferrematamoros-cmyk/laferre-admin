@@ -83,6 +83,14 @@ create table if not exists public.inventory_pendings (
 create index if not exists inventory_pendings_open on public.inventory_pendings (company_id) where resolved_at is null;
 
 -- ── Permisos: anon sólo LEE letras, rondas y fichas. Planes y pendientes, nada. ──
+-- Explícitos: en proyectos nuevos las tablas no siempre quedan expuestas solas, y así
+-- tampoco dependemos de los permisos por omisión.
+revoke all on public.inventory_plans, public.inventory_letters, public.inventory_rounds,
+              public.inventory_sections, public.inventory_pendings from anon, authenticated;
+grant select on public.inventory_letters, public.inventory_rounds, public.inventory_sections to anon, authenticated;
+grant all on public.inventory_plans, public.inventory_letters, public.inventory_rounds,
+             public.inventory_sections, public.inventory_pendings to service_role;
+
 alter table public.inventory_plans    enable row level security;
 alter table public.inventory_letters  enable row level security;
 alter table public.inventory_rounds   enable row level security;
@@ -225,7 +233,12 @@ create policy "inventario_anon_upload" on storage.objects for insert to anon wit
     select 1 from public.inventory_sections s
     join public.inventory_rounds r on r.id = s.round_id
     where r.closed_at is null and s.status = 'in_progress'
-      and storage.objects.name like (s.round_id::text || '/' || s.id::text || '/%')
+      and storage.objects.name ~ ('^' || s.round_id::text || '/' || s.id::text || '/[0-9]{13}\.jpg
+  )
+);
+
+commit;
+)
   )
 );
 
