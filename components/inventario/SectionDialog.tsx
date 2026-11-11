@@ -6,6 +6,7 @@ import { safeHttps } from '@/lib/safe-url';
 import c from '@/components/conoce/co.module.css';
 import v from './inv.module.css';
 import { AREA_LABEL, shopTime } from './labels';
+import { minutesText, spanText } from '@/lib/inventory-time';
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -96,8 +97,13 @@ export default function SectionDialog({ section, previous, people, onClose, onRe
                 </div>
                 <div>
                   <dt>Quién</dt>
+                  <dd>{who(section.done_by)}</dd>
+                </div>
+                <div>
+                  <dt>Tiempo</dt>
                   <dd>
-                    {who(section.done_by)}{section.done_at ? ` · terminó a las ${shopTime(section.done_at)}` : ''}
+                    {section.minutes_taken ? <>Anotó que tardó <b>{minutesText(section.minutes_taken)}</b>.</> : 'No anotó cuánto tardó.'}
+                    {section.done_at && <span className={v.span}>{spanText(section.claimed_at, section.done_at)}</span>}
                   </dd>
                 </div>
               </dl>

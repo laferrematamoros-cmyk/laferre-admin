@@ -6,6 +6,7 @@ import { allows, isUuid } from '@/lib/access-rules';
 import { shopClock } from '@/lib/my-day';
 import { dueDays, dueInstant } from '@/lib/inventory-schedule';
 import { openRound } from '@/lib/inventory-server';
+import { roundTimeStats } from '@/lib/inventory-time';
 import type { InventoryData, InvLetter, InvPending, InvPlan, InvRound, InvRoundSummary, InvSection } from '@/lib/inventory-types';
 
 // Con `export type Result = …`, no `export type { Result }`: en un archivo 'use server'
@@ -82,7 +83,8 @@ export async function loadInventory(companyId: string): Promise<{ ok: true; data
 
   const summaries: InvRoundSummary[] = roundList.map(r => {
     const mine = allSections.filter(s => s.round_id === r.id);
-    return { ...r, total: mine.length, done: mine.filter(s => s.status === 'done').length };
+    const t = roundTimeStats(mine);
+    return { ...r, total: mine.length, done: mine.filter(s => s.status === 'done').length, avgMinutes: t.avg, slowest: t.slowest };
   });
 
   const people: Record<string, string> = Object.fromEntries((emps.data ?? []).map(e => [e.id as string, e.name as string]));

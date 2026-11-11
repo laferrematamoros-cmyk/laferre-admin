@@ -66,6 +66,8 @@
 .facts div { display: flex; flex-direction: column; gap: 2px; }
 .facts dt { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .facts dd { margin: 0; font-size: 14px; line-height: 1.45; white-space: pre-line; overflow-wrap: anywhere; }
+/* Hora en que tomaron y terminaron la letra: sólo la ve el admin (la app no la enseña). */
+.span { display: block; margin-top: 2px; font-size: 12.5px; color: var(--muted); }
 .area { display: inline-flex; padding: 3px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 700; }
 .a_bien { background: var(--st-ok-soft); color: var(--st-ok-ink); }
 .a_regular { background: var(--st-late-soft); color: var(--st-late-ink); }

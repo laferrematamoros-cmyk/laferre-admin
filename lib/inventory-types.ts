@@ -12,9 +12,15 @@ export interface InvSection {
   observations: string | null; improvement: string | null; action_taken: string | null;
   had_differences: boolean | null; differences_resolved: boolean | null; pending_note: string | null;
   redo_note: string | null; redo_requested_at: string | null;
+  /** Lo anota el empleado al terminar (SQL 009). null = no lo anotó (app vieja). */
+  minutes_taken: number | null;
 }
 export interface InvPending { id: string; round_id: string; section_id: string; note: string; reported_by: string | null; reported_at: string; resolved_at: string | null; resolved_by: string | null; resolution_note: string | null; code: string; }
-export interface InvRoundSummary extends InvRound { total: number; done: number; }
+export interface InvRoundSummary extends InvRound {
+  total: number; done: number;
+  /** Promedio del tiempo anotado por letra (min) y la letra que más tardó. */
+  avgMinutes: number | null; slowest: { code: string; minutes: number } | null;
+}
 
 export interface InventoryData {
   plan: InvPlan | null;
