@@ -1,0 +1,26 @@
+/* Bitácora semanal de una lista con firma: la hoja de papel, ya llena. */
+
+.bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 18px; border: 1px solid var(--card-border); background: var(--card-bg); }
+.table { width: 100%; min-width: 820px; border-collapse: collapse; font-size: 13px; }
+.table th { padding: 10px 8px; background: #0B0B0C; color: #fff; font-size: 11.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; text-align: center; white-space: nowrap; }
+.table th:first-child { text-align: left; padding-left: 14px; }
+.today { box-shadow: inset 0 -3px 0 var(--accent); }
+.area td { padding: 8px 14px; background: #EEEEF2; font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink2); }
+.table td { border-top: 1px solid var(--hair); }
+.task { padding: 8px 14px; font-weight: 600; color: var(--ink); min-width: 220px; }
+.cell { padding: 6px 4px; text-align: center; vertical-align: middle; }
+.off { background: #F6F6F8; }
+.done { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--st-ok-soft); color: var(--st-ok-ink); font-size: 13px; font-weight: 800; }
+.skip { display: inline-block; max-width: 140px; padding: 2px 8px; border-radius: 999px; background: var(--st-late-soft); color: var(--st-late-ink); font-size: 11.5px; font-weight: 700; line-height: 1.35; }
+.none { color: var(--faint); }
+.pend { color: var(--muted); font-size: 12px; }
+.cam { display: inline-flex; margin-left: 4px; vertical-align: -2px; color: var(--muted); }
+.foot td { padding: 8px 6px; text-align: center; font-size: 12.5px; background: #FAFAFB; }
+.foot td:first-child { text-align: left; padding-left: 14px; font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink2); }
+.signed { color: var(--st-ok-ink); font-weight: 600; }
+.wait { color: var(--st-late-ink); font-weight: 700; }
+.muted { color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12.5px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { display: inline-block; width: 14px; height: 14px; border-radius: 4px; background: #F6F6F8; border: 1px solid var(--hair); }
