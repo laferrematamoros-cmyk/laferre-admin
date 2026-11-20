@@ -56,7 +56,7 @@ describe('buildToday', () => {
     expect(by.a1.minutesLate).toBeNull();
   });
   it('el porcentaje sólo cuenta lo que ya venció (igual que Reportes)', () => {
-    expect(r.counts).toEqual({ done: 1, doneLate: 1, running: 1, upcoming: 1, overdue: 1, optional: 0 });
+    expect(r.counts).toEqual({ done: 1, doneLate: 1, running: 1, signing: 0, upcoming: 1, overdue: 1, optional: 0 });
     expect([r.done, r.due, r.pct]).toEqual([2, 3, 67]);
   });
   it('necesita atención: atrasadas primero, luego lo que vence en 30 min o menos', () => {
@@ -170,5 +170,27 @@ describe('actividades opcionales', () => {
   it('statusLabel: en días pasados dice que no se marcó', () => {
     expect(statusLabel('optional', false)).toBe('Opcional');
     expect(statusLabel('optional', true)).toBe('Opcional, sin marcar');
+  });
+});
+
+describe('rol semanal y listas por firmar (hoy)', () => {
+  const rot = { employee_ids: ['e2', 'e1'], anchor_week: '2026-10-26', valid_from: '2026-10-26', created_at: '2026-10-20T10:00:00Z' };
+  it('el asignado es el de turno', () => {
+    const r = buildToday([act({ id: 'a1', rotations: [rot] })], [], EMP, WED_3PM);
+    expect(r.rows[0].assignedIds).toEqual(['e2']);
+    expect(r.rows[0].assignee).toBe('BETO');
+  });
+  it('terminada esperando firma, pasada la hora: "Falta firma", no atrasada', () => {
+    const r = buildToday([act({ id: 'a1', rotations: [rot], signingDates: ['2026-10-28'] })], [], EMP, WED_3PM);
+    expect(r.rows[0].status).toBe('signing');
+    expect(r.counts.signing).toBe(1);
+    expect(r.counts.overdue).toBe(0);
+    expect(r.due).toBe(0);
+    expect(r.people.find(p => p.id === 'e2')!.pending).toBe(1);
+    expect(r.attention).toHaveLength(0);
+  });
+  it('si ya se firmó (hay registro), cuenta como hecha', () => {
+    const r = buildToday([act({ id: 'a1', rotations: [rot], signingDates: ['2026-10-28'] })], [comp('a1', 'e2')], EMP, WED_3PM);
+    expect(r.rows[0].status).toBe('done');
   });
 });

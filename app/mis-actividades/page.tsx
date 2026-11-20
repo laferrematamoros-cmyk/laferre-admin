@@ -20,12 +20,13 @@ import m from '@/components/mis/mis.module.css';
 const TONE: Record<TodayStatus, { edge: string; bg: string; ink: string }> = {
   overdue:  { edge: 'var(--st-miss)', bg: 'var(--st-miss-soft)', ink: 'var(--st-miss-ink)' },
   running:  { edge: 'var(--st-run)',  bg: 'var(--st-run-soft)',  ink: 'var(--st-run-ink)' },
+  signing:  { edge: 'var(--st-run)',  bg: 'var(--st-run-soft)',  ink: 'var(--st-run-ink)' },
   upcoming: { edge: 'var(--st-todo)', bg: '#F0F0F3',             ink: '#55555B' },
   done:     { edge: 'var(--st-ok)',   bg: 'var(--st-ok-soft)',   ink: 'var(--st-ok-ink)' },
   doneLate: { edge: 'var(--st-late)', bg: 'var(--st-late-soft)', ink: 'var(--st-late-ink)' },
   optional: { edge: 'var(--st-opt)',  bg: 'var(--st-opt-soft)',  ink: 'var(--st-opt-ink)' },
 };
-const BAR_ORDER: TodayStatus[] = ['done', 'doneLate', 'overdue', 'running', 'upcoming'];
+const BAR_ORDER: TodayStatus[] = ['done', 'doneLate', 'overdue', 'running', 'signing', 'upcoming'];
 
 interface Toast { title: string; body: string; tone: 'info' | 'ok' | 'warn' | 'alert' }
 interface Day { date: string; acts: LiveActivity[]; comps: TodayCompletion[]; emps: ReportEmployee[] }
@@ -35,7 +36,7 @@ const hhmm = (iso: string) => new Date(iso).toLocaleTimeString('es-MX', { hour: 
 /** Para la leyenda: "1 hecha", "5 hechas", "2 por hacer". */
 const COUNT_LABEL: Record<TodayStatus, [string, string]> = {
   done: ['hecha', 'hechas'], doneLate: ['hecha tarde', 'hechas tarde'], overdue: ['atrasada', 'atrasadas'],
-  running: ['en curso', 'en curso'], upcoming: ['por hacer', 'por hacer'], optional: ['opcional', 'opcionales'],
+  running: ['en curso', 'en curso'], signing: ['por firmar', 'por firmar'], upcoming: ['por hacer', 'por hacer'], optional: ['opcional', 'opcionales'],
 };
 
 function pillText(r: TodayRow, nowMin: number): string {

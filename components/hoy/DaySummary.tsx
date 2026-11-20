@@ -11,10 +11,11 @@ import { BG } from './look';
 import DayLine from './DayLine';
 
 const PILL = { ok: s.okPill, late: s.latePill, miss: s.missPill };
-const CHIPS: TodayStatus[] = ['overdue', 'running', 'upcoming', 'doneLate', 'done'];
+const CHIPS: TodayStatus[] = ['overdue', 'running', 'signing', 'upcoming', 'doneLate', 'done'];
 const CHIP_TXT: Record<TodayStatus, [string, string]> = {
   overdue: ['atrasada', 'atrasadas'],
   running: ['en curso', 'en curso'],
+  signing: ['por firmar', 'por firmar'],
   upcoming: ['por hacer', 'por hacer'],
   doneLate: ['hecha tarde', 'hechas tarde'],
   done: ['hecha a tiempo', 'hechas a tiempo'],

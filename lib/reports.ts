@@ -1,4 +1,5 @@
 import type { Activity, Completion, Employee } from './supabase';
+import { assignedOn, isSigning, type DutyInfo } from './duty';
 
 // ── Nombres de días y meses ─────────────────────────────────────────────────────
 const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -114,7 +115,9 @@ export function liveAt(a: Lifecycle, t: Date): boolean {
   return true;
 }
 
-export type ReportActivity = Pick<Activity, 'id' | 'title' | 'limit_time' | 'days_of_week' | 'week_of_month' | 'assigned_employee_ids' | 'created_at' | 'is_optional'> & Lifecycle;
+/** Con lista (supabase/010): `rotations`/`overrides` dicen a quién le tocaba cada día y
+ *  `signingDates`, qué días están terminados esperando firma (los agrega withDuty). */
+export type ReportActivity = Pick<Activity, 'id' | 'title' | 'limit_time' | 'days_of_week' | 'week_of_month' | 'assigned_employee_ids' | 'created_at' | 'is_optional'> & Lifecycle & DutyInfo;
 export type ReportCompletion = Pick<Completion, 'activity_id' | 'employee_id' | 'scheduled_date' | 'was_late'>;
 export type ReportEmployee = Pick<Employee, 'id' | 'name' | 'initials'>;
 
@@ -140,6 +143,8 @@ export interface WeekReport {
   missed: MissedItem[];
   /** Opcionales: nunca entran a lo de arriba, se ven aparte. */
   optional: OptionalRow[];
+  /** Listas terminadas que esperan firma: todavía no cuentan, ni como hechas ni como sin hacer. */
+  signing: number;
 }
 export interface TrendPoint { start: Date; label: string; pct: number | null; }
 
@@ -192,6 +197,7 @@ export function buildWeekReport(
   const days: DayReport[] = [];
   const missed: MissedItem[] = [];
   let generalMiss = 0;
+  let signing = 0;
   const optional = new Map<string, OptionalRow>();
   const todayStr = toDateStr(now);
 
@@ -215,10 +221,14 @@ export function buildWeekReport(
         }
         continue;
       }
-      const st = activityStatus(comp, day, a.limit_time, now);
+      // Terminada y esperando firma: queda "por hacer" (no baja el % ni cuenta como sin hacer).
+      const waiting = !comp && isSigning(a, dateStr);
+      if (waiting) signing++;
+      const st = waiting ? 'todo' : activityStatus(comp, day, a.limit_time, now);
       dc[st]++;
       counts[st]++;
-      const assigned = (a.assigned_employee_ids ?? []) as string[];
+      // Con rol semanal: a quien le tocaba ESE día (no a quien le toca hoy).
+      const assigned = assignedOn(a, dateStr);
 
       if (comp) {
         if (emp.has(comp.employee_id)) {
@@ -261,7 +271,7 @@ export function buildWeekReport(
 
   const done = counts.ok + counts.late;
   const due = done + counts.miss;
-  return { weekStart, counts, done, due, pct: pctOf(done, due), days, people, generalMiss, missed, optional: [...optional.values()] };
+  return { weekStart, counts, done, due, pct: pctOf(done, due), days, people, generalMiss, missed, optional: [...optional.values()], signing };
 }
 
 /** Porcentaje de las `n` semanas que terminan en `selected` (la última es la elegida). */

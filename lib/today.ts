@@ -1,20 +1,23 @@
 import type { Activity, Completion } from './supabase';
 import { activityRunsOn, dueAt, liveAt, pctOf, toDateStr, type Lifecycle, type ReportEmployee } from './reports';
+import { assignedOn, isSigning, type DutyInfo } from './duty';
 
 // ── Estados de una actividad HOY ────────────────────────────────────────────────
 // Mismas reglas que Reportes (lo hecho tarde cuenta, lo que no vence no baja el %),
 // más "en curso": ya empezó y todavía no vence.
 // "optional": actividad opcional sin marcar. No está atrasada ni pendiente: si ese día
 // no hubo nada que hacer, no pasa nada. Las opcionales nunca entran al porcentaje.
-export type TodayStatus = 'done' | 'doneLate' | 'running' | 'upcoming' | 'overdue' | 'optional';
-export const TODAY_STATUSES: TodayStatus[] = ['done', 'doneLate', 'running', 'upcoming', 'overdue', 'optional'];
+// "signing": lista terminada que espera la firma del admin (supabase/010). Todavía no cuenta:
+// ni hecha ni atrasada.
+export type TodayStatus = 'done' | 'doneLate' | 'running' | 'signing' | 'upcoming' | 'overdue' | 'optional';
+export const TODAY_STATUSES: TodayStatus[] = ['done', 'doneLate', 'running', 'signing', 'upcoming', 'overdue', 'optional'];
 export const TODAY_LABEL: Record<TodayStatus, string> = {
-  done: 'Hecha', doneLate: 'Hecha tarde', running: 'En curso', upcoming: 'Por hacer', overdue: 'Atrasada', optional: 'Opcional',
+  done: 'Hecha', doneLate: 'Hecha tarde', running: 'En curso', signing: 'Falta firma', upcoming: 'Por hacer', overdue: 'Atrasada', optional: 'Opcional',
 };
 /** "Por vencer": en curso y le quedan estos minutos o menos. */
 export const SOON_MIN = 30;
 
-export type TodayActivity = Pick<Activity, 'id' | 'title' | 'description' | 'start_time' | 'limit_time' | 'days_of_week' | 'week_of_month' | 'assigned_employee_ids' | 'created_at' | 'is_optional'> & Lifecycle;
+export type TodayActivity = Pick<Activity, 'id' | 'title' | 'description' | 'start_time' | 'limit_time' | 'days_of_week' | 'week_of_month' | 'assigned_employee_ids' | 'created_at' | 'is_optional'> & Lifecycle & DutyInfo;
 export type TodayCompletion = Pick<Completion, 'activity_id' | 'employee_id' | 'scheduled_date' | 'was_late' | 'completed_at' | 'photo_url' | 'note'>;
 
 export interface TodayRow {
@@ -110,8 +113,10 @@ export function buildDay(
       const comp = compByAct.get(a.id);
       const optional = !!a.is_optional;
       // Una opcional no tiene "tarde": hecha o sin marcar.
-      const status: TodayStatus = optional ? (comp ? 'done' : 'optional') : todayStatus(comp, start, limit, now);
-      const assigned = (a.assigned_employee_ids ?? []) as string[];
+      const status: TodayStatus = optional ? (comp ? 'done' : 'optional')
+        : !comp && isSigning(a, dateStr) ? 'signing'
+        : todayStatus(comp, start, limit, now);
+      const assigned = assignedOn(a, dateStr); // con rol: el de turno ese día
       const owners = assigned.filter(id => emp.has(id));
       return {
         id: a.id,
@@ -136,7 +141,7 @@ export function buildDay(
     })
     .sort((x, y) => x.startMin - y.startMin || x.limitMin - y.limitMin || x.title.localeCompare(y.title, 'es'));
 
-  const counts: Record<TodayStatus, number> = { done: 0, doneLate: 0, running: 0, upcoming: 0, overdue: 0, optional: 0 };
+  const counts: Record<TodayStatus, number> = { done: 0, doneLate: 0, running: 0, signing: 0, upcoming: 0, overdue: 0, optional: 0 };
   const optional = { done: 0, total: 0 };
   const per = new Map<string, { done: number; late: number; overdue: number; pending: number }>();
   const bump = (id: string) => {

@@ -242,3 +242,27 @@ describe('actividades opcionales', () => {
     expect(r.pct).toBeNull();
   });
 });
+
+describe('rol semanal y listas por firmar', () => {
+  // Rol: e1 la semana del 26 oct, e2 la del 2 nov.
+  const rot = { employee_ids: ['e1', 'e2'], anchor_week: '2026-10-26', valid_from: '2026-10-26', created_at: '2026-10-20T10:00:00Z' };
+  const nextWeekNow = new Date(2026, 10, 4, 12, 0); // miércoles 4 nov: ya le toca a e2
+
+  it('lo que no se hizo en la semana de e1 se le cuenta a e1, aunque hoy le toque a e2', () => {
+    const r = buildWeekReport(MON, [act({ id: 'a1', days_of_week: [1], rotations: [rot] })], [], EMP, nextWeekNow);
+    expect(r.people.find(p => p.id === 'e1')!.miss).toBe(1);
+    expect(r.people.find(p => p.id === 'e2')!.miss).toBe(0);
+    expect(r.missed[0].assignee).toBe('ANA');
+    expect(r.generalMiss).toBe(0);
+  });
+  it('terminada y esperando firma: no cuenta como sin hacer ni baja el porcentaje', () => {
+    const r = buildWeekReport(MON, [act({ id: 'a1', days_of_week: [1], rotations: [rot], signingDates: ['2026-10-26'] })], [], EMP, nextWeekNow);
+    expect(r.counts.miss).toBe(0);
+    expect(r.counts.todo).toBe(1);
+    expect(r.signing).toBe(1);
+    expect(r.pct).toBeNull();
+  });
+  it('sin listas por firmar, signing es 0', () => {
+    expect(buildWeekReport(MON, [act({ id: 'a1' })], [], EMP, FRI_430PM).signing).toBe(0);
+  });
+});
