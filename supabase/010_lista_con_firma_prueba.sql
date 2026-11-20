@@ -99,8 +99,25 @@ begin
   r := chk_sign_pin(run, '2468');
   res := res || E'\n' || case when r->>'code' = 'locked' then 'OK    ' else 'FALLA ' end || '12 bloqueado con PIN bueno: ' || coalesce(r->>'error', r::text);
 
-  -- 13. Regresar una tarea
-  update signer_settings set pin_locked_until = null, failed_pin_attempts = 0 where id;
+  -- 12b. Segundo bloqueo seguido: 30 minutos
+  update signer_settings set pin_locked_until = null where id;  -- como si ya hubieran pasado los 15 min
+  for n in 1..5 loop r := chk_sign_pin(run, '1111'); end loop;
+  res := res || E'\n' || case when r->>'error' = 'PIN equivocado. Se bloqueó 30 minutos.' then 'OK    ' else 'FALLA ' end
+             || '12b segundo bloqueo: ' || coalesce(r->>'error', r::text);
+
+  -- 12c. Tercer bloqueo: se apaga la firma con PIN (nadie prueba más de 15)
+  update signer_settings set pin_locked_until = null where id;
+  for n in 1..5 loop r := chk_sign_pin(run, '1111'); end loop;
+  res := res || E'\n' || case when r->>'code' = 'disabled' and (select pin_disabled from signer_settings where id) then 'OK    ' else 'FALLA ' end
+             || '12c tercer bloqueo apaga el PIN: ' || coalesce(r->>'error', r::text);
+  r := chk_sign_pin(run, '2468');
+  res := res || E'\n' || case when r->>'code' = 'disabled' then 'OK    ' else 'FALLA ' end || '12d apagado, ni el bueno pasa';
+
+  -- 13. Regresar una tarea (antes, un PIN nuevo vuelve a prender la firma con PIN)
+  r := chk_set_pin('2468');
+  res := res || E'\n' || case when (r->>'ok')::boolean
+                                and (select not pin_disabled and pin_lock_count = 0 and pin_locked_until is null from signer_settings where id)
+                            then 'OK    ' else 'FALLA ' end || '12e PIN nuevo lo vuelve a prender';
   r := chk_return(run, array[i1], 'Repetir');
   select status into st from checklist_runs where id = run;
   res := res || E'\n' || case when (r->>'ok')::boolean and st = 'returned'

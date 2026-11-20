@@ -92,6 +92,10 @@ create table if not exists public.signer_settings (
   notify_emails       text[] not null default '{}',
   failed_pin_attempts int not null default 0,
   pin_locked_until    timestamptz,
+  -- Bloqueos seguidos sin una firma buena (15 min, luego 30); al tercero se apaga la firma con PIN
+  -- hasta que se cree uno nuevo: nadie puede probar más de 15 PIN.
+  pin_lock_count      int not null default 0,
+  pin_disabled        boolean not null default false,
   lock_notified       boolean not null default true,
   updated_at          timestamptz not null default now()
 );
@@ -312,13 +316,15 @@ begin
   return jsonb_build_object('ok', true);
 end $$;
 
--- ── Firmar en persona con PIN (teléfono). 5 equivocados → 15 min bloqueado + correo. ──
+-- ── Firmar en persona con PIN (teléfono). Cada 5 equivocados se bloquea (15 min, luego 30) y se avisa
+--    por correo; al tercer bloqueo se apaga la firma con PIN hasta crear uno nuevo en Ajustes. ──
 create or replace function public.chk_sign_pin(p_run uuid, p_pin text)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   s signer_settings;
   st text;
   n int;
+  mins int;
 begin
   select status into st from checklist_runs where id = p_run;
   if st is null then return jsonb_build_object('ok', false, 'error', 'No se encontró la lista.'); end if;
@@ -329,6 +335,10 @@ begin
   if s.pin_hash is null then
     return jsonb_build_object('ok', false, 'error', 'Todavía no hay PIN. Créalo en el panel → Ajustes.');
   end if;
+  if s.pin_disabled then
+    return jsonb_build_object('ok', false, 'code', 'disabled', 'error',
+      'La firma con PIN está apagada por intentos equivocados. El Ing. puede firmar desde el panel o crear un PIN nuevo.');
+  end if;
   if s.pin_locked_until is not null and s.pin_locked_until > now() then
     return jsonb_build_object('ok', false, 'code', 'locked', 'error',
       'Demasiados intentos. Espera ' || ceil(extract(epoch from s.pin_locked_until - now()) / 60)::int || ' min o firma desde el panel.');
@@ -336,14 +346,22 @@ begin
   if p_pin is null or p_pin !~ '^[0-9]{4,6}$' or extensions.crypt(p_pin, s.pin_hash) <> s.pin_hash then
     n := s.failed_pin_attempts + 1;
     if n >= 5 then
-      update signer_settings set failed_pin_attempts = 0, pin_locked_until = now() + interval '15 minutes', lock_notified = false where id;
-      return jsonb_build_object('ok', false, 'code', 'locked', 'error', 'PIN equivocado. Se bloqueó 15 minutos.');
+      if s.pin_lock_count + 1 >= 3 then
+        update signer_settings set failed_pin_attempts = 0, pin_lock_count = pin_lock_count + 1, pin_disabled = true,
+          pin_locked_until = null, lock_notified = false where id;
+        return jsonb_build_object('ok', false, 'code', 'disabled', 'error',
+          'PIN equivocado. La firma con PIN se apagó; el Ing. puede firmar desde el panel o crear un PIN nuevo.');
+      end if;
+      mins := 15 * (s.pin_lock_count + 1);
+      update signer_settings set failed_pin_attempts = 0, pin_lock_count = pin_lock_count + 1,
+        pin_locked_until = now() + make_interval(mins => mins), lock_notified = false where id;
+      return jsonb_build_object('ok', false, 'code', 'locked', 'error', 'PIN equivocado. Se bloqueó ' || mins || ' minutos.');
     end if;
     update signer_settings set failed_pin_attempts = n where id;
     return jsonb_build_object('ok', false, 'code', 'bad_pin', 'error',
       case when 5 - n = 1 then 'PIN equivocado. Te queda 1 intento.' else 'PIN equivocado. Te quedan ' || (5 - n) || ' intentos.' end);
   end if;
-  update signer_settings set failed_pin_attempts = 0 where id;
+  update signer_settings set failed_pin_attempts = 0, pin_lock_count = 0 where id;
   return chk_sign_internal(p_run, s.signer_name, 'pin');
 end $$;
 
@@ -387,7 +405,8 @@ begin
     return jsonb_build_object('ok', false, 'error', 'El PIN debe ser de 4 a 6 números.');
   end if;
   update signer_settings set pin_hash = extensions.crypt(p_pin, extensions.gen_salt('bf')),
-    failed_pin_attempts = 0, pin_locked_until = null, lock_notified = true, updated_at = now()
+    failed_pin_attempts = 0, pin_locked_until = null, pin_lock_count = 0, pin_disabled = false,
+    lock_notified = true, updated_at = now()
   where id;
   return jsonb_build_object('ok', true);
 end $$;

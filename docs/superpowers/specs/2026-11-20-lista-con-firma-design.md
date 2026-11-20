@@ -117,7 +117,8 @@ Migración `supabase/010_lista_con_firma.sql`:
   - el estado de la lista;
   - la ruta de las fotos, que debe existir en el depósito.
 - `chk_sign_pin`:
-  - un PIN de 4 dígitos se adivina en 10,000 intentos, así que tras **5 PIN equivocados** se bloquea la firma en persona 15 minutos y se avisa por correo;
+  - un PIN de 4 dígitos se adivina en 10,000 intentos, así que cada **5 PIN equivocados** se bloquea la firma en persona (15 min, luego 30) y se avisa por correo; al **tercer bloqueo** se apaga hasta crear un PIN nuevo, así que nadie prueba más de 15 PIN;
+  - límite aceptado: cualquiera puede bloquearla a propósito, pero solo estorba (se sigue firmando desde el panel). Que un empleado palomee "como otro" es el mismo límite de toda la app (se elige el nombre, sin contraseña); lo que cuenta es la firma del admin;
   - nunca regresa el hash.
 - Fotos en depósito **privado** `listas`, con ruta `<run>/<item>/<13 dígitos>.jpg`. El panel usa enlaces firmados de 1 h.
 - Las fotos se borran a los 21 días, igual que la evidencia normal. Las palomitas, motivos y firmas se quedan.
