@@ -1,0 +1,38 @@
+/* Por firmar (lista con firma). Se apoya en panel.module.css y co.module.css (ventana, visor). */
+
+.list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.item { display: flex; flex-direction: column; gap: 8px; padding: 16px; border: 1px solid var(--card-border); border-radius: 20px; background: var(--card-bg); color: var(--ink); text-align: left; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
+.item:hover { transform: translateY(-1px); box-shadow: 0 10px 24px -14px rgba(12, 12, 16, .35); }
+.item:focus-visible, .row:focus-visible, .thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.itemTop { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.itemTop b { font-size: 16px; font-weight: 800; letter-spacing: -.01em; }
+.meta { font-size: 13px; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; background: var(--chip); color: var(--chip-ink); font-size: 12px; font-weight: 600; }
+.late { background: var(--st-late-soft); color: var(--st-late-ink); }
+.miss { background: var(--st-miss-soft); color: var(--st-miss-ink); }
+.ok { background: var(--st-ok-soft); color: var(--st-ok-ink); }
+.empty { padding: 28px 20px; border-radius: 20px; background: var(--card-bg); border: 1px solid var(--card-border); text-align: center; color: var(--muted); font-size: 14px; }
+
+/* Ficha */
+.info { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; color: var(--ink2); }
+.banner { padding: 10px 12px; border-radius: 14px; font-size: 13.5px; font-weight: 600; line-height: 1.45; }
+.bannerOk { background: var(--st-ok-soft); color: var(--st-ok-ink); }
+.bannerLate { background: var(--st-late-soft); color: var(--st-late-ink); }
+.area { margin: 6px 0 2px; font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.rows { display: flex; flex-direction: column; gap: 6px; }
+.row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 10px; border: 1px solid var(--hair); border-radius: 14px; background: #fff; text-align: left; font: inherit; color: var(--ink); }
+button.row { cursor: pointer; }
+.picked { border-color: var(--st-late); background: var(--st-late-soft); }
+.mark { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; font-size: 13px; font-weight: 800; }
+.mDone { background: var(--st-ok-soft); color: var(--st-ok-ink); }
+.mSkip { background: var(--st-late-soft); color: var(--st-late-ink); }
+.mPend { background: #F0F0F3; color: #77777D; }
+.box { width: 20px; height: 20px; accent-color: #B45309; }
+.label { min-width: 0; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.reason { display: block; margin-top: 2px; font-size: 12.5px; font-weight: 500; color: var(--st-late-ink); }
+.gone { display: block; margin-top: 2px; font-size: 12px; font-weight: 500; color: var(--muted); }
+.thumb { width: 52px; height: 52px; padding: 0; border: 1px solid var(--hair); border-radius: 10px; overflow: hidden; background: #F2F2F5; cursor: zoom-in; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+@media (prefers-reduced-motion: reduce) { .item { transition: none; } }
