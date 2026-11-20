@@ -40,3 +40,18 @@ export interface SignRun {
 }
 export type RunsResult = { ok: true; runs: SignRun[] } | { ok: false; error: string };
 export type RunResult = { ok: true; run: SignRun } | { ok: false; error: string };
+
+export interface SignerInfo {
+  name: string;
+  hasPin: boolean;
+  emails: string[];
+  /** Hay cuenta de Gmail para mandar (CORREO_USUARIO y CORREO_CLAVE en Vercel). */
+  mailReady: boolean;
+  /** Firma con PIN bloqueada hasta esta hora (ISO), o null. */
+  lockedUntil: string | null;
+  /** Firma con PIN apagada por intentos equivocados (hasta crear un PIN nuevo). */
+  pinDisabled: boolean;
+  /** Sólo un administrador que ve las dos empresas puede cambiar esto (es una sola configuración). */
+  canEdit: boolean;
+}
+export type SignerResult = { ok: true; signer: SignerInfo } | { ok: false; error: string };

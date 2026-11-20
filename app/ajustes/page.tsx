@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { useSession } from '@/lib/session-context';
 import Usuarios, { companyLabel, initials, ROLE, type CompanyOpt } from '@/components/ajustes/Usuarios';
 import Telefonos from '@/components/ajustes/Telefonos';
+import Firma from '@/components/ajustes/Firma';
 import { IconCheck } from '@/components/panel/icons';
 import s from '@/components/panel/panel.module.css';
 import a from '@/components/ajustes/aj.module.css';
@@ -84,6 +85,7 @@ export default function AjustesPage() {
             <Usuarios companies={companies} own={company ? ownCompany?.id ?? null : null} />
           )}
 
+          {role === 'admin' && <Firma />}
           {role === 'admin' && <Telefonos />}
         </div>
       </div>
