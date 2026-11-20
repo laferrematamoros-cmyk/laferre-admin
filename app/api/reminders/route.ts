@@ -5,6 +5,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { matchesWeekOfMonth } from '@/lib/reports';
 import { pushExpo } from '@/lib/expo-push';
 import { runInventoryTick } from '@/lib/inventory-server';
+import { runChecklistNotices } from '@/lib/checklist-notices';
 
 // Cron runs every 5 minutes via cron-job.org
 // Notification rules per activity (if not completed):
@@ -64,7 +65,12 @@ export async function GET(req: Request) {
   try { inventory = await runInventoryTick(supabase, new Date()); }
   catch (e) { inventory = [`inventario error: ${(e as Error).message}`]; }
 
-  if (nowMin > END_OF_DAY) return NextResponse.json({ ok: true, sent: [], inventory, reason: 'fuera de jornada' });
+  // Listas con firma: correos de "por firmar" que se quedaron sin mandar y el de PIN bloqueado.
+  let checklist: string[] = [];
+  try { checklist = await runChecklistNotices(supabase); }
+  catch (e) { checklist = [`listas error: ${(e as Error).message}`]; }
+
+  if (nowMin > END_OF_DAY) return NextResponse.json({ ok: true, sent: [], inventory, checklist, reason: 'fuera de jornada' });
 
   const [{ data: acts }, { data: comps }, { data: devices }, { data: emps }] = await Promise.all([
     supabase.from('activities').select('*').eq('is_active', true),
@@ -78,7 +84,7 @@ export async function GET(req: Request) {
   const withToken  = (emps ?? []) as EmployeeTokenRow[];
   const sent: string[] = [];
 
-  if (allDevices.length === 0 && withToken.length === 0) return NextResponse.json({ ok: true, sent: [], inventory, reason: 'no devices registered' });
+  if (allDevices.length === 0 && withToken.length === 0) return NextResponse.json({ ok: true, sent: [], inventory, checklist, reason: 'no devices registered' });
 
   // Listas con firma (supabase/010): avisar sólo a quien está de turno y no avisar lo ya entregado.
   // Si la base no tiene la 010, la consulta falla y todo sigue como antes.
@@ -155,5 +161,5 @@ export async function GET(req: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, sent, inventory, nowMin, todayStr });
+  return NextResponse.json({ ok: true, sent, inventory, checklist, nowMin, todayStr });
 }
