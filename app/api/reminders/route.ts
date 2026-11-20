@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cronAllowed } from '@/lib/cron-auth';
-import { reminderTargets, type DeviceRow, type EmployeeTokenRow } from '@/lib/push-targets';
+import { reminderTargets, personTargets, type DeviceRow, type EmployeeTokenRow } from '@/lib/push-targets';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { matchesWeekOfMonth } from '@/lib/reports';
 import { pushExpo } from '@/lib/expo-push';
@@ -69,7 +69,7 @@ export async function GET(req: Request) {
   const [{ data: acts }, { data: comps }, { data: devices }, { data: emps }] = await Promise.all([
     supabase.from('activities').select('*').eq('is_active', true),
     supabase.from('completions').select('activity_id').eq('scheduled_date', todayStr),
-    supabase.from('device_tokens').select('token, company_id'),
+    supabase.from('device_tokens').select('*'), // '*': employee_id existe desde supabase/008
     supabase.from('employees').select('id, company_id, push_token').eq('is_active', true).not('push_token', 'is', null),
   ]);
 
@@ -80,12 +80,39 @@ export async function GET(req: Request) {
 
   if (allDevices.length === 0 && withToken.length === 0) return NextResponse.json({ ok: true, sent: [], inventory, reason: 'no devices registered' });
 
+  // Listas con firma (supabase/010): avisar sólo a quien está de turno y no avisar lo ya entregado.
+  // Si la base no tiene la 010, la consulta falla y todo sigue como antes.
+  const chkActs = ((acts ?? []) as any[]).filter(a => a.checklist_enabled);
+  const handed = new Set<string>();
+  const dutyOf = new Map<string, string | null>();
+  if (chkActs.length) {
+    const runs = await supabase.from('checklist_runs').select('activity_id, status')
+      .eq('scheduled_date', todayStr).in('activity_id', chkActs.map(a => a.id));
+    if (!runs.error) {
+      for (const r of (runs.data ?? []) as { activity_id: string; status: string }[]) {
+        if (r.status === 'awaiting_signature' || r.status === 'signed') handed.add(r.activity_id);
+      }
+      for (const a of chkActs) {
+        const { data, error } = await supabase.rpc('duty_employee', { p_activity: a.id, p_date: todayStr });
+        if (!error) dutyOf.set(a.id, (data as string | null) ?? null);
+      }
+    }
+  }
+
   for (const act of (acts ?? []) as any[]) {
     if (!(act.days_of_week as number[]).includes(todayDow)) continue;
     if (doneIds.has(act.id)) continue;
 
     // Sólo a su empresa: a la persona asignada si tiene teléfono, si no a los de la empresa.
-    const tokens = reminderTargets(act, allDevices, withToken);
+    // Con lista: sólo a quien está de turno (y a nadie si ya la entregó o no hay nadie de turno).
+    let tokens: string[];
+    if (act.checklist_enabled && dutyOf.has(act.id)) {
+      const duty = dutyOf.get(act.id);
+      if (handed.has(act.id) || !duty) continue;
+      tokens = personTargets(act.company_id, duty, allDevices, withToken);
+    } else {
+      tokens = reminderTargets(act, allDevices, withToken);
+    }
     if (tokens.length === 0) continue;
 
     const startMin  = timeToMin(act.start_time);

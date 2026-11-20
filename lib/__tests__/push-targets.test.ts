@@ -1,4 +1,4 @@
-import { reminderTargets, type DeviceRow, type EmployeeTokenRow } from '../push-targets';
+import { reminderTargets, personTargets, type DeviceRow, type EmployeeTokenRow } from '../push-targets';
 
 const LF = 'a6798a18-9565-4f2b-929a-0c6771e7ef54';
 const BFM = '22604654-8a66-4a30-9a20-ab48d7a9c794';
@@ -46,5 +46,26 @@ describe('reminderTargets', () => {
   it('sin repetidos', () => {
     const dup: DeviceRow[] = [{ token: 'x', company_id: LF }, { token: 'x', company_id: LF }];
     expect(reminderTargets({ company_id: LF, assigned_employee_ids: [] }, dup, [])).toEqual(['x']);
+  });
+});
+
+describe('personTargets (la persona de turno de una lista)', () => {
+  const devs: DeviceRow[] = [
+    ...devices,
+    { token: 'lf-eddie-tel', company_id: LF, employee_id: 'eddie' },
+    { token: 'bfm-eddie', company_id: BFM, employee_id: 'eddie' }, // otra empresa: nunca
+  ];
+  it('el teléfono registrado a su nombre (device_tokens) aunque no tenga push_token', () => {
+    expect(personTargets(LF, 'eddie', devs, emps)).toEqual(['lf-eddie-tel']);
+  });
+  it('también el push_token de employees, sin repetir', () => {
+    const d2: DeviceRow[] = [...devs, { token: 'lf-laura', company_id: LF, employee_id: 'laura' }];
+    expect(personTargets(LF, 'laura', d2, emps)).toEqual(['lf-laura']);
+  });
+  it('sin teléfono propio: a los teléfonos de su empresa (como un recordatorio general)', () => {
+    expect(personTargets(LF, 'yaja', devs, emps).sort()).toEqual(['lf-caja', 'lf-eddie-tel', 'lf-laura']);
+  });
+  it('sin empresa, nada', () => {
+    expect(personTargets(null, 'eddie', devs, emps)).toEqual([]);
   });
 });
