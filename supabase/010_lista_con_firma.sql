@@ -341,7 +341,7 @@ begin
     end if;
     update signer_settings set failed_pin_attempts = n where id;
     return jsonb_build_object('ok', false, 'code', 'bad_pin', 'error',
-      'PIN equivocado. Te quedan ' || (5 - n) || case when 5 - n = 1 then ' intento.' else ' intentos.' end);
+      case when 5 - n = 1 then 'PIN equivocado. Te queda 1 intento.' else 'PIN equivocado. Te quedan ' || (5 - n) || ' intentos.' end);
   end if;
   update signer_settings set failed_pin_attempts = 0 where id;
   return chk_sign_internal(p_run, s.signer_name, 'pin');

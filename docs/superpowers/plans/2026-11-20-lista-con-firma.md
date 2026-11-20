@@ -431,7 +431,7 @@ begin
     end if;
     update signer_settings set failed_pin_attempts = n where id;
     return jsonb_build_object('ok', false, 'code', 'bad_pin', 'error',
-      'PIN equivocado. Te quedan ' || (5 - n) || case when 5 - n = 1 then ' intento.' else ' intentos.' end);
+      case when 5 - n = 1 then 'PIN equivocado. Te queda 1 intento.' else 'PIN equivocado. Te quedan ' || (5 - n) || ' intentos.' end);
   end if;
   update signer_settings set failed_pin_attempts = 0 where id;
   return chk_sign_internal(p_run, s.signer_name, 'pin');
@@ -618,7 +618,7 @@ git commit -m "feat(listas): migración 010 — lista con firma, rol semanal y P
 | 7 | `chk_finish` con pendientes | "Faltan tareas" |
 | 8 | marcar la sin foto `done` y la con foto `skipped` con motivo → `chk_finish` | `ok`, status `awaiting_signature` |
 | 9 | insert directo en `completions` de esa actividad | error "Actualiza la app" |
-| 10 | `chk_sign_pin` con PIN malo 4 veces | "Te quedan 1 intento." |
+| 10 | `chk_sign_pin` con PIN malo 4 veces | "Te queda 1 intento." |
 | 11 | 5º PIN malo | `code=locked` y `pin_locked_until` > now |
 | 12 | PIN bueno estando bloqueado | `code=locked` |
 | 13 | quitar el bloqueo (`update signer_settings…`), `chk_return` con una tarea | status `returned`, la tarea `pending` |
