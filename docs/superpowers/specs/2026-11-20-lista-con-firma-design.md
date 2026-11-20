@@ -95,7 +95,7 @@ Migración `supabase/010_lista_con_firma.sql`:
 - `checklist_items`
   - columnas: id, activity_id, area, label, days int[], needs_photo, sort, archived_at;
   - archivar, no borrar.
-- `activity_rotations`: activity_id (pk), employee_ids uuid[] (orden), anchor_week date (lunes en que le toca a `employee_ids[1]`).
+- `activity_rotations` **por versiones**: activity_id, employee_ids uuid[] (orden), anchor_week date (lunes en que le toca a `employee_ids[1]`), valid_from date. Cambiar el orden crea una versión nueva desde hoy, y las semanas pasadas siguen con la versión que tenían. Antes de la primera versión, la actividad era general (como estaba).
 - `activity_duty_overrides`: id, activity_id, from_date, to_date, employee_id. Una semana = lun–sáb; un día = from = to. Gana el más reciente.
 - `checklist_runs`
   - columnas: id, activity_id, company_id, scheduled_date, employee_id;
@@ -110,7 +110,8 @@ Migración `supabase/010_lista_con_firma.sql`:
 - Función SQL `duty_employee(activity, date)`: rol + cambios. Es la única fuente de verdad para las RPC. El panel tiene una copia en TS (`lib/duty.ts`) con las mismas pruebas.
 
 **Seguridad.** Mismo patrón que el inventario:
-- El teléfono escribe solo con RPC `SECURITY DEFINER`: `chk_open`, `chk_mark`, `chk_finish`, `chk_sign_pin`. Las tablas nuevas tienen RLS sin escritura para anon.
+- El teléfono escribe solo con RPC `SECURITY DEFINER`: `chk_open`, `chk_mark`, `chk_finish`, `chk_sign_pin`; lee lo de hoy con `chk_today`. Las tablas nuevas tienen RLS sin escritura para anon.
+- El panel firma, regresa y pone el PIN con RPC que solo puede llamar `service_role` (`chk_sign_panel`, `chk_return`, `chk_set_pin`).
 - Las RPC validan:
   - que el empleado esté de turno ese día;
   - el estado de la lista;
