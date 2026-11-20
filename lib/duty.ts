@@ -40,12 +40,16 @@ export function assignedOn(a: { assigned_employee_ids: string[] | null } & DutyI
 /** La lista de ese día está terminada y espera firma. */
 export const isSigning = (a: DutyInfo, date: string): boolean => (a.signingDates ?? []).includes(date);
 
-/** Esta semana y las siguientes, para el editor del rol. */
+/** Esta semana y las siguientes, para el editor del rol. La semana actual se calcula con HOY
+ *  (un rol o un cambio que empezó a media semana ya cuenta); las siguientes, con su lunes.
+ *  Sólo pintan la semana los cambios que la cubren hasta el sábado (un cambio de un día, no). */
 export function upcomingDuty(rotations: Rotation[], overrides: DutyOverride[], today: string, n: number): { weekStart: string; employeeId: string | null }[] {
   const start = dayNum(mondayOf(today));
   return Array.from({ length: n }, (_, i) => {
     const weekStart = fromNum(start + i * 7);
-    // Se pregunta por el martes: un cambio de un solo día en lunes no debe pintar toda la semana.
-    return { weekStart, employeeId: dutyOn(rotations, overrides.filter(o => o.from_date <= weekStart && o.to_date >= fromNum(dayNum(weekStart) + 5)), fromNum(dayNum(weekStart) + 1)) };
+    const ref = i === 0 && today > weekStart ? today : weekStart;
+    const saturday = fromNum(dayNum(weekStart) + 5);
+    const weekly = overrides.filter(o => o.from_date <= ref && o.to_date >= saturday);
+    return { weekStart, employeeId: dutyOn(rotations, weekly, ref) };
   });
 }

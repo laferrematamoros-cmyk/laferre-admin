@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import AdminShell from '@/components/AdminShell';
 import { supabase, type Activity, type Employee } from '@/lib/supabase';
@@ -54,6 +55,11 @@ export default function EditActividadPage() {
             <h1 className={s.title}>Editar actividad</h1>
             <div className={s.sub}>{activity ? activity.title : 'Cargando…'}</div>
           </div>
+          {activity && (
+            <Link href={`/actividades/${activity.id}/lista`} className={`${s.btn} ${s.btnSoft}`}>
+              Lista con firma{activity.checklist_enabled ? ' · prendida' : ''}
+            </Link>
+          )}
         </header>
         <div className={s.content}>
           {error ? (

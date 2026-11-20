@@ -61,3 +61,18 @@ describe('mondayOf / upcomingDuty', () => {
     ]);
   });
 });
+
+describe('upcomingDuty: semana actual', () => {
+  it('un rol que empezó hoy (a media semana) ya enseña al de esta semana', () => {
+    const r: Rotation = { ...rot, valid_from: '2026-11-20' };
+    expect(upcomingDuty([r], [], '2026-11-20', 2).map(w => w.employeeId)).toEqual([E, L]);
+  });
+  it('un cambio de semana hecho a media semana (de hoy al domingo) sale en esta semana', () => {
+    const ov: DutyOverride[] = [{ from_date: '2026-11-20', to_date: '2026-11-22', employee_id: Y, created_at: '2026-11-20T15:00:00Z' }];
+    expect(upcomingDuty([rot], ov, '2026-11-20', 2).map(w => w.employeeId)).toEqual([Y, L]);
+  });
+  it('un cambio de un solo día no pinta la semana', () => {
+    const ov: DutyOverride[] = [{ from_date: '2026-11-24', to_date: '2026-11-24', employee_id: Y, created_at: '2026-11-20T15:00:00Z' }];
+    expect(upcomingDuty([rot], ov, '2026-11-20', 2).map(w => w.employeeId)).toEqual([E, L]);
+  });
+});
