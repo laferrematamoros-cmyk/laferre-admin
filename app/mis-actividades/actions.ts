@@ -31,13 +31,15 @@ export async function completeActivity(activityId: string, photoPath: string | n
   const db = admin();
   const [a, e] = await Promise.all([
     db.from('activities')
-      .select('id, company_id, limit_time, days_of_week, week_of_month, assigned_employee_ids, is_active, archived_at, evidence_photo')
+      .select('id, company_id, limit_time, days_of_week, week_of_month, assigned_employee_ids, is_active, archived_at, evidence_photo, checklist_enabled')
       .eq('id', activityId).maybeSingle(),
     db.from('employees').select('id, company_id, is_active').eq('id', session.employeeId).maybeSingle(),
   ]);
   if (a.error || e.error) return fail((a.error ?? e.error)!.message);
   const act = a.data, emp = e.data;
   if (!act) return fail('Actividad no encontrada.');
+  // Con lista (supabase/010) sólo cuenta al firmarla; la base también lo frena (trigger).
+  if (act.checklist_enabled) return fail('Esta actividad se hace con su lista desde el teléfono.');
   if (!emp || !emp.is_active) return fail('Tu empleado está dado de baja. Pídele a un administrador que lo revise.');
   if (act.company_id !== emp.company_id) return fail('Esa actividad no es de tu empresa.');
   const assigned = (act.assigned_employee_ids ?? []) as string[];

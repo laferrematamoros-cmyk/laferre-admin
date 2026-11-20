@@ -54,7 +54,7 @@ export default function ReportesPage() {
     (async () => {
       try {
         const [activities, emps] = await Promise.all([
-          loadActivities(supabase, company.id) as Promise<ReportActivity[]>,
+          loadActivities(supabase, company.id, { from, to }) as Promise<ReportActivity[]>,
           supabase.from('employees')
             .select('id, name, initials')
             .eq('is_active', true).eq('company_id', company.id).order('name'),

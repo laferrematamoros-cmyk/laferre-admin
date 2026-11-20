@@ -50,6 +50,8 @@ export interface Activity {
   evidence_signature: boolean;
   is_active: boolean;
   created_at: string;
+  /** Lista con firma (supabase/010): el teléfono enseña la lista del día y sólo cuenta al firmarla. */
+  checklist_enabled?: boolean;
   /** Archivada desde esta fecha (sale de la lista y de la app; el pasado se conserva). */
   archived_at?: string | null;
 }

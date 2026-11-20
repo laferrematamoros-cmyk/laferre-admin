@@ -80,7 +80,7 @@ export default function MisActividadesPage() {
     try {
       const today = new Date();
       const [acts, emps] = await Promise.all([
-        loadActivities(supabase, company.id),
+        loadActivities(supabase, company.id, { from: toDateStr(today), to: toDateStr(today) }),
         supabase.from('employees').select('id, name, initials').eq('company_id', company.id).eq('is_active', true),
       ]);
       if (emps.error) throw new Error(emps.error.message);

@@ -1,13 +1,17 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Activity } from './supabase';
 import type { PauseSpan } from './reports';
+import type { DutyInfo } from './duty';
+import { withDuty } from './duty-data';
 
-export type LiveActivity = Activity & { pauses: PauseSpan[] };
+export type LiveActivity = Activity & { pauses: PauseSpan[] } & DutyInfo;
 
 /** Todas las actividades de la empresa con sus pausas. Incluye las pausadas y las archivadas:
  *  los cálculos deciden con `liveAt` en qué días contaban, así el pasado no cambia.
- *  Si la tabla de pausas todavía no existe (falta correr supabase/005), sigue sin ellas. */
-export async function loadActivities(sb: SupabaseClient, companyId: string): Promise<LiveActivity[]> {
+ *  Si la tabla de pausas todavía no existe (falta correr supabase/005), sigue sin ellas.
+ *  Con el rango (YYYY-MM-DD), a las actividades con lista les agrega su rol, cambios y días
+ *  que esperan firma (supabase/010) para que Reportes e Inicio sepan a quién le tocaba. */
+export async function loadActivities(sb: SupabaseClient, companyId: string, range?: { from: string; to: string }): Promise<LiveActivity[]> {
   const acts = await sb.from('activities').select('*').eq('company_id', companyId).order('start_time');
   if (acts.error) throw new Error(acts.error.message);
   const list = (acts.data ?? []) as Activity[];
@@ -25,7 +29,7 @@ export async function loadActivities(sb: SupabaseClient, companyId: string): Pro
   }
 
   const now = new Date().toISOString();
-  return list.map(a => {
+  const live = list.map(a => {
     const pauses = byAct.get(a.id) ?? [];
     // Pausada desde antes de que existiera el historial de pausas: deja de contar desde ahora
     // (lo pasado se conserva). Las mensuales las prende y apaga el cron: no son pausas.
@@ -34,4 +38,5 @@ export async function loadActivities(sb: SupabaseClient, companyId: string): Pro
     }
     return { ...a, pauses };
   });
+  return range ? withDuty(sb, live, range.from, range.to) : live;
 }

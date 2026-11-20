@@ -64,7 +64,7 @@ export default function CalendarioPage() {
     const now = new Date();
     try {
       const [activities, emps] = await Promise.all([
-        loadActivities(supabase, company.id) as Promise<TodayActivity[]>,
+        loadActivities(supabase, company.id, { from, to }) as Promise<TodayActivity[]>,
         supabase.from('employees')
           .select('id, name, initials')
           .eq('is_active', true).eq('company_id', company.id).order('name'),
