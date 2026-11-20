@@ -11,6 +11,8 @@ type Result = { ok: true } | { ok: false; error: string };
 
 const hhmm = (iso: string) => new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Matamoros' });
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+/** El día en Matamoros (no el de UTC: una firma a las 7:30 pm ya es "mañana" en UTC). */
+const shopDay = (iso: string) => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
 
 /** La ficha de una lista terminada: lo que palomearon, fotos, motivos, y Firmar / Regresar. */
 export default function SignDialog({ run, onClose, onSign, onReturn }: {
@@ -65,7 +67,7 @@ export default function SignDialog({ run, onClose, onSign, onReturn }: {
 
           {run.status === 'signed' && run.signedAt && (
             <div className={`${v.banner} ${v.bannerOk}`}>
-              Firmada por {run.signedBy ?? 'el administrador'} el {shortDate(run.signedAt.slice(0, 10))} a las {hhmm(run.signedAt)}
+              Firmada por {run.signedBy ?? 'el administrador'} el {shortDate(shopDay(run.signedAt))} a las {hhmm(run.signedAt)}
               {run.signedVia === 'pin' ? ' (con PIN en el teléfono).' : ' (desde el panel).'}
             </div>
           )}

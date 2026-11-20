@@ -16,6 +16,8 @@ import v from '@/components/actividades/bitacora.module.css';
 const DAY = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 const TZ = 'America/Matamoros';
 const todayShop = () => new Date().toLocaleDateString('en-CA', { timeZone: TZ });
+/** El día en Matamoros de una hora (no el de UTC). */
+const shopDay = (iso: string) => new Date(iso).toLocaleDateString('en-CA', { timeZone: TZ });
 const addDays = (d: string, n: number) => {
   const [y, m, dd] = d.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, dd + n)).toISOString().slice(0, 10);
@@ -153,7 +155,7 @@ export default function BitacoraPage() {
                     {bit.days.map(d => (
                       <td key={d.date}>
                         {d.status === 'signed' && d.signedAt
-                          ? <span className={v.signed}>{d.signedBy} · {dm(d.signedAt.slice(0, 10))} {hm(d.signedAt)}{d.signedVia === 'pin' ? ' (PIN)' : ''}</span>
+                          ? <span className={v.signed}>{d.signedBy} · {dm(shopDay(d.signedAt))} {hm(d.signedAt)}{d.signedVia === 'pin' ? ' (PIN)' : ''}</span>
                           : d.status === 'awaiting_signature' ? <Link className={v.wait} href="/firmas">Falta firma</Link>
                           : d.status === 'returned' ? <span className={v.wait}>Regresada</span>
                           : d.status === 'in_progress' ? <span className={v.muted}>Sin terminar</span>
