@@ -1,5 +1,5 @@
 -- Pruebas de 011_capacitaciones.sql. Correr DESPUÉS de la migración.
--- NO guarda nada: arma una capacitación y dos empleados de prueba, prueba todo y al final truena
+-- NO guarda nada: arma dos capacitaciones y dos empleados de prueba, prueba todo y al final truena
 -- A PROPÓSITO con los resultados (el editor de Supabase no enseña los NOTICE). Debe salir:
 --   ERROR: RESULTADOS (no se guardó nada): … y cada renglón con OK.
 -- Si algún renglón dice FALLA, mandar el texto completo.
@@ -11,6 +11,7 @@ declare
   prueba uuid;
   nuevo  uuid;
   baja   uuid;
+  otra   uuid;
   sid    uuid;
   viejo  uuid;
   dl     timestamptz;
@@ -162,12 +163,28 @@ begin
   res := res || E'\n' || case when ok1 and ok2 and n = 1 and n2 = 0 then 'OK    ' else 'FALLA ' end
              || '14 avisos: nueva ' || ok1 || ', no se repite ' || ok2 || ', por vencer ' || n || ', nuevas repetidas ' || n2;
 
-  -- 15. Freno: 60 aperturas en la última hora
-  insert into training_sessions (training_id, employee_id, version, source)
-  select prueba, nuevo, 2, 'app' from generate_series(1, 60);
-  r := cap_open(prueba, nuevo);
-  res := res || E'\n' || case when (r->>'ok')::boolean = false and r->>'error' like 'Demasiados%' then 'OK    ' else 'FALLA ' end
-             || '15 freno de 60 por hora: ' || coalesce(r->>'error', r::text);
+  -- 15. Freno: con 60 aperturas en la última hora no crea más; regresa la que ya tenga de esa
+  --     capacitación y versión (si sirve) y, si no tiene, frena
+  insert into trainings (slug, title, sort_order, is_active)
+  values ('prueba-cap-2', 'PRUEBA CAPACITACIÓN 2 (no se guarda)', 998, true) returning id into otra;
+  update training_sessions set opened_at = now() - interval '13 hours'   -- las de la v2 ya vencieron
+   where training_id = prueba and employee_id = nuevo and version = 2;
+  insert into training_sessions (training_id, employee_id, version, source, opened_at)
+  values (prueba, nuevo, 2, 'app', now() - interval '5 minutes') returning id into sid;  -- la que sí sirve
+  insert into training_sessions (training_id, employee_id, version, source, opened_at)
+  select prueba, nuevo, 1, 'app', now() - interval '1 minute' from generate_series(1, 60);  -- versión vieja: no sirve
+  insert into training_sessions (training_id, employee_id, version, source, opened_at)
+  values (prueba, lau, 2, 'app', now());  -- de otra persona: no sirve
+  select count(*) into n from training_sessions where employee_id = nuevo;
+  r  := cap_open(prueba, nuevo);
+  r2 := cap_open(otra, nuevo);
+  select count(*) into n2 from training_sessions where employee_id = nuevo;
+  res := res || E'\n' || case when (r->>'ok')::boolean and (r->>'session')::uuid = sid and (r->>'reused')::boolean
+                                and r->>'slug' = 'prueba-cap'
+                                and (r2->>'ok')::boolean = false and r2->>'error' like 'Demasiados%'
+                                and n2 = n then 'OK    ' else 'FALLA ' end
+             || '15 freno de 60 por hora: regresa la suya ' || ((r->>'session')::uuid is not distinct from sid)
+             || ', sin sesión válida: ' || coalesce(r2->>'error', r2::text) || ', sesiones ' || n || ' → ' || n2;
 
   -- 16. Permisos: anon no lee las tablas ni usa las funciones del panel; sí ve su lista
   execute 'set role anon';
@@ -193,6 +210,41 @@ begin
   res := res || E'\n' || case when st = 'bloqueado / matrix bloqueado / marcar bloqueado / avisos bloqueado / lista pending'
                             then 'OK    ' else 'FALLA ' end
              || '16 anon: tablas ' || st;
+
+  -- 17. Origen: anon abre y contesta como 'app', pero no puede abrir como panel; el panel sí
+  execute 'set role anon';
+  got := 'bloqueado';
+  begin
+    r := cap_open(prueba, lau);
+    sid := (r->>'session')::uuid;
+    got := case when (r->>'ok')::boolean and sid is not null then 'abre' else coalesce(r->>'error', r::text) end;
+  exception when insufficient_privilege then got := 'bloqueado';
+  end;
+  st := 'cap_open ' || got;
+  got := 'bloqueado';
+  begin
+    r := cap_answer(sid, 'understood');
+    got := coalesce(r->>'code', r::text);
+  exception when insufficient_privilege then got := 'bloqueado';
+  end;
+  st := st || ' / cap_answer ' || got;
+  got := 'pudo';
+  begin perform cap_open_panel(prueba, lau); exception when insufficient_privilege then got := 'bloqueado'; end;
+  st := st || ' / cap_open_panel ' || got;
+  got := 'pudo';
+  begin perform cap_open_as(prueba, lau, 'panel'); exception when insufficient_privilege then got := 'bloqueado'; end;
+  st := st || ' / cap_open_as ' || got;
+  execute 'reset role';
+  ok1 := (select source = 'app' from training_sessions where id = sid);
+  r := cap_open_panel(prueba, lau);
+  ok2 := (r->>'ok')::boolean and (select source = 'panel' from training_sessions where id = (r->>'session')::uuid);
+  -- ya no existe el cap_open de tres parámetros (con origen)
+  ok3 := (select count(*) = 1 and min(p.pronargs) = 2 from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+           where ns.nspname = 'public' and p.proname = 'cap_open');
+  res := res || E'\n' || case when st = 'cap_open abre / cap_answer too_soon / cap_open_panel bloqueado / cap_open_as bloqueado'
+                                and ok1 and ok2 and ok3 then 'OK    ' else 'FALLA ' end
+             || '17 origen: anon ' || st || ' / sesión de anon es app ' || coalesce(ok1::text, 'no')
+             || ' / panel crea origen panel ' || coalesce(ok2::text, 'no') || ' / sin cap_open de 3 ' || coalesce(ok3::text, 'no');
 
   raise exception 'RESULTADOS (no se guardó nada):%', res;
 end $$;

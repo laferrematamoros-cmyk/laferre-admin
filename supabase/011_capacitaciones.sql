@@ -120,14 +120,15 @@ returns jsonb language sql stable security definer set search_path = public as $
    where r.employee_id = p_employee
 $$;
 
--- Abre una capacitación: crea la sesión (es el ?s= del enlace).
-create or replace function public.cap_open(p_training uuid, p_employee uuid, p_source text default 'app')
+-- Interna: abre una capacitación con el origen que le pasen y crea la sesión (es el ?s= del enlace).
+-- Nadie la llama directo: el teléfono usa cap_open ('app') y el panel cap_open_panel ('panel').
+create or replace function public.cap_open_as(p_training uuid, p_employee uuid, p_source text)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   t   trainings;
   sid uuid;
 begin
-  if p_source not in ('app', 'panel') then
+  if p_source is null or p_source not in ('app', 'panel') then
     return jsonb_build_object('ok', false, 'error', 'Origen no válido.');
   end if;
   select * into t from trainings where id = p_training;
@@ -137,14 +138,39 @@ begin
   if not exists (select 1 from employees where id = p_employee and is_active) then
     return jsonb_build_object('ok', false, 'error', 'Tu nombre no está activo. Pídele ayuda al Ing.');
   end if;
+  -- Freno: con 60 aperturas en la última hora ya no se crean sesiones. Para que nadie pueda dejar
+  -- a otro sin ver su capacitación abriéndola muchas veces a su nombre, se regresa la sesión
+  -- más reciente que ya tenga de ESTA capacitación y versión, si todavía sirve (menos de 12 h).
   if (select count(*) from training_sessions
        where employee_id = p_employee and opened_at > now() - interval '1 hour') >= 60 then
+    select id into sid from training_sessions
+     where training_id = t.id and employee_id = p_employee and version = t.version
+       and opened_at > now() - interval '12 hours'
+     order by opened_at desc
+     limit 1;
+    if sid is not null then
+      return jsonb_build_object('ok', true, 'session', sid, 'slug', t.slug, 'reused', true);
+    end if;
     return jsonb_build_object('ok', false, 'error', 'Demasiados intentos. Espera un rato.');
   end if;
   insert into training_sessions (training_id, employee_id, version, source)
   values (t.id, p_employee, t.version, p_source) returning id into sid;
   return jsonb_build_object('ok', true, 'session', sid, 'slug', t.slug);
 end $$;
+
+-- Teléfono (anon): abre una capacitación. Siempre es origen 'app': la llave pública no puede decir 'panel'.
+-- Una copia anterior de este archivo tenía cap_open con un tercer parámetro (el origen): se quita.
+drop function if exists public.cap_open(uuid, uuid, text);
+create or replace function public.cap_open(p_training uuid, p_employee uuid)
+returns jsonb language sql security definer set search_path = public as $$
+  select cap_open_as(p_training, p_employee, 'app')
+$$;
+
+-- Panel (service_role): la practicante abre una capacitación desde el panel.
+create or replace function public.cap_open_panel(p_training uuid, p_employee uuid)
+returns jsonb language sql security definer set search_path = public as $$
+  select cap_open_as(p_training, p_employee, 'panel')
+$$;
 
 -- Contesta: 'understood' (Entendí) o 'doubt' (que el Ing. me la explique).
 create or replace function public.cap_answer(p_session uuid, p_answer text, p_note text default null)
@@ -252,14 +278,17 @@ $$;
 revoke all on function public.cap_deadline(timestamptz, int) from public, anon, authenticated;
 revoke all on function public.cap_rows(timestamptz) from public, anon, authenticated;
 revoke all on function public.cap_list(uuid) from public;
-revoke all on function public.cap_open(uuid, uuid, text) from public;
+revoke all on function public.cap_open_as(uuid, uuid, text) from public, anon, authenticated;
+revoke all on function public.cap_open(uuid, uuid) from public;
+revoke all on function public.cap_open_panel(uuid, uuid) from public, anon, authenticated;
 revoke all on function public.cap_answer(uuid, text, text) from public;
 revoke all on function public.cap_matrix() from public, anon, authenticated;
 revoke all on function public.cap_mark_trained(uuid, uuid, text) from public, anon, authenticated;
 revoke all on function public.cap_claim_notices(timestamptz) from public, anon, authenticated;
 grant execute on function public.cap_deadline(timestamptz, int) to service_role;
 grant execute on function public.cap_list(uuid) to anon, authenticated, service_role;
-grant execute on function public.cap_open(uuid, uuid, text) to anon, authenticated, service_role;
+grant execute on function public.cap_open(uuid, uuid) to anon, authenticated, service_role;
+grant execute on function public.cap_open_panel(uuid, uuid) to service_role;
 grant execute on function public.cap_answer(uuid, text, text) to anon, authenticated, service_role;
 grant execute on function public.cap_matrix() to service_role;
 grant execute on function public.cap_mark_trained(uuid, uuid, text) to service_role;
