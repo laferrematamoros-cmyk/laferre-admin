@@ -20,6 +20,10 @@ const EMPTY: SessionData = { role: null, name: null, company: null, employeeId: 
 
 const Ctx = createContext<SessionCtx>({ ...EMPTY, loading: true });
 
+// Páginas sin sesión del panel: la entrada y la capacitación que abre el teléfono.
+const PUBLIC_PATHS = ['/login', '/ver-capacitacion'];
+const isPublic = (p: string | null) => !!p && PUBLIC_PATHS.some(x => p === x || p.startsWith(x + '/'));
+
 export function SessionProvider({ children, initial }: { children: React.ReactNode; initial?: SessionData }) {
   const [state, setState] = useState<SessionData>(initial ?? EMPTY);
   const [loading, setLoading] = useState(!initial);
@@ -35,7 +39,7 @@ export function SessionProvider({ children, initial }: { children: React.ReactNo
       .then(d => {
         if (!alive) return;
         // Usuario eliminado desde Ajustes: el servidor ya borró su cookie → a la entrada.
-        if (!d.role && pathname !== '/login') { window.location.replace('/login'); return; }
+        if (!d.role && !isPublic(pathname)) { window.location.replace('/login'); return; }
         setState({ role: d.role ?? null, name: d.name ?? null, company: d.company ?? null, employeeId: d.employeeId ?? null });
       })
       .catch(() => { /* mantiene estado previo */ })

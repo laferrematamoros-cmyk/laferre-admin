@@ -1,0 +1,147 @@
+/* Página de una capacitación (teléfono, practicante y vista previa del admin). */
+
+.root {
+  --ink: #0B0B0C; --ink2: #36363B; --muted: #5E5E66; --line: rgba(12, 12, 16, .09);
+  position: relative;
+  overflow-x: clip;
+  background: #F4F4F6;
+  color: var(--ink);
+  font-family: var(--font-geist), system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+.standalone { min-height: 100vh; min-height: 100dvh; }
+.embedded { min-height: 100%; }
+/* La barra fija de abajo no debe tapar el final. Dentro del panel la barra va en el flujo (sticky). */
+.standalone.withBar { padding-bottom: 110px; }
+
+.wrap {
+  max-width: 1180px; margin: 0 auto; padding: 18px 16px 24px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+
+/* ── Encabezado ── */
+.head { display: flex; flex-direction: column; gap: 4px; padding-top: 4px; }
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+}
+.eyebrow i {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+.hello { margin: 6px 0 0; font-size: 16px; font-weight: 600; color: var(--ink2); }
+.title { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -.03em; line-height: 1.12; text-wrap: balance; overflow-wrap: anywhere; }
+
+.notice { margin: 0; padding: 12px 14px; border-radius: 16px; font-size: 14px; font-weight: 500; line-height: 1.4; }
+.noticeOk { background: var(--st-ok-soft); color: var(--st-ok-ink); }
+.noticeDoubt { background: var(--st-late-soft); color: var(--st-late-ink); }
+.noticeInfo { background: var(--st-run-soft); color: var(--st-run-ink); }
+
+.preview {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 14px;
+  padding: 8px 8px 8px 14px; border-radius: 16px; font-size: 13.5px; line-height: 1.4;
+  background: var(--st-run-soft); color: var(--st-run-ink);
+}
+.previewTimer { font-weight: 500; }
+.previewBack {
+  min-height: 44px; padding: 0 16px; display: inline-flex; align-items: center; border-radius: 999px;
+  background: #fff; color: var(--ink); font-size: 13px; font-weight: 600; text-decoration: none;
+  border: 1px solid var(--line);
+}
+.num { font-variant-numeric: tabular-nums; }
+
+/* ── Botones ── */
+.btn {
+  min-height: 52px; padding: 0 20px; border-radius: 999px; border: 1px solid transparent;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  font-family: var(--font-geist), system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 16px; font-weight: 600; line-height: 1.2; text-align: center; text-decoration: none;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: background .15s, color .15s, box-shadow .15s, opacity .15s;
+}
+.btn:focus-visible, .option:focus-visible, .x:focus-visible, .previewBack:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.light { background: #fff; border-color: rgba(12, 12, 16, .14); color: var(--ink); }
+.dark {
+  background: #0B0B0C; border-color: #0B0B0C; color: #fff;
+  box-shadow: 0 8px 18px -10px rgba(12, 12, 16, .7), inset 0 1px 0 rgba(255, 255, 255, .15);
+}
+.btn:disabled { cursor: default; }
+.light:disabled { opacity: .55; }
+/* "Entendí" esperando la cuenta: se lee, pero se ve apagado. */
+.dark:disabled { background: #DADADF; border-color: #DADADF; color: #4E4E55; box-shadow: none; }
+
+/* ── Barra de abajo ── */
+.bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: rgba(244, 244, 246, .94);
+  border-top: 1px solid var(--line);
+  -webkit-backdrop-filter: blur(14px) saturate(140%); backdrop-filter: blur(14px) saturate(140%);
+}
+.embedded .bar { position: sticky; }
+.barIn { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
+.barBtns { display: flex; gap: 10px; }
+.barBtns > .btn { flex: 1 1 0; min-width: 0; }
+.error { margin: 0; padding: 10px 12px; border-radius: 12px; font-size: 14px; line-height: 1.35; background: var(--st-miss-soft); color: var(--st-miss-ink); }
+
+/* ── Hoja "Tengo dudas" ── */
+.overlay { position: fixed; inset: 0; background: rgba(12, 12, 16, .4); }
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; margin: 0 auto; width: 100%; max-width: 560px;
+  max-height: 92vh; max-height: 92dvh; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+  border-radius: 24px 24px 0 0; background: #fff; color: var(--ink);
+  box-shadow: 0 -20px 60px -20px rgba(0, 0, 0, .35);
+  animation: sheetIn .22s cubic-bezier(.2, .8, .2, 1);
+}
+@keyframes sheetIn { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.sheetHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sheetHead h2 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -.02em; }
+.x {
+  width: 44px; height: 44px; flex: none; display: grid; place-items: center; border: 0; border-radius: 50%;
+  background: #F0F0F3; color: var(--ink); font-size: 16px; cursor: pointer;
+}
+.option {
+  min-height: 64px; padding: 12px 16px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  border: 1px solid var(--line); border-radius: 18px; background: #F7F7F9; color: var(--ink);
+  font-family: inherit; text-align: left; cursor: pointer;
+}
+.option b, .ask label b { font-size: 16px; font-weight: 700; }
+.option span, .ask label span { font-size: 13.5px; color: var(--muted); }
+.ask { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px 16px; border: 1px solid var(--line); border-radius: 18px; }
+.ask label { display: flex; flex-direction: column; gap: 2px; }
+.textarea {
+  width: 100%; min-height: 96px; padding: 12px 14px; resize: vertical;
+  border: 1px solid rgba(12, 12, 16, .16); border-radius: 14px; background: #fff; color: var(--ink);
+  font-family: inherit; font-size: 16px; line-height: 1.4; /* 16 px: iOS no hace zoom al escribir */
+}
+.textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+.count { align-self: flex-end; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* ── Pantalla final ── */
+.final {
+  min-height: inherit; max-width: 460px; margin: 0 auto; padding: 48px 20px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center;
+}
+.check {
+  width: 64px; height: 64px; display: grid; place-items: center; border-radius: 50%;
+  background: var(--st-ok-soft); color: var(--st-ok); font-size: 30px; font-weight: 700;
+}
+.finalTitle { margin: 4px 0 0; font-size: 28px; font-weight: 700; letter-spacing: -.03em; }
+.finalText { margin: 0 0 8px; font-size: 16px; line-height: 1.45; color: var(--ink2); }
+.big { width: 100%; max-width: 340px; }
+.closeTab { margin: 0; font-size: 14px; color: var(--muted); }
+
+@media (min-width: 768px) {
+  .wrap { padding: 28px 28px 32px; gap: 16px; }
+  .title { font-size: 34px; }
+  .bar { padding-left: 28px; padding-right: 28px; }
+  .barBtns { justify-content: flex-end; }
+  .barBtns > .btn { flex: 0 1 240px; }
+  .sheet { bottom: 16px; border-radius: 24px; padding-bottom: 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn { transition: none; }
+  .sheet { animation: none; }
+}

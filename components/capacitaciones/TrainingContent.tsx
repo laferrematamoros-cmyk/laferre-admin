@@ -7,7 +7,9 @@ export default function TrainingContent({ slug, round = 0 }: { slug: string; rou
   const parts = catalogBySlug(slug)?.parts ?? [];
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {parts.map(p => { const C = PARTS[p]; return C ? <C key={`${p}-${round}`} /> : null; })}
+      {/* Cada parte en su propio bloque: varias animaciones son `container-type: inline-size` con
+          `margin: 0 auto`, y como hijo directo de un flex se encogían a 32 px de ancho. */}
+      {parts.map(p => { const C = PARTS[p]; return C ? <div key={`${p}-${round}`} style={{ minWidth: 0 }}><C /></div> : null; })}
     </div>
   );
 }
