@@ -78,6 +78,8 @@
 - Create: `supabase/011_capacitaciones.sql`
 - Create: `supabase/011_capacitaciones_prueba.sql`
 
+> **Cambio tras la revisión de seguridad (2026-11-21):** `cap_open` ya no recibe `p_source` (siempre `app`); la practicante abre con `cap_open_panel` (sólo service_role). Al pasar el freno de 60 por hora se reutiliza la última sesión válida en vez de rechazar. El SQL bueno es el del repo, no el de abajo.
+
 - [ ] **Step 1: Escribir la migración**
 
 ```sql
@@ -1346,7 +1348,7 @@ export async function openMyTraining(slug: string): Promise<MyOpen> {
   const db = admin();
   const { data: t } = await db.from('trainings').select('id, title, min_seconds, version').eq('slug', slug).maybeSingle();
   if (!t) return { ok: false, error: 'No existe esa capacitación.' };
-  const { data, error } = await db.rpc('cap_open', { p_training: t.id, p_employee: s.employeeId, p_source: 'panel' });
+  const { data, error } = await db.rpc('cap_open_panel', { p_training: t.id, p_employee: s.employeeId });
   if (error) return { ok: false, error: error.message };
   const r = data as { ok: boolean; error?: string; session?: string };
   if (!r.ok || !r.session) return { ok: false, error: r.error ?? 'No se pudo abrir.' };
@@ -1521,7 +1523,7 @@ export async function loadTrainings(employeeId: string): Promise<TrainingItem[] 
 }
 
 export async function openTraining(trainingId: string, employeeId: string): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
-  const { data, error } = await supabase.rpc('cap_open', { p_training: trainingId, p_employee: employeeId, p_source: 'app' });
+  const { data, error } = await supabase.rpc('cap_open', { p_training: trainingId, p_employee: employeeId });
   if (error) return { ok: false, error: OFFLINE };
   const r = data as { ok: boolean; error?: string; session?: string; slug?: string };
   if (!r?.ok || !r.session || !r.slug) return { ok: false, error: r?.error ?? 'No se pudo abrir.' };
