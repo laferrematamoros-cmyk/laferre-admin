@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { CATALOG, catalogBySlug } from '../capacitaciones/catalog';
 import { dueLabel, summarize, buildMatrix, openDoubts, type CapRow } from '../capacitaciones/status';
+import { groupClaims, noticeText, inNoticeHours, type NoticeClaim } from '../capacitaciones/notices';
 import { catalogSyncPlan } from '../capacitaciones/sync';
 
 describe('catálogo', () => {
@@ -79,5 +80,37 @@ describe('tabla de avance', () => {
   });
   it('openDoubts: la más vieja primero', () => {
     expect(openDoubts(rows).map(r => r.employee_name)).toEqual(['YAJAIRA', 'LAURA']);
+  });
+});
+
+const cl = (p: Partial<NoticeClaim>): NoticeClaim => ({
+  employee_id: 'e1', employee_name: 'EDDIE GARCIA', company_id: 'c1', training_id: 't1', title: 'Instalar un fregadero',
+  kind: 'new', deadline: '2026-11-27T06:00:00.000Z', ...p,
+});
+const now = new Date('2026-11-25T18:00:00Z');
+
+describe('avisos', () => {
+  it('agrupa por persona; la que está en las dos listas se queda en "por vencer"', () => {
+    const g = groupClaims([cl({}), cl({ kind: 'due_soon' }), cl({ training_id: 't2', title: 'Lavabo' }), cl({ employee_id: 'e2', employee_name: 'LAURA' })]);
+    expect(g.map(x => [x.name, x.news.map(n => n.training_id), x.dues.map(n => n.training_id)]))
+      .toEqual([['EDDIE GARCIA', ['t2'], ['t1']], ['LAURA', ['t1'], []]]);
+  });
+  it('textos', () => {
+    const one = groupClaims([cl({})])[0];
+    expect(noticeText(one, now)).toEqual({ title: 'Capacitación', body: 'Eddie, tienes una capacitación nueva: Instalar un fregadero.' });
+    const many = groupClaims([cl({}), cl({ training_id: 't2' }), cl({ training_id: 't3' })])[0];
+    expect(noticeText(many, now).body).toBe('Eddie, tienes 3 capacitaciones nuevas por ver.');
+    const due = groupClaims([cl({ kind: 'due_soon' })])[0];
+    expect(noticeText(due, now).body).toBe('Eddie, vence mañana: Instalar un fregadero.');
+    const dues = groupClaims([cl({ kind: 'due_soon' }), cl({ kind: 'due_soon', training_id: 't2' })])[0];
+    expect(noticeText(dues, now).body).toBe('Eddie, tienes 2 capacitaciones por vencer.');
+    const both = groupClaims([cl({ kind: 'due_soon' }), cl({ training_id: 't2' })])[0];
+    expect(noticeText(both, now).body).toBe('Eddie, vence mañana: Instalar un fregadero. También tienes una nueva.');
+  });
+  it('horario: de 9:00 a 19:00 en Matamoros', () => {
+    expect(inNoticeHours(new Date('2026-11-25T14:59:00Z'))).toBe(false); // 8:59
+    expect(inNoticeHours(new Date('2026-11-25T15:00:00Z'))).toBe(true);  // 9:00
+    expect(inNoticeHours(new Date('2026-11-26T00:59:00Z'))).toBe(true);  // 18:59
+    expect(inNoticeHours(new Date('2026-11-26T01:00:00Z'))).toBe(false); // 19:00
   });
 });
