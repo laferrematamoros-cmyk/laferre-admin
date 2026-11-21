@@ -182,7 +182,7 @@ training_notices                         -- avisos ya apartados
 | `cap_deadline(base timestamptz, days int)` | interna | Inicio del día siguiente a `fecha(base, Matamoros) + days`, en hora de Matamoros. |
 | `cap_rows()` | interna | Una fila por empleado activo × capacitación activa, con estado, plazo, respuesta, nota, capacitado por y número de vistas (versión actual). Toda la lógica de estados vive aquí. |
 | `cap_list(p_employee)` | anon | Lo de esa persona (activa) para el teléfono y la practicante: id, slug, título, orden, estado, plazo, fecha de respuesta. Empleado inactivo o inexistente: lista vacía. |
-| `cap_open(p_training, p_employee)` | anon | Revisa que la capacitación esté activa y el empleado activo; crea la sesión con la versión actual y regresa `{ok, session, slug}`. |
+| `cap_open(p_training, p_employee, p_source)` | anon | Revisa que la capacitación esté activa y el empleado activo, y que no haya más de 60 aperturas de esa persona en la última hora (freno contra abusos); crea la sesión con la versión actual y regresa `{ok, session, slug}`. `p_source` es `app` (por defecto) o `panel`. |
 | `cap_answer(p_session, p_answer, p_note)` | anon | Revisa: sesión existe y tiene menos de 12 h; capacitación activa y misma versión; empleado activo; para `understood`, que hayan pasado `min_seconds` desde `opened_at` (si no, `{ok:false, code:'too_soon', seconds_left}`); nota de hasta 500. Si ya está `trained` no cambia nada (`{ok:true, already:true}`). Si no, guarda la respuesta (la nota sólo con `doubt`) y marca la sesión contestada. |
 | `cap_matrix()` | service_role | `cap_rows()` completo, para la tabla de Avance y "Por capacitar". |
 | `cap_mark_trained(p_training, p_employee, p_by)` | service_role | Pasa de `doubt` a `trained` en la versión actual (`trained_at`, `trained_by`). Si no estaba en `doubt`, `{ok:false}`. |
@@ -190,7 +190,7 @@ training_notices                         -- avisos ya apartados
 
 Los ajustes (activar, orden, plazo, tiempo) se guardan con acciones del servidor con la llave de servicio, sólo con sesión de admin.
 
-**Semilla:** las 13 filas de la tabla de arriba, pausadas, con su orden y su tiempo mínimo inicial.
+**Sin semilla en el SQL:** las 13 filas las crea la sincronización del catálogo (siguiente sección), pausadas, con su orden y su tiempo mínimo inicial, la primera vez que corre el cron o se abre la página Capacitación. Así la lista vive en un solo lugar (el código).
 
 ## Catálogo y versiones (código del panel)
 
