@@ -29,7 +29,9 @@ create table if not exists public.training_sessions (
   answered_at timestamptz
 );
 create index if not exists training_sessions_who_idx on public.training_sessions (employee_id, opened_at);
-create index if not exists training_sessions_tev_idx on public.training_sessions (training_id, employee_id, version);
+-- Una copia anterior de este archivo lo creó sin opened_at: se borra y se vuelve a crear con las 4 columnas.
+drop index if exists public.training_sessions_tev_idx;
+create index if not exists training_sessions_tev_idx on public.training_sessions (training_id, employee_id, version, opened_at);
 
 create table if not exists public.training_progress (
   id          uuid primary key default gen_random_uuid(),
@@ -72,6 +74,12 @@ begin
     if new.is_active then new.published_at := now(); end if;
   elsif new.is_active and (not old.is_active or new.version > old.version) then
     new.published_at := now();
+    -- Reactivarla es empezar de cero: el plazo vuelve a contar desde hoy, así que se borran los
+    -- avisos ya apartados de esta versión para que "nueva" y "por vencer" se manden otra vez con
+    -- el plazo nuevo. Al subir la versión no hace falta: los avisos se apartan por versión.
+    if not old.is_active then
+      delete from training_notices where training_id = new.id and version = new.version;
+    end if;
   end if;
   return new;
 end $$;
@@ -127,6 +135,7 @@ returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   t   trainings;
   sid uuid;
+  n   int;
 begin
   if p_source is null or p_source not in ('app', 'panel') then
     return jsonb_build_object('ok', false, 'error', 'Origen no válido.');
@@ -138,20 +147,20 @@ begin
   if not exists (select 1 from employees where id = p_employee and is_active) then
     return jsonb_build_object('ok', false, 'error', 'Tu nombre no está activo. Pídele ayuda al Ing.');
   end if;
-  -- Freno: con 60 aperturas en la última hora ya no se crean sesiones. Para que nadie pueda dejar
-  -- a otro sin ver su capacitación abriéndola muchas veces a su nombre, se regresa la sesión
-  -- más reciente que ya tenga de ESTA capacitación y versión, si todavía sirve (menos de 12 h).
-  if (select count(*) from training_sessions
-       where employee_id = p_employee and opened_at > now() - interval '1 hour') >= 60 then
+  -- Freno: si esta persona ya abrió ESTA capacitación (misma versión y mismo origen) 20 veces en la
+  -- última hora, no se crea otra sesión: se regresa la más reciente de esas 20. Nunca se rechaza
+  -- (así nadie puede dejar a otro sin ver su capacitación abriéndola muchas veces a su nombre) y
+  -- nunca se regresa una sesión de otro origen (una del panel no le llega a la llave pública).
+  select count(*) into n from training_sessions
+   where training_id = t.id and employee_id = p_employee and version = t.version
+     and source = p_source and opened_at > now() - interval '1 hour';
+  if n >= 20 then
     select id into sid from training_sessions
      where training_id = t.id and employee_id = p_employee and version = t.version
-       and opened_at > now() - interval '12 hours'
+       and source = p_source and opened_at > now() - interval '1 hour'
      order by opened_at desc
      limit 1;
-    if sid is not null then
-      return jsonb_build_object('ok', true, 'session', sid, 'slug', t.slug, 'reused', true);
-    end if;
-    return jsonb_build_object('ok', false, 'error', 'Demasiados intentos. Espera un rato.');
+    return jsonb_build_object('ok', true, 'session', sid, 'slug', t.slug, 'reused', true);
   end if;
   insert into training_sessions (training_id, employee_id, version, source)
   values (t.id, p_employee, t.version, p_source) returning id into sid;
@@ -237,6 +246,14 @@ language sql stable security definer set search_path = public as $$
   select * from cap_rows(now())
 $$;
 
+-- Panel (service_role): cuántas dudas esperan al Ing. en una empresa (el numerito del menú),
+-- sin bajar la tabla completa de cap_matrix.
+create or replace function public.cap_doubt_count(p_company uuid)
+returns int language sql stable security definer set search_path = public as $$
+  select count(*)::int from cap_rows(now()) r
+   where r.company_id = p_company and r.status = 'doubt'
+$$;
+
 -- Panel (service_role): "Ya lo capacité".
 create or replace function public.cap_mark_trained(p_training uuid, p_employee uuid, p_by text)
 returns jsonb language plpgsql security definer set search_path = public as $$
@@ -262,8 +279,10 @@ language sql security definer set search_path = public as $$
     select r.employee_id, r.employee_name, r.company_id, r.training_id, r.title, r.version, r.deadline, k.kind
       from cap_rows(p_now) r
       cross join (values ('new'::text), ('due_soon'::text)) as k(kind)
-     where r.status = 'pending'
-       and (k.kind = 'new' or r.deadline - p_now <= interval '48 hours')
+     -- "nueva": a quien no ha contestado, aunque ya esté atrasada (p. ej. un empleado reactivado);
+     -- "por vencer": sólo a quien sigue a tiempo y le quedan 48 h o menos.
+     where (k.kind = 'new' and r.status in ('pending', 'overdue'))
+        or (k.kind = 'due_soon' and r.status = 'pending' and r.deadline - p_now <= interval '48 hours')
   ), ins as (
     insert into training_notices (training_id, employee_id, version, kind, sent_at)
     select c.training_id, c.employee_id, c.version, c.kind, p_now from cand c
@@ -275,6 +294,7 @@ language sql security definer set search_path = public as $$
     join cand c on c.training_id = i.training_id and c.employee_id = i.employee_id and c.kind = i.kind
 $$;
 
+revoke all on function public.trainings_publish() from public, anon, authenticated;
 revoke all on function public.cap_deadline(timestamptz, int) from public, anon, authenticated;
 revoke all on function public.cap_rows(timestamptz) from public, anon, authenticated;
 revoke all on function public.cap_list(uuid) from public;
@@ -283,6 +303,7 @@ revoke all on function public.cap_open(uuid, uuid) from public;
 revoke all on function public.cap_open_panel(uuid, uuid) from public, anon, authenticated;
 revoke all on function public.cap_answer(uuid, text, text) from public;
 revoke all on function public.cap_matrix() from public, anon, authenticated;
+revoke all on function public.cap_doubt_count(uuid) from public, anon, authenticated;
 revoke all on function public.cap_mark_trained(uuid, uuid, text) from public, anon, authenticated;
 revoke all on function public.cap_claim_notices(timestamptz) from public, anon, authenticated;
 grant execute on function public.cap_deadline(timestamptz, int) to service_role;
@@ -291,6 +312,7 @@ grant execute on function public.cap_open(uuid, uuid) to anon, authenticated, se
 grant execute on function public.cap_open_panel(uuid, uuid) to service_role;
 grant execute on function public.cap_answer(uuid, text, text) to anon, authenticated, service_role;
 grant execute on function public.cap_matrix() to service_role;
+grant execute on function public.cap_doubt_count(uuid) to service_role;
 grant execute on function public.cap_mark_trained(uuid, uuid, text) to service_role;
 grant execute on function public.cap_claim_notices(timestamptz) to service_role;
 

@@ -1,37 +1,60 @@
 -- Pruebas de 011_capacitaciones.sql. Correr DESPUÉS de la migración.
--- NO guarda nada: arma dos capacitaciones y dos empleados de prueba, prueba todo y al final truena
+-- NO guarda nada: arma dos capacitaciones y seis empleados de prueba, prueba todo y al final truena
 -- A PROPÓSITO con los resultados (el editor de Supabase no enseña los NOTICE). Debe salir:
 --   ERROR: RESULTADOS (no se guardó nada): … y cada renglón con OK.
 -- Si algún renglón dice FALLA, mandar el texto completo.
 -- Dentro del bloque now() no cambia: el paso del tiempo se simula moviendo opened_at y published_at.
+-- No depende de los empleados reales: usa los suyos, de La Ferre y de BFM.
 do $$
 declare
-  co     uuid := 'a6798a18-9565-4f2b-929a-0c6771e7ef54';  -- La Ferre
-  lau    uuid := '0ddf2629-36b8-4aa1-b769-39d45740bb43';  -- Laura
-  prueba uuid;
-  nuevo  uuid;
-  baja   uuid;
-  otra   uuid;
-  sid    uuid;
-  viejo  uuid;
-  dl     timestamptz;
-  r      jsonb;
-  r2     jsonb;
-  st     text;
-  got    text;
-  ok1    boolean;
-  ok2    boolean;
-  ok3    boolean;
-  n      int;
-  n2     int;
-  res    text := '';
+  co       uuid := 'a6798a18-9565-4f2b-929a-0c6771e7ef54';  -- La Ferre
+  bfm      uuid;
+  base_co  int;
+  base_bfm int;
+  prueba   uuid;
+  otra     uuid;
+  antiguo  uuid;  -- La Ferre, dado de alta hace 90 días
+  nuevo    uuid;  -- La Ferre, dado de alta hoy
+  baja     uuid;  -- La Ferre, inactivo
+  ent      uuid;  -- La Ferre, la entiende en la v2
+  dud      uuid;  -- La Ferre, tiene dudas en la v2
+  ajeno    uuid;  -- BFM
+  sid      uuid;
+  viejo    uuid;
+  dl       timestamptz;
+  r        jsonb;
+  r2       jsonb;
+  st       text;
+  st2      text;
+  got      text;
+  ok1      boolean;
+  ok2      boolean;
+  ok3      boolean;
+  ok4      boolean;
+  ok5      boolean;
+  n        int;
+  n2       int;
+  n3       int;
+  res      text := '';
 begin
+  select id into bfm from companies where slug = 'bfm';
+  base_co  := cap_doubt_count(co);   -- dudas reales que ya hubiera (se restan en el caso 18)
+  base_bfm := cap_doubt_count(bfm);
+
   insert into trainings (slug, title, sort_order, is_active, deadline_days, min_seconds)
   values ('prueba-cap', 'PRUEBA CAPACITACIÓN (no se guarda)', 999, true, 7, 30) returning id into prueba;
   insert into employees (id, name, role, initials, company_id, is_active, created_at)
+  values (gen_random_uuid(), 'PRUEBA ANTIGUO (no se guarda)', 'Prueba', 'PA', co, true, now() - interval '90 days') returning id into antiguo;
+  insert into employees (id, name, role, initials, company_id, is_active, created_at)
   values (gen_random_uuid(), 'PRUEBA NUEVO (no se guarda)', 'Prueba', 'PN', co, true, now()) returning id into nuevo;
-  insert into employees (id, name, role, initials, company_id, is_active)
-  values (gen_random_uuid(), 'PRUEBA BAJA (no se guarda)', 'Prueba', 'PB', co, false) returning id into baja;
+  insert into employees (id, name, role, initials, company_id, is_active, created_at)
+  values (gen_random_uuid(), 'PRUEBA BAJA (no se guarda)', 'Prueba', 'PB', co, false, now() - interval '90 days') returning id into baja;
+  insert into employees (id, name, role, initials, company_id, is_active, created_at)
+  values (gen_random_uuid(), 'PRUEBA ENTENDIDA (no se guarda)', 'Prueba', 'PE', co, true, now() - interval '90 days') returning id into ent;
+  insert into employees (id, name, role, initials, company_id, is_active, created_at)
+  values (gen_random_uuid(), 'PRUEBA DUDA (no se guarda)', 'Prueba', 'PD', co, true, now() - interval '90 days') returning id into dud;
+  insert into employees (id, name, role, initials, company_id, is_active, created_at)
+  values (gen_random_uuid(), 'PRUEBA BFM (no se guarda)', 'Prueba', 'PF', bfm, true, now() - interval '90 days') returning id into ajeno;
 
   -- 1. El trigger pone published_at
   select published_at = now() into ok1 from trainings where id = prueba;
@@ -51,22 +74,28 @@ begin
   res := res || E'\n' || case when dl = '2026-12-01 00:00-06'::timestamptz then 'OK    ' else 'FALLA ' end
              || '2 cap_deadline(23 nov 15:00, 7) = ' || dl;
 
-  -- 3. La lista de Laura
-  got := (select e->>'status' from jsonb_array_elements(cap_list(lau)) e where e->>'slug' = 'prueba-cap');
+  -- 3. La lista de antiguo
+  got := (select e->>'status' from jsonb_array_elements(cap_list(antiguo)) e where e->>'slug' = 'prueba-cap');
   res := res || E'\n' || case when got = 'pending' then 'OK    ' else 'FALLA ' end
-             || '3 cap_list(Laura) trae prueba-cap: ' || coalesce(got, 'no viene');
+             || '3 cap_list(antiguo) trae prueba-cap: ' || coalesce(got, 'no viene');
 
-  -- 4. Publicada hace 10 días: Laura atrasada, el nuevo cuenta desde su alta
+  -- 4. Publicada hace 10 días: antiguo atrasado, el nuevo cuenta desde su alta;
+  --    si el atrasado contesta "dudas", ya no sale atrasado sino con dudas
   update trainings set published_at = now() - interval '10 days' where id = prueba;
-  got := (select e->>'status' from jsonb_array_elements(cap_list(lau)) e where e->>'slug' = 'prueba-cap');
+  got := (select e->>'status' from jsonb_array_elements(cap_list(antiguo)) e where e->>'slug' = 'prueba-cap');
   st  := (select e->>'status' from jsonb_array_elements(cap_list(nuevo)) e where e->>'slug' = 'prueba-cap');
-  res := res || E'\n' || case when got = 'overdue' and st = 'pending' then 'OK    ' else 'FALLA ' end
-             || '4 hace 10 días: Laura ' || coalesce(got, 'no viene') || ', nuevo ' || coalesce(st, 'no viene');
+  r := cap_open(prueba, antiguo);
+  r := cap_answer((r->>'session')::uuid, 'doubt', 'Duda de antiguo');
+  st2 := (select e->>'status' from jsonb_array_elements(cap_list(antiguo)) e where e->>'slug' = 'prueba-cap');
+  res := res || E'\n' || case when got = 'overdue' and st = 'pending' and (r->>'ok')::boolean and st2 = 'doubt'
+                            then 'OK    ' else 'FALLA ' end
+             || '4 hace 10 días: antiguo ' || coalesce(got, 'no viene') || ', nuevo ' || coalesce(st, 'no viene')
+             || ', antiguo con dudas ' || coalesce(st2, r::text);
 
   -- 5. Abrir una pausada
   update trainings set is_active = false where id = prueba;
   r := cap_open(prueba, nuevo);
-  got := coalesce((select 'viene' from jsonb_array_elements(cap_list(lau)) e where e->>'slug' = 'prueba-cap'), 'no viene');
+  got := coalesce((select 'viene' from jsonb_array_elements(cap_list(antiguo)) e where e->>'slug' = 'prueba-cap'), 'no viene');
   res := res || E'\n' || case when (r->>'ok')::boolean = false and r->>'error' like '%pausa%' and got = 'no viene' then 'OK    ' else 'FALLA ' end
              || '5 abrir pausada: ' || coalesce(r->>'error', r::text) || ' (en la lista: ' || got || ')';
   update trainings set is_active = true where id = prueba;
@@ -147,46 +176,90 @@ begin
   res := res || E'\n' || case when ok1 and ok2 and ok3 then 'OK    ' else 'FALLA ' end
              || '13 capacitado: marcar ' || ok1 || ', segunda vez rechazada ' || ok2 || ', entendí después no lo cambia ' || ok3;
 
-  -- 14. Avisos: "nueva" una sola vez; "por vencer" un día antes del plazo
-  select count(*) into n from cap_claim_notices(now()) c
-   where c.training_id = prueba and c.employee_id = lau and c.kind = 'new';
-  ok1 := n = 1;
-  select count(*) into n from cap_claim_notices(now()) c
-   where c.training_id = prueba and c.employee_id = lau;
-  ok2 := n = 0;
-  select deadline into dl from cap_rows(now()) c where c.training_id = prueba and c.employee_id = lau;
-  select count(*) filter (where c.employee_id = lau and c.kind = 'due_soon'),
-         count(*) filter (where c.kind = 'new')
+  -- 14. Avisos
+  --     En la v2: nuevo ya está capacitado; ent la entiende y dud tiene dudas
+  r := cap_open(prueba, ent);
+  sid := (r->>'session')::uuid;
+  update training_sessions set opened_at = now() - interval '40 seconds' where id = sid;
+  perform cap_answer(sid, 'understood');
+  r := cap_open(prueba, dud);
+  perform cap_answer((r->>'session')::uuid, 'doubt', 'Duda de prueba');
+  -- a) "nueva" para antiguo; nada para los que ya contestaron
+  select count(*) filter (where c.employee_id = antiguo and c.kind = 'new'),
+         count(*) filter (where c.employee_id in (nuevo, ent, dud))
     into n, n2
-    from cap_claim_notices(dl - interval '1 day') c
-   where c.training_id = prueba;
-  res := res || E'\n' || case when ok1 and ok2 and n = 1 and n2 = 0 then 'OK    ' else 'FALLA ' end
-             || '14 avisos: nueva ' || ok1 || ', no se repite ' || ok2 || ', por vencer ' || n || ', nuevas repetidas ' || n2;
+    from cap_claim_notices(now()) c where c.training_id = prueba;
+  ok1 := n = 1 and n2 = 0;
+  -- b) la segunda llamada ya no la regresa
+  select count(*) into n from cap_claim_notices(now()) c
+   where c.training_id = prueba and c.employee_id = antiguo;
+  ok2 := n = 0;
+  -- c) un día antes del plazo: "por vencer" para antiguo; ni "nueva" repetida ni nada a los que contestaron
+  select deadline into dl from cap_rows(now()) c where c.training_id = prueba and c.employee_id = antiguo;
+  select count(*) filter (where c.employee_id = antiguo and c.kind = 'due_soon'),
+         count(*) filter (where c.kind = 'new'),
+         count(*) filter (where c.employee_id in (nuevo, ent, dud))
+    into n, n2, n3
+    from cap_claim_notices(dl - interval '1 day') c where c.training_id = prueba;
+  ok3 := n = 1 and n2 = 0 and n3 = 0;
+  -- d) un empleado reactivado que ya está atrasado: le llega "nueva" y no "por vencer"
+  update employees set is_active = true where id = baja;
+  select count(*) filter (where c.kind = 'new'), count(*) filter (where c.kind = 'due_soon')
+    into n, n2
+    from cap_claim_notices(dl + interval '1 day') c where c.training_id = prueba and c.employee_id = baja;
+  ok4 := n = 1 and n2 = 0
+         and (select c.status from cap_rows(dl + interval '1 day') c where c.training_id = prueba and c.employee_id = baja) = 'overdue';
+  update employees set is_active = false where id = baja;
+  -- e) pausar y reactivar es empezar de cero: "nueva" y "por vencer" se vuelven a apartar
+  update trainings set is_active = false where id = prueba;
+  update trainings set is_active = true where id = prueba;
+  select count(*) into n from cap_claim_notices(now()) c
+   where c.training_id = prueba and c.employee_id = antiguo and c.kind = 'new';
+  select deadline into dl from cap_rows(now()) c where c.training_id = prueba and c.employee_id = antiguo;
+  select count(*) into n2 from cap_claim_notices(dl - interval '1 day') c
+   where c.training_id = prueba and c.employee_id = antiguo and c.kind = 'due_soon';
+  ok5 := n = 1 and n2 = 1;
+  res := res || E'\n' || case when ok1 and ok2 and ok3 and ok4 and ok5 then 'OK    ' else 'FALLA ' end
+             || '14 avisos: nueva ' || ok1 || ', no se repite ' || ok2 || ', por vencer ' || ok3
+             || ', reactivado atrasado ' || ok4 || ', otra vez al reactivarla ' || ok5;
 
-  -- 15. Freno: con 60 aperturas en la última hora no crea más; regresa la que ya tenga de esa
-  --     capacitación y versión (si sirve) y, si no tiene, frena
+  -- 15. Freno por capacitación: con 20 aperturas de la misma (versión y origen) en la última hora
+  --     regresa la más reciente de esas, sin crear otra; no frena otras capacitaciones; y nunca
+  --     le da al teléfono una sesión del panel
   insert into trainings (slug, title, sort_order, is_active)
   values ('prueba-cap-2', 'PRUEBA CAPACITACIÓN 2 (no se guarda)', 998, true) returning id into otra;
-  update training_sessions set opened_at = now() - interval '13 hours'   -- las de la v2 ya vencieron
-   where training_id = prueba and employee_id = nuevo and version = 2;
+  update training_sessions set opened_at = now() - interval '2 hours'   -- las de antes ya no cuentan
+   where training_id = prueba and employee_id = nuevo;
   insert into training_sessions (training_id, employee_id, version, source, opened_at)
-  values (prueba, nuevo, 2, 'app', now() - interval '5 minutes') returning id into sid;  -- la que sí sirve
+  select prueba, nuevo, 2, 'app', now() - interval '30 minutes' from generate_series(1, 19);
   insert into training_sessions (training_id, employee_id, version, source, opened_at)
-  select prueba, nuevo, 1, 'app', now() - interval '1 minute' from generate_series(1, 60);  -- versión vieja: no sirve
-  insert into training_sessions (training_id, employee_id, version, source, opened_at)
-  values (prueba, lau, 2, 'app', now());  -- de otra persona: no sirve
+  values (prueba, nuevo, 2, 'app', now() - interval '2 minutes') returning id into sid;  -- la más reciente de las 20
+  insert into training_sessions (training_id, employee_id, version, source, opened_at) values
+    (prueba, nuevo,   2, 'panel', now() - interval '1 minute'),   -- otro origen: no
+    (prueba, nuevo,   1, 'app',   now() - interval '1 minute'),   -- versión vieja: no
+    (prueba, antiguo, 2, 'app',   now() - interval '1 minute');   -- otra persona: no
   select count(*) into n from training_sessions where employee_id = nuevo;
-  r  := cap_open(prueba, nuevo);
-  r2 := cap_open(otra, nuevo);
+  r := cap_open(prueba, nuevo);
   select count(*) into n2 from training_sessions where employee_id = nuevo;
-  res := res || E'\n' || case when (r->>'ok')::boolean and (r->>'session')::uuid = sid and (r->>'reused')::boolean
-                                and r->>'slug' = 'prueba-cap'
-                                and (r2->>'ok')::boolean = false and r2->>'error' like 'Demasiados%'
-                                and n2 = n then 'OK    ' else 'FALLA ' end
-             || '15 freno de 60 por hora: regresa la suya ' || ((r->>'session')::uuid is not distinct from sid)
-             || ', sin sesión válida: ' || coalesce(r2->>'error', r2::text) || ', sesiones ' || n || ' → ' || n2;
+  ok1 := (r->>'ok')::boolean and (r->>'session')::uuid = sid and (r->>'reused')::boolean
+         and r->>'slug' = 'prueba-cap' and n2 = n;
+  r := cap_open(otra, nuevo);
+  select count(*) into n3 from training_sessions where employee_id = nuevo;
+  ok2 := (r->>'ok')::boolean and r->'reused' is null and n3 = n2 + 1
+         and exists (select 1 from training_sessions where id = (r->>'session')::uuid and training_id = otra and source = 'app');
+  insert into training_sessions (training_id, employee_id, version, source, opened_at)
+  select otra, ent, 1, 'panel', now() - interval '10 minutes' from generate_series(1, 20);
+  r  := cap_open(otra, ent);
+  r2 := cap_open_panel(otra, ent);
+  ok3 := (r->>'ok')::boolean and r->'reused' is null
+         and (select source from training_sessions where id = (r->>'session')::uuid) = 'app'
+         and (r2->>'reused')::boolean
+         and (select source from training_sessions where id = (r2->>'session')::uuid) = 'panel';
+  res := res || E'\n' || case when ok1 and ok2 and ok3 then 'OK    ' else 'FALLA ' end
+             || '15 freno: regresa la más reciente sin crear ' || ok1 || ' (sesiones ' || n || ' → ' || n2 || ')'
+             || ', otra capacitación sí abre ' || ok2 || ', con 20 del panel el teléfono recibe una suya ' || ok3;
 
-  -- 16. Permisos: anon no lee las tablas ni usa las funciones del panel; sí ve su lista
+  -- 16. Permisos: anon no lee las tablas ni usa las funciones internas o del panel; sí ve su lista
   execute 'set role anon';
   got := 'leyó';
   begin perform 1 from trainings; exception when insufficient_privilege then got := 'bloqueado'; end;
@@ -200,14 +273,28 @@ begin
   got := 'pudo';
   begin perform * from cap_claim_notices(); exception when insufficient_privilege then got := 'bloqueado'; end;
   st := st || ' / avisos ' || got;
+  got := 'pudo';
+  begin perform * from cap_rows(); exception when insufficient_privilege then got := 'bloqueado'; end;
+  st := st || ' / filas ' || got;
+  got := 'pudo';
+  begin perform cap_deadline(now(), 7); exception when insufficient_privilege then got := 'bloqueado'; end;
+  st := st || ' / plazo ' || got;
+  got := 'pudo';
+  begin perform cap_doubt_count(co); exception when insufficient_privilege then got := 'bloqueado'; end;
+  st := st || ' / dudas ' || got;
   got := 'no';
   begin
-    got := coalesce((select e->>'status' from jsonb_array_elements(cap_list(lau)) e where e->>'slug' = 'prueba-cap'), 'no viene');
+    got := coalesce((select e->>'status' from jsonb_array_elements(cap_list(antiguo)) e where e->>'slug' = 'prueba-cap'), 'no viene');
   exception when insufficient_privilege then got := 'bloqueado';
   end;
   st := st || ' / lista ' || got;
   execute 'reset role';
-  res := res || E'\n' || case when st = 'bloqueado / matrix bloqueado / marcar bloqueado / avisos bloqueado / lista pending'
+  -- la función del trigger no se puede llamar directo; basta revisar que anon no tenga el permiso
+  st := st || ' / trigger ' || case when has_function_privilege('anon', 'public.trainings_publish()', 'execute')
+                                    then 'pudo' else 'bloqueado' end;
+  res := res || E'\n' || case when st = 'bloqueado / matrix bloqueado / marcar bloqueado / avisos bloqueado'
+                                       || ' / filas bloqueado / plazo bloqueado / dudas bloqueado / lista pending'
+                                       || ' / trigger bloqueado'
                             then 'OK    ' else 'FALLA ' end
              || '16 anon: tablas ' || st;
 
@@ -215,7 +302,7 @@ begin
   execute 'set role anon';
   got := 'bloqueado';
   begin
-    r := cap_open(prueba, lau);
+    r := cap_open(prueba, antiguo);
     sid := (r->>'session')::uuid;
     got := case when (r->>'ok')::boolean and sid is not null then 'abre' else coalesce(r->>'error', r::text) end;
   exception when insufficient_privilege then got := 'bloqueado';
@@ -229,14 +316,14 @@ begin
   end;
   st := st || ' / cap_answer ' || got;
   got := 'pudo';
-  begin perform cap_open_panel(prueba, lau); exception when insufficient_privilege then got := 'bloqueado'; end;
+  begin perform cap_open_panel(prueba, antiguo); exception when insufficient_privilege then got := 'bloqueado'; end;
   st := st || ' / cap_open_panel ' || got;
   got := 'pudo';
-  begin perform cap_open_as(prueba, lau, 'panel'); exception when insufficient_privilege then got := 'bloqueado'; end;
+  begin perform cap_open_as(prueba, antiguo, 'panel'); exception when insufficient_privilege then got := 'bloqueado'; end;
   st := st || ' / cap_open_as ' || got;
   execute 'reset role';
   ok1 := (select source = 'app' from training_sessions where id = sid);
-  r := cap_open_panel(prueba, lau);
+  r := cap_open_panel(prueba, antiguo);
   ok2 := (r->>'ok')::boolean and (select source = 'panel' from training_sessions where id = (r->>'session')::uuid);
   -- ya no existe el cap_open de tres parámetros (con origen)
   ok3 := (select count(*) = 1 and min(p.pronargs) = 2 from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
@@ -245,6 +332,22 @@ begin
                                 and ok1 and ok2 and ok3 then 'OK    ' else 'FALLA ' end
              || '17 origen: anon ' || st || ' / sesión de anon es app ' || coalesce(ok1::text, 'no')
              || ' / panel crea origen panel ' || coalesce(ok2::text, 'no') || ' / sin cap_open de 3 ' || coalesce(ok3::text, 'no');
+
+  -- 18. Numerito de dudas por empresa: cuenta las dudas vigentes de la prueba.
+  --     Ya había una de La Ferre (dud, caso 14); las de la v1 (casos 4 y 10) ya no cuentan.
+  r := cap_open(prueba, antiguo);
+  r := cap_answer((r->>'session')::uuid, 'doubt', 'Duda de prueba 2');
+  ok1 := (r->>'ok')::boolean;
+  r := cap_open(otra, nuevo);
+  r := cap_answer((r->>'session')::uuid, 'doubt');
+  ok1 := ok1 and (r->>'ok')::boolean;
+  r := cap_open(prueba, ajeno);
+  r := cap_answer((r->>'session')::uuid, 'doubt');
+  ok1 := ok1 and (r->>'ok')::boolean;
+  n  := cap_doubt_count(co) - base_co;
+  n2 := cap_doubt_count(bfm) - base_bfm;
+  res := res || E'\n' || case when ok1 and n = 3 and n2 = 1 then 'OK    ' else 'FALLA ' end
+             || '18 cap_doubt_count: La Ferre ' || n || ' (esperadas 3), BFM ' || n2 || ' (esperada 1)';
 
   raise exception 'RESULTADOS (no se guardó nada):%', res;
 end $$;
