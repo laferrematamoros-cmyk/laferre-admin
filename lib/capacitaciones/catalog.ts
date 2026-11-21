@@ -6,7 +6,7 @@ export interface CatalogEntry {
   slug: string;
   title: string;
   version: number;
-  /** Tiempo mínimo inicial (s): una vuelta completa de la animación, redondeada hacia arriba a 5 s. El admin lo cambia. */
+  /** Tiempo mínimo inicial (s): una vuelta completa de la animación, redondeada hacia arriba a 5 s, y nunca menos de 20 s (hay que leer las tarjetas). El admin lo cambia. */
   minSeconds: number;
   /** Componentes de components/capacitaciones/anim/ (sin .jsx), en orden. */
   parts: string[];
@@ -18,11 +18,11 @@ export const CATALOG: CatalogEntry[] = [
   { slug: 'gas-estufa',           title: 'Conectar el gas a la estufa', version: 1, minSeconds: 30, parts: ['InstalarGasEstufa'] },
   { slug: 'bomba',                title: 'Instalar una bomba',          version: 1, minSeconds: 40, parts: ['InstalarBomba'] },
   { slug: 'hidroneumatico',       title: 'Instalar un hidroneumático',  version: 1, minSeconds: 35, parts: ['InstalarHidroneumatico'] },
-  { slug: 'errores-bombas',       title: 'Errores comunes con bombas',  version: 1, minSeconds: 10, parts: ['BombaSistemasIncorrectos'] },
-  { slug: 'brocas-metal',         title: 'Brocas para metal',           version: 1, minSeconds: 10, parts: ['BrocaMetal'] },
+  { slug: 'errores-bombas',       title: 'Errores comunes con bombas',  version: 1, minSeconds: 20, parts: ['BombaSistemasIncorrectos'] },
+  { slug: 'brocas-metal',         title: 'Brocas para metal',           version: 1, minSeconds: 20, parts: ['BrocaMetal'] },
   { slug: 'cables-interruptores', title: 'Cables e interruptores',      version: 1, minSeconds: 40, parts: ['CableDelgadoPeligro', 'CableEInterruptor'] },
   { slug: 'extension',            title: 'Extensión sobrecargada',      version: 1, minSeconds: 25, parts: ['ExtensionSobrecargada'] },
-  { slug: 'focos-led',            title: 'Focos LED',                   version: 1, minSeconds: 5, parts: ['ComparativaFocos'] },
+  { slug: 'focos-led',            title: 'Focos LED',                   version: 1, minSeconds: 20, parts: ['ComparativaFocos'] },
   { slug: 'cortinas',             title: 'Mantenimiento de cortinas',   version: 1, minSeconds: 30, parts: ['MantenimientoCortina'] },
   { slug: 'impermeabilizar',      title: 'Impermeabilizar un techo',    version: 1, minSeconds: 50, parts: ['CalculadoraYTipsImpermeabilizante', 'PasosImpermeabilizar', 'ProductosImpermeabilizante'] },
   { slug: 'pintar-pared',         title: 'Pintar una pared',            version: 1, minSeconds: 20, parts: ['PasosPintar'] },

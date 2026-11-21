@@ -46,7 +46,7 @@ Fuente: `C:\Users\jose_\Downloads\Nueva carpeta (12)\BFM Ferretería design vers
 
 Todas empiezan en la versión 1 y **pausadas**. El orden inicial es el de la tabla; el dueño lo cambia en el panel.
 
-**Tiempo mínimo inicial:** lo que dura una vuelta completa de la animación (o la suma de sus componentes animados), medida en el navegador, redondeada hacia arriba a 5 s. La calculadora y la lista de productos no suman tiempo.
+**Tiempo mínimo inicial:** lo que dura una vuelta completa de la animación (o la suma de sus componentes animados), medida en el navegador, redondeada hacia arriba a 5 s, con un mínimo de 20 s porque hay que leer el texto (focos, brocas y errores con bombas son tarjetas que se repiten en pocos segundos). La calculadora y la lista de productos no suman tiempo.
 
 ## Estados y plazos
 
