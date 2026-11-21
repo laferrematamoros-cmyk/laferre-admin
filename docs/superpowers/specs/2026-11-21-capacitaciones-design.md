@@ -126,7 +126,7 @@ Entrada **"Capacitación"** en el menú, después de "Conoce", con numerito = pe
 Los manda el cron que ya corre cada 5 minutos (`/api/reminders`), sólo entre 9:00 y 19:00 hora de Matamoros.
 
 - **Nuevas:** a cada persona con capacitaciones activas que no ha contestado (por ver o atrasada; por ejemplo, un empleado reactivado) y de las que todavía no se le avisó (en esa versión). Pausar y volver a prender una capacitación borra sus avisos apartados: como su plazo empieza de nuevo, "nueva" y "por vencer" vuelven a salir. Se juntan en un solo aviso: *"Eddie, tienes 3 capacitaciones nuevas por ver."* (con una: *"…una capacitación nueva: Instalar un fregadero."*).
-- **Por vencer:** cuando faltan 48 h o menos para el plazo y sigue sin contestar: *"Eddie, te quedan 2 días para ver: Instalar un fregadero."* (con varias: *"…para ver 3 capacitaciones."*).
+- **Por vencer:** cuando faltan 48 h o menos para el plazo y sigue sin contestar: *"Eddie, vence mañana: Instalar un fregadero."* (o *"vence hoy"*, *"vence el jue 26"*; con varias: *"Eddie, tienes 3 capacitaciones por vencer."*). Si además hay nuevas: *"… También tienes 2 nuevas."*
 - Cada aviso se aparta en la base **antes** de mandarse (no se repite aunque dos corridas del cron se encimen).
 - **A qué teléfonos:** los de esa persona (`personTargets`, igual que la lista con firma). Si no tiene, a los de su empresa, y por eso el texto lleva su nombre.
 

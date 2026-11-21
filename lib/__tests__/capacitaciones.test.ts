@@ -52,6 +52,11 @@ describe('dueLabel (plazo = inicio del día siguiente, hora de Matamoros)', () =
     expect(dueLabel(dl, new Date('2026-11-25T18:00:00Z'))).toBe('vence mañana');
     expect(dueLabel(dl, new Date('2026-11-26T18:00:00Z'))).toBe('vence hoy');
     expect(dueLabel(dl, new Date('2026-11-27T07:00:00Z'))).toBe('venció el jue 26');
+    expect(dueLabel(dl, new Date(dl))).toBe('venció el jue 26'); // justo en el plazo ya venció
+  });
+  it('"mañana" no se equivoca el día que se adelanta el reloj (día de 23 h)', () => {
+    // 14 mar 2027: cambio de horario. Plazo = lun 15 00:00 CDT; son las 23:30 CST del sáb 13.
+    expect(dueLabel('2027-03-15T05:00:00.000Z', new Date('2027-03-14T05:30:00Z'))).toBe('vence mañana');
   });
 });
 
@@ -106,6 +111,8 @@ describe('avisos', () => {
     expect(noticeText(dues, now).body).toBe('Eddie, tienes 2 capacitaciones por vencer.');
     const both = groupClaims([cl({ kind: 'due_soon' }), cl({ training_id: 't2' })])[0];
     expect(noticeText(both, now).body).toBe('Eddie, vence mañana: Instalar un fregadero. También tienes una nueva.');
+    const many2 = groupClaims([cl({ kind: 'due_soon' }), cl({ kind: 'due_soon', training_id: 't2' }), cl({ training_id: 't3' }), cl({ training_id: 't4' })])[0];
+    expect(noticeText(many2, now).body).toBe('Eddie, tienes 2 capacitaciones por vencer. También tienes 2 nuevas.');
   });
   it('horario: de 9:00 a 19:00 en Matamoros', () => {
     expect(inNoticeHours(new Date('2026-11-25T14:59:00Z'))).toBe(false); // 8:59

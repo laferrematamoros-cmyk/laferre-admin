@@ -20,6 +20,12 @@ export interface CapRow {
 const TZ = 'America/Matamoros';
 const ymd = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
 
+/** El día de calendario siguiente a "AAAA-MM-DD" (sin horas: no le afecta el cambio de horario). */
+const nextDay = (s: string) => {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+};
+
 function dayName(d: Date): string {
   const p = Object.fromEntries(new Intl.DateTimeFormat('es-MX', { timeZone: TZ, weekday: 'short', day: 'numeric' })
     .formatToParts(d).map(x => [x.type, x.value]));
@@ -32,7 +38,7 @@ export function dueLabel(deadlineIso: string, now: Date): string {
   const last = new Date(end - 1);
   if (now.getTime() >= end) return `venció el ${dayName(last)}`;
   if (ymd(last) === ymd(now)) return 'vence hoy';
-  if (ymd(last) === ymd(new Date(now.getTime() + 86_400_000))) return 'vence mañana';
+  if (ymd(last) === nextDay(ymd(now))) return 'vence mañana';
   return `vence el ${dayName(last)}`;
 }
 
