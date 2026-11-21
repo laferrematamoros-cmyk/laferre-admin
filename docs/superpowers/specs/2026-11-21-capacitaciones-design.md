@@ -125,7 +125,7 @@ Entrada **"Capacitación"** en el menú, después de "Conoce", con numerito = pe
 
 Los manda el cron que ya corre cada 5 minutos (`/api/reminders`), sólo entre 9:00 y 19:00 hora de Matamoros.
 
-- **Nuevas:** a cada persona con capacitaciones activas que no ha contestado y de las que todavía no se le avisó (en esa versión). Se juntan en un solo aviso: *"Eddie, tienes 3 capacitaciones nuevas por ver."* (con una: *"…una capacitación nueva: Instalar un fregadero."*).
+- **Nuevas:** a cada persona con capacitaciones activas que no ha contestado (por ver o atrasada; por ejemplo, un empleado reactivado) y de las que todavía no se le avisó (en esa versión). Pausar y volver a prender una capacitación borra sus avisos apartados: como su plazo empieza de nuevo, "nueva" y "por vencer" vuelven a salir. Se juntan en un solo aviso: *"Eddie, tienes 3 capacitaciones nuevas por ver."* (con una: *"…una capacitación nueva: Instalar un fregadero."*).
 - **Por vencer:** cuando faltan 48 h o menos para el plazo y sigue sin contestar: *"Eddie, te quedan 2 días para ver: Instalar un fregadero."* (con varias: *"…para ver 3 capacitaciones."*).
 - Cada aviso se aparta en la base **antes** de mandarse (no se repite aunque dos corridas del cron se encimen).
 - **A qué teléfonos:** los de esa persona (`personTargets`, igual que la lista con firma). Si no tiene, a los de su empresa, y por eso el texto lleva su nombre.
@@ -182,10 +182,11 @@ training_notices                         -- avisos ya apartados
 | `cap_deadline(base timestamptz, days int)` | interna | Inicio del día siguiente a `fecha(base, Matamoros) + days`, en hora de Matamoros. |
 | `cap_rows()` | interna | Una fila por empleado activo × capacitación activa, con estado, plazo, respuesta, nota, capacitado por y número de vistas (versión actual). Toda la lógica de estados vive aquí. |
 | `cap_list(p_employee)` | anon | Lo de esa persona (activa) para el teléfono y la practicante: id, slug, título, orden, estado, plazo, fecha de respuesta. Empleado inactivo o inexistente: lista vacía. |
-| `cap_open(p_training, p_employee)` | anon | Revisa que la capacitación esté activa y el empleado activo; crea la sesión (origen `app`) con la versión actual y regresa `{ok, session, slug}`. Freno: con 60 aperturas o más de esa persona en la última hora no crea otra; reutiliza su última sesión válida (menos de 12 h, misma capacitación y versión) y, si no tiene, rechaza. Así nadie puede bloquear a otro llenándole el freno. |
+| `cap_open(p_training, p_employee)` | anon | Revisa que la capacitación esté activa y el empleado activo; crea la sesión (origen `app`) con la versión actual y regresa `{ok, session, slug}`. Freno: con 20 aperturas o más de esa persona, en esa capacitación, versión y origen, en la última hora, no crea otra: regresa la más reciente de esas (`reused: true`). Nunca rechaza (nadie puede bloquear a otro) y nunca entrega una sesión de otro origen. |
 | `cap_open_panel(p_training, p_employee)` | service_role | Igual, con origen `panel` (la practicante). Desde el teléfono no se puede fingir ese origen. |
 | `cap_answer(p_session, p_answer, p_note)` | anon | Revisa: sesión existe y tiene menos de 12 h; capacitación activa y misma versión; empleado activo; para `understood`, que hayan pasado `min_seconds` desde `opened_at` (si no, `{ok:false, code:'too_soon', seconds_left}`); nota de hasta 500. Si ya está `trained` no cambia nada (`{ok:true, already:true}`). Si no, guarda la respuesta (la nota sólo con `doubt`) y marca la sesión contestada. |
 | `cap_matrix()` | service_role | `cap_rows()` completo, para la tabla de Avance y "Por capacitar". |
+| `cap_doubt_count(p_company)` | service_role | Cuántas dudas abiertas hay en esa empresa (numerito del menú, sin bajar la tabla completa). |
 | `cap_mark_trained(p_training, p_employee, p_by)` | service_role | Pasa de `doubt` a `trained` en la versión actual (`trained_at`, `trained_by`). Si no estaba en `doubt`, `{ok:false}`. |
 | `cap_claim_notices(p_now)` | service_role | Calcula los avisos "nueva" y "por vencer" que tocan, los inserta en `training_notices` con `on conflict do nothing` y regresa sólo los que sí se insertaron (empleado, nombre, empresa, capacitación, título, tipo). |
 

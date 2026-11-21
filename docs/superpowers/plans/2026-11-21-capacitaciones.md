@@ -78,7 +78,7 @@
 - Create: `supabase/011_capacitaciones.sql`
 - Create: `supabase/011_capacitaciones_prueba.sql`
 
-> **Cambio tras la revisión de seguridad (2026-11-21):** `cap_open` ya no recibe `p_source` (siempre `app`); la practicante abre con `cap_open_panel` (sólo service_role). Al pasar el freno de 60 por hora se reutiliza la última sesión válida en vez de rechazar. El SQL bueno es el del repo, no el de abajo.
+> **Cambio tras la revisión de seguridad (2026-11-21):** `cap_open` ya no recibe `p_source` (siempre `app`); la practicante abre con `cap_open_panel` (sólo service_role). El freno cuenta por persona + capacitación + versión + origen (20 por hora) y reutiliza la última sesión en vez de rechazar; hay `cap_doubt_count` para el numerito; reactivar borra los avisos apartados. El SQL bueno es el del repo, no el de abajo.
 
 - [ ] **Step 1: Escribir la migración**
 
@@ -1245,8 +1245,8 @@ export async function markTrained(trainingId: string, employeeId: string): Promi
 export async function pendingDoubtCount(companyId: string): Promise<number> {
   const a = await adminAccess();
   if (!a.ok || !allows(a.own, companyId)) return 0;
-  const { data } = await admin().rpc('cap_matrix');
-  return ((data ?? []) as CapRow[]).filter(r => r.company_id === companyId && r.status === 'doubt').length;
+  const { data } = await admin().rpc('cap_doubt_count', { p_company: companyId });
+  return typeof data === 'number' ? data : 0;
 }
 ```
 
