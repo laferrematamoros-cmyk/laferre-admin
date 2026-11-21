@@ -1287,7 +1287,7 @@ Revisar que `allows` y `isUuid` existan con esa firma en `lib/access-rules.ts` (
 
 - [ ] **Step 5: `components/capacitaciones/TrainingSettings.tsx`**
   - Un renglón por capacitación, en orden, con:
-    - interruptor activa/pausada (`role="switch"`, `aria-checked`);
+    - interruptor activa/pausada (`role="switch"`, `aria-checked`). Al **pausar** una activa, confirmar en el renglón: *"Si la pausas y la vuelves a prender, a todos los que no la han visto les llega otro aviso y su plazo empieza de nuevo."* [Pausar] [Cancelar];
     - título y `v{version}`;
     - plazo (`input type=number`, 1–60, guarda al salir del campo o con Enter);
     - tiempo mínimo (5–600, igual);
