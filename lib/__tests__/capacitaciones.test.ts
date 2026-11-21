@@ -11,8 +11,7 @@ describe('catálogo', () => {
     expect(new Set(CATALOG.map(c => c.slug)).size).toBe(13);
     CATALOG.forEach(c => expect(c.slug).toMatch(/^[a-z0-9-]{1,40}$/));
   });
-  // TODO Task 5: quitar el skip cuando se copien las animaciones
-  it.skip('cada parte existe en components/capacitaciones/anim', () => {
+  it('cada parte existe en components/capacitaciones/anim', () => {
     for (const c of CATALOG) for (const p of c.parts)
       expect(existsSync(join(process.cwd(), 'components/capacitaciones/anim', `${p}.jsx`))).toBe(true);
   });
