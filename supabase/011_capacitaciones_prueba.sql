@@ -32,6 +32,7 @@ declare
   ok3      boolean;
   ok4      boolean;
   ok5      boolean;
+  ok6      boolean;
   n        int;
   n2       int;
   n3       int;
@@ -176,7 +177,8 @@ begin
   res := res || E'\n' || case when ok1 and ok2 and ok3 then 'OK    ' else 'FALLA ' end
              || '13 capacitado: marcar ' || ok1 || ', segunda vez rechazada ' || ok2 || ', entendí después no lo cambia ' || ok3;
 
-  -- 14. Avisos
+  -- 14. Avisos. cap_claim_notices regresa un renglón por persona con sus avisos en `notices`;
+  --     aquí se abren con jsonb_array_elements (x = un aviso) para contarlos.
   --     En la v2: nuevo ya está capacitado; ent la entiende y dud tiene dudas
   r := cap_open(prueba, ent);
   sid := (r->>'session')::uuid;
@@ -185,43 +187,59 @@ begin
   r := cap_open(prueba, dud);
   perform cap_answer((r->>'session')::uuid, 'doubt', 'Duda de prueba');
   -- a) "nueva" para antiguo; nada para los que ya contestaron
-  select count(*) filter (where c.employee_id = antiguo and c.kind = 'new'),
+  select count(*) filter (where c.employee_id = antiguo and x->>'kind' = 'new'),
          count(*) filter (where c.employee_id in (nuevo, ent, dud))
     into n, n2
-    from cap_claim_notices(now()) c where c.training_id = prueba;
+    from cap_claim_notices(now()) c cross join lateral jsonb_array_elements(c.notices) x
+   where (x->>'training_id')::uuid = prueba;
   ok1 := n = 1 and n2 = 0;
   -- b) la segunda llamada ya no la regresa
-  select count(*) into n from cap_claim_notices(now()) c
-   where c.training_id = prueba and c.employee_id = antiguo;
+  select count(*) into n
+    from cap_claim_notices(now()) c cross join lateral jsonb_array_elements(c.notices) x
+   where (x->>'training_id')::uuid = prueba and c.employee_id = antiguo;
   ok2 := n = 0;
   -- c) un día antes del plazo: "por vencer" para antiguo; ni "nueva" repetida ni nada a los que contestaron
   select deadline into dl from cap_rows(now()) c where c.training_id = prueba and c.employee_id = antiguo;
-  select count(*) filter (where c.employee_id = antiguo and c.kind = 'due_soon'),
-         count(*) filter (where c.kind = 'new'),
+  select count(*) filter (where c.employee_id = antiguo and x->>'kind' = 'due_soon'),
+         count(*) filter (where x->>'kind' = 'new'),
          count(*) filter (where c.employee_id in (nuevo, ent, dud))
     into n, n2, n3
-    from cap_claim_notices(dl - interval '1 day') c where c.training_id = prueba;
+    from cap_claim_notices(dl - interval '1 day') c cross join lateral jsonb_array_elements(c.notices) x
+   where (x->>'training_id')::uuid = prueba;
   ok3 := n = 1 and n2 = 0 and n3 = 0;
   -- d) un empleado reactivado que ya está atrasado: le llega "nueva" y no "por vencer"
   update employees set is_active = true where id = baja;
-  select count(*) filter (where c.kind = 'new'), count(*) filter (where c.kind = 'due_soon')
+  select count(*) filter (where x->>'kind' = 'new'), count(*) filter (where x->>'kind' = 'due_soon')
     into n, n2
-    from cap_claim_notices(dl + interval '1 day') c where c.training_id = prueba and c.employee_id = baja;
+    from cap_claim_notices(dl + interval '1 day') c cross join lateral jsonb_array_elements(c.notices) x
+   where (x->>'training_id')::uuid = prueba and c.employee_id = baja;
   ok4 := n = 1 and n2 = 0
          and (select c.status from cap_rows(dl + interval '1 day') c where c.training_id = prueba and c.employee_id = baja) = 'overdue';
   update employees set is_active = false where id = baja;
   -- e) pausar y reactivar es empezar de cero: "nueva" y "por vencer" se vuelven a apartar
   update trainings set is_active = false where id = prueba;
   update trainings set is_active = true where id = prueba;
-  select count(*) into n from cap_claim_notices(now()) c
-   where c.training_id = prueba and c.employee_id = antiguo and c.kind = 'new';
+  select count(*) into n
+    from cap_claim_notices(now()) c cross join lateral jsonb_array_elements(c.notices) x
+   where (x->>'training_id')::uuid = prueba and c.employee_id = antiguo and x->>'kind' = 'new';
   select deadline into dl from cap_rows(now()) c where c.training_id = prueba and c.employee_id = antiguo;
-  select count(*) into n2 from cap_claim_notices(dl - interval '1 day') c
-   where c.training_id = prueba and c.employee_id = antiguo and c.kind = 'due_soon';
+  select count(*) into n2
+    from cap_claim_notices(dl - interval '1 day') c cross join lateral jsonb_array_elements(c.notices) x
+   where (x->>'training_id')::uuid = prueba and c.employee_id = antiguo and x->>'kind' = 'due_soon';
   ok5 := n = 1 and n2 = 1;
-  res := res || E'\n' || case when ok1 and ok2 and ok3 and ok4 and ok5 then 'OK    ' else 'FALLA ' end
+  -- f) un renglón por persona: se reactiva otra vez y se pide un día antes del plazo; antiguo recibe
+  --    "nueva" y "por vencer" juntas en UN solo renglón
+  update trainings set is_active = false where id = prueba;
+  update trainings set is_active = true where id = prueba;
+  select count(*),
+         sum((select count(*) from jsonb_array_elements(c.notices) x where (x->>'training_id')::uuid = prueba))
+    into n, n2
+    from cap_claim_notices(dl - interval '1 day') c where c.employee_id = antiguo;
+  ok6 := n = 1 and n2 = 2;
+  res := res || E'\n' || case when ok1 and ok2 and ok3 and ok4 and ok5 and ok6 then 'OK    ' else 'FALLA ' end
              || '14 avisos: nueva ' || ok1 || ', no se repite ' || ok2 || ', por vencer ' || ok3
-             || ', reactivado atrasado ' || ok4 || ', otra vez al reactivarla ' || ok5;
+             || ', reactivado atrasado ' || ok4 || ', otra vez al reactivarla ' || ok5
+             || ', un renglón con sus 2 avisos ' || ok6 || ' (' || n || ' renglón, ' || coalesce(n2, 0) || ' avisos)';
 
   -- 15. Freno por capacitación: con 20 aperturas de la misma (versión y origen) en la última hora
   --     regresa la más reciente de esas, sin crear otra; no frena otras capacitaciones; y nunca

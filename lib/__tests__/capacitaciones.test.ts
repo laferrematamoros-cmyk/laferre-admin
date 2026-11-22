@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CATALOG, catalogBySlug } from '../capacitaciones/catalog';
 import { dueLabel, summarize, buildMatrix, openDoubts, type CapRow } from '../capacitaciones/status';
-import { groupClaims, noticeText, inNoticeHours, type NoticeClaim } from '../capacitaciones/notices';
+import { groupClaims, flattenClaimRows, noticeText, inNoticeHours, type NoticeClaim } from '../capacitaciones/notices';
 import { catalogSyncPlan } from '../capacitaciones/sync';
 
 describe('catálogo', () => {
@@ -107,6 +107,26 @@ const cl = (p: Partial<NoticeClaim>): NoticeClaim => ({
 const now = new Date('2026-11-25T18:00:00Z');
 
 describe('avisos', () => {
+  it('flattenClaimRows abre el renglón por persona en avisos sueltos (sin avisos, nada)', () => {
+    const rows = [
+      { employee_id: 'e1', employee_name: 'EDDIE GARCIA', company_id: 'c1', notices: [
+        { training_id: 't1', title: 'Instalar un fregadero', kind: 'due_soon' as const, deadline: '2026-11-27T06:00:00+00:00' },
+        { training_id: 't1', title: 'Instalar un fregadero', kind: 'new' as const, deadline: '2026-11-27T06:00:00+00:00' },
+        { training_id: 't2', title: 'Lavabo', kind: 'new' as const, deadline: '2026-11-29T06:00:00+00:00' },
+      ] },
+      { employee_id: 'e2', employee_name: 'LAURA', company_id: null, notices: null },
+      { employee_id: 'e3', employee_name: 'YAJAIRA', company_id: 'c1', notices: [] },
+    ];
+    const flat = flattenClaimRows(rows);
+    expect(flat).toEqual([
+      cl({ kind: 'due_soon', deadline: '2026-11-27T06:00:00+00:00' }),
+      cl({ deadline: '2026-11-27T06:00:00+00:00' }),
+      cl({ training_id: 't2', title: 'Lavabo', deadline: '2026-11-29T06:00:00+00:00' }),
+    ]);
+    expect(groupClaims(flat).map(g => [g.name, g.news.map(n => n.training_id), g.dues.map(n => n.training_id)]))
+      .toEqual([['EDDIE GARCIA', ['t2'], ['t1']]]);
+    expect(flattenClaimRows([])).toEqual([]);
+  });
   it('agrupa por persona; la que está en las dos listas se queda en "por vencer"', () => {
     const g = groupClaims([cl({}), cl({ kind: 'due_soon' }), cl({ training_id: 't2', title: 'Lavabo' }), cl({ employee_id: 'e2', employee_name: 'LAURA' })]);
     expect(g.map(x => [x.name, x.news.map(n => n.training_id), x.dues.map(n => n.training_id)]))

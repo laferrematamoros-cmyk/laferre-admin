@@ -2,7 +2,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { CATALOG } from './catalog';
 import { catalogSyncPlan, type DbTraining } from './sync';
-import { groupClaims, noticeText, inNoticeHours, type NoticeClaim } from './notices';
+import { groupClaims, flattenClaimRows, noticeText, inNoticeHours, type NoticeClaimRow } from './notices';
 // Imports relativos (como inventory-server.ts): jest no tiene el mapeo de `@/`.
 import { personTargets, type DeviceRow, type EmployeeTokenRow } from '../push-targets';
 import { pushExpo } from '../expo-push';
@@ -32,17 +32,20 @@ export async function runTrainingTick(db: SupabaseClient, now = new Date()): Pro
   if (!inNoticeHours(now)) return log;
   const { data, error } = await db.rpc('cap_claim_notices', { p_now: now.toISOString() });
   if (error) { log.push(`capacitación avisos: ${error.message}`); return log; }
-  const groups = groupClaims((data ?? []) as NoticeClaim[]);
+  const groups = groupClaims(flattenClaimRows((data ?? []) as NoticeClaimRow[]));
   if (!groups.length) return log;
   const [{ data: devices }, { data: emps }] = await Promise.all([
     db.from('device_tokens').select('*'),
     db.from('employees').select('id, company_id, push_token').eq('is_active', true).not('push_token', 'is', null),
   ]);
-  for (const g of groups) {
+  // Uno por persona: si Expo falla con alguien, a los demás se les manda igual.
+  const sent = await Promise.allSettled(groups.map(async g => {
     const tokens = personTargets(g.companyId, g.employeeId, (devices ?? []) as DeviceRow[], (emps ?? []) as EmployeeTokenRow[]);
     const { title, body } = noticeText(g, now);
     await pushExpo(tokens, title, body);
-    log.push(`capacitación → ${g.name}: ${g.news.length} nuevas, ${g.dues.length} por vencer (${tokens.length} tel.)`);
-  }
+    return `capacitación → ${g.name}: ${g.news.length} nuevas, ${g.dues.length} por vencer (${tokens.length} tel.)`;
+  }));
+  sent.forEach((s, i) => log.push(s.status === 'fulfilled' ? s.value
+    : `capacitación → ${groups[i].name}: error ${s.reason instanceof Error ? s.reason.message : String(s.reason)}`));
   return log;
 }

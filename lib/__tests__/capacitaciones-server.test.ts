@@ -74,9 +74,12 @@ describe('runTrainingTick', () => {
   });
 
   it('en horario manda un solo aviso por persona, a sus teléfonos', async () => {
+    // cap_claim_notices regresa un renglón por persona con sus avisos en `notices`.
     const claims = [
-      { employee_id: 'e1', employee_name: 'ANA LOPEZ', company_id: 'c1', training_id: 't1', title: 'Uno', kind: 'new', deadline: '2026-12-01' },
-      { employee_id: 'e1', employee_name: 'ANA LOPEZ', company_id: 'c1', training_id: 't2', title: 'Dos', kind: 'new', deadline: '2026-12-01' },
+      { employee_id: 'e1', employee_name: 'ANA LOPEZ', company_id: 'c1', notices: [
+        { training_id: 't1', title: 'Uno', kind: 'new', deadline: '2026-12-01T06:00:00+00:00' },
+        { training_id: 't2', title: 'Dos', kind: 'new', deadline: '2026-12-01T06:00:00+00:00' },
+      ] },
     ];
     const { db, rpc } = fakeDb({
       tables: {
@@ -91,5 +94,33 @@ describe('runTrainingTick', () => {
     expect(pushExpo).toHaveBeenCalledTimes(1);
     expect(pushExpo).toHaveBeenCalledWith(['tokA'], 'Capacitación', 'Ana, tienes 2 capacitaciones nuevas por ver.');
     expect(log).toEqual(['capacitación → ANA LOPEZ: 2 nuevas, 0 por vencer (1 tel.)']);
+  });
+
+  it('si Expo falla con la primera persona, a la segunda se le manda igual y queda el error en el log', async () => {
+    const claims = [
+      { employee_id: 'e1', employee_name: 'ANA LOPEZ', company_id: 'c1', notices: [
+        { training_id: 't1', title: 'Uno', kind: 'new', deadline: '2026-12-01T06:00:00+00:00' },
+      ] },
+      { employee_id: 'e2', employee_name: 'BETO RUIZ', company_id: 'c1', notices: [
+        { training_id: 't1', title: 'Uno', kind: 'new', deadline: '2026-12-01T06:00:00+00:00' },
+      ] },
+    ];
+    (pushExpo as jest.Mock).mockImplementationOnce(async () => { throw new Error('Expo no contesta'); });
+    const { db } = fakeDb({
+      tables: {
+        trainings: { data: synced },
+        device_tokens: { data: [{ token: 'tokA', company_id: 'c1', employee_id: 'e1' }, { token: 'tokB', company_id: 'c1', employee_id: 'e2' }] },
+        employees: { data: [] },
+      },
+      rpc: { data: claims },
+    });
+    const log = await runTrainingTick(db, new Date(T));
+    expect(pushExpo).toHaveBeenCalledTimes(2);
+    expect(pushExpo).toHaveBeenNthCalledWith(1, ['tokA'], 'Capacitación', 'Ana, tienes una capacitación nueva: Uno.');
+    expect(pushExpo).toHaveBeenNthCalledWith(2, ['tokB'], 'Capacitación', 'Beto, tienes una capacitación nueva: Uno.');
+    expect(log).toEqual([
+      'capacitación → ANA LOPEZ: error Expo no contesta',
+      'capacitación → BETO RUIZ: 1 nuevas, 0 por vencer (1 tel.)',
+    ]);
   });
 });

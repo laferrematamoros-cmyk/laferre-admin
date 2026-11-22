@@ -1,12 +1,28 @@
 import { shopClock } from '../my-day';
 import { dueLabel } from './status';
 
-/** Lo que regresa cap_claim_notices(): un aviso ya apartado en la base. */
+/** Un aviso ya apartado en la base, suelto (lo que usan groupClaims y noticeText). */
 export interface NoticeClaim {
   employee_id: string; employee_name: string; company_id: string | null;
   training_id: string; title: string; kind: 'new' | 'due_soon'; deadline: string;
 }
+/**
+ * Lo que regresa cap_claim_notices(): UN renglón por persona con sus avisos en `notices`
+ * (así la respuesta no choca con el tope de 1,000 filas de Supabase).
+ */
+export interface NoticeClaimRow {
+  employee_id: string; employee_name: string; company_id: string | null;
+  notices: Pick<NoticeClaim, 'training_id' | 'title' | 'kind' | 'deadline'>[] | null;
+}
 export interface NoticeGroup { employeeId: string; name: string; companyId: string | null; news: NoticeClaim[]; dues: NoticeClaim[] }
+
+/** Abre los renglones por persona en avisos sueltos, como los espera groupClaims. */
+export function flattenClaimRows(rows: NoticeClaimRow[]): NoticeClaim[] {
+  return rows.flatMap(r => (r.notices ?? []).map(n => ({
+    employee_id: r.employee_id, employee_name: r.employee_name, company_id: r.company_id,
+    training_id: n.training_id, title: n.title, kind: n.kind, deadline: n.deadline,
+  })));
+}
 
 export function groupClaims(claims: NoticeClaim[]): NoticeGroup[] {
   const by = new Map<string, NoticeGroup>();

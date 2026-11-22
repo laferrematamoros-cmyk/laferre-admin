@@ -276,10 +276,14 @@ begin
   return jsonb_build_object('ok', true);
 end $$;
 
--- Cron (service_role): aparta los avisos que tocan y regresa SÓLO los que apartó en esta llamada.
+-- Cron (service_role): aparta los avisos que tocan y regresa SÓLO los que apartó en esta llamada,
+-- en UN renglón por persona (sus avisos van juntos en `notices`, por plazo y título). Así la
+-- respuesta nunca pasa de una fila por empleado: Supabase no regresa más de 1,000 filas y no avisa,
+-- y lo que se apartara de más ya nunca se mandaría.
+-- Una copia anterior de este archivo regresaba un renglón por aviso: se quita (cambia lo que regresa).
+drop function if exists public.cap_claim_notices(timestamptz);
 create or replace function public.cap_claim_notices(p_now timestamptz default now())
-returns table (employee_id uuid, employee_name text, company_id uuid, training_id uuid,
-               title text, kind text, deadline timestamptz)
+returns table (employee_id uuid, employee_name text, company_id uuid, notices jsonb)
 language sql security definer set search_path = public as $$
   with cand as (
     select r.employee_id, r.employee_name, r.company_id, r.training_id, r.title, r.version, r.deadline, k.kind
@@ -295,9 +299,14 @@ language sql security definer set search_path = public as $$
     on conflict do nothing
     returning training_notices.training_id, training_notices.employee_id, training_notices.kind
   )
-  select c.employee_id, c.employee_name, c.company_id, c.training_id, c.title, c.kind, c.deadline
+  select c.employee_id, c.employee_name, c.company_id,
+         jsonb_agg(jsonb_build_object('training_id', c.training_id, 'title', c.title,
+                                      'kind', c.kind, 'deadline', c.deadline)
+                   order by c.deadline, c.title, c.kind)
     from ins i
     join cand c on c.training_id = i.training_id and c.employee_id = i.employee_id and c.kind = i.kind
+   group by c.employee_id, c.employee_name, c.company_id
+   order by c.employee_name, c.employee_id
 $$;
 
 revoke all on function public.trainings_publish() from public, anon, authenticated;
