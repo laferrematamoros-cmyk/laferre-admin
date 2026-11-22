@@ -1321,11 +1321,12 @@ import { getSession } from '@/lib/auth';
 import { supabaseAdmin as admin } from '@/lib/supabase';
 import { catalogBySlug } from '@/lib/capacitaciones/catalog';
 import type { TrainingStatus } from '@/lib/capacitaciones/status';
+import { firstNameOf, shortDay } from '@/lib/capacitaciones/format';
 
 export interface MyTraining { id: string; slug: string; title: string; sort_order: number; version: number; status: TrainingStatus; deadline: string; answered_at: string | null }
 export type MyList = { ok: true; items: MyTraining[] } | { ok: false; error: string };
 export type MyOpen =
-  | { ok: true; token: string; title: string; minSeconds: number; employeeName: string; previous: { status: TrainingStatus; answeredAt: string } | null }
+  | { ok: true; token: string; title: string; minSeconds: number; firstName: string; previous: { status: TrainingStatus; answeredAt: string; day: string } | null }
   | { ok: false; error: string };
 
 const NO_EMP = 'Tu usuario no está vinculado a un empleado. Pídeselo a un administrador.';
@@ -1358,8 +1359,8 @@ export async function openMyTraining(slug: string): Promise<MyOpen> {
   ]);
   return {
     ok: true, token: r.session, title: t.title as string, minSeconds: t.min_seconds as number,
-    employeeName: (e?.name as string | undefined) ?? (s.name ?? ''),
-    previous: p ? { status: p.status as TrainingStatus, answeredAt: p.answered_at as string } : null,
+    firstName: firstNameOf((e?.name as string | undefined) ?? s.name),
+    previous: p ? { status: p.status as TrainingStatus, answeredAt: p.answered_at as string, day: shortDay(p.answered_at as string) } : null,
   };
 }
 
@@ -1383,7 +1384,7 @@ export async function myPendingCount(): Promise<number> {
   - Toma `slug` con `useParams()`.
   - Al montar llama a `openMyTraining(slug)` **una vez**: un `useRef` evita el doble llamado del modo estricto. Abrir crea una fila, por eso no se hace en el render del servidor (el prefetch la crearía sin que nadie la vea).
   - Mientras carga, "Cargando…". Si hay error, su texto y "Volver".
-  - Si sale bien: `<AdminShell><div style={{ overflowY: 'auto', height: '100%' }}><TrainingViewer slug={slug} title={r.title} employeeName={r.employeeName} minSeconds={r.minSeconds} token={r.token} previous={r.previous} embedded back={{ href: '/mis-capacitaciones', label: 'Volver a mis capacitaciones' }} /></div></AdminShell>`.
+  - Si sale bien: `<AdminShell><div style={{ overflowY: 'auto', height: '100%' }}><TrainingViewer slug={slug} title={r.title} firstName={r.firstName} minSeconds={r.minSeconds} token={r.token} previous={r.previous} embedded back={{ href: '/mis-capacitaciones', label: 'Volver a mis capacitaciones' }} /></div></AdminShell>`.
 
 - [ ] **Step 4:** `npx jest` + `npx tsc --noEmit`. **Commit** — los 3 archivos · `feat(capacitaciones): Mis capacitaciones de la practicante`
 

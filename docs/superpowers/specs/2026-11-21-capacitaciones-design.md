@@ -208,6 +208,7 @@ Los ajustes (activar, orden, plazo, tiempo) se guardan con acciones del servidor
 ## Cómo se integran las animaciones
 
 - Los 16 `.jsx` se copian a `components/capacitaciones/anim/` con `"use client"` en la primera línea y, si no, sin cambios. El panel ya tiene `allowJs`.
+- **Única excepción:** en las 14 que se arrancan solas, las opciones del `IntersectionObserver` pasan a `{ threshold: 0, rootMargin: '0px 0px -35% 0px' }`, con un comentario. Con el `threshold` original (0.15 a 0.45), las más altas no arrancaban nunca en un celular, porque nunca se veía esa fracción de ellas. Si el diseñador manda versiones nuevas, hay que volver a aplicar el cambio. Una prueba de jest (`capacitaciones.test.ts`) truena si se copian sin él.
 - `bfm-assets/` se copia a `public/bfm-assets/` y `aislamax-recorte.webp` a `public/` (≈3.3 MB). El middleware ya deja pasar imágenes sin sesión.
 - Desde la versión actualizada, cada componente usa nombres de animación propios (`if17-`, `bm10-`…) y ya no mete estilos globales, así que se pueden mostrar varios juntos y no afectan al panel.
 - Los enlaces a productos llevan al cotizador de BFM (`bfmpedidosv-2.vercel.app/cotizar`); se dejan así.
