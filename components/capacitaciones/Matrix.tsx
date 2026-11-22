@@ -45,6 +45,15 @@ export default function Matrix({ rows, companyNames = {}, now = new Date() }: {
   }, [selKey]);
 
   const pendingOnly = sum.open - sum.overdue;
+  const cellId = (e: string, t: string) => `cap-cell-${e}-${t}`;
+
+  /** Cierra la ficha y regresa el foco a la celda que la abrió. */
+  function close() {
+    if (!picked) return;
+    const id = cellId(picked.e, picked.t);
+    setPicked(null);
+    requestAnimationFrame(() => document.getElementById(id)?.focus());
+  }
 
   return (
     <section className={s.card} aria-label="Avance por persona">
@@ -98,7 +107,7 @@ export default function Matrix({ rows, companyNames = {}, now = new Date() }: {
                       return (
                         <td key={t.id}>
                           {r ? (
-                            <button type="button" className={v.cell} aria-expanded={on} aria-controls={on ? 'cap-detail' : undefined}
+                            <button type="button" id={cellId(p.id, t.id)} className={v.cell} aria-expanded={on} aria-controls={on ? 'cap-detail' : undefined}
                               aria-label={`${name} · ${t.title}: ${STATUS_LABEL[r.status]}`}
                               onClick={() => setPicked(on ? null : { e: p.id, t: t.id })}>
                               <StatusMark status={r.status} />
@@ -119,14 +128,19 @@ export default function Matrix({ rows, companyNames = {}, now = new Date() }: {
         </table>
       </div>
 
+      {/* Siempre en la página (vacía al principio): así el lector de pantalla también anuncia la primera ficha que se abre. */}
+      <p className={v.sr} aria-live="polite">
+        {sel ? `${titleCase(sel.employee_name)} · ${sel.title}: ${STATUS_LABEL[sel.status]}. La ficha está debajo de la tabla.` : ''}
+      </p>
       {sel && (
-        <div ref={detailRef} id="cap-detail" className={v.detail} role="region" aria-live="polite" aria-label={`${titleCase(sel.employee_name)} · ${sel.title}`}>
+        <div ref={detailRef} id="cap-detail" className={v.detail} role="region" aria-label={`${titleCase(sel.employee_name)} · ${sel.title}`}
+          onKeyDown={e => { if (e.key === 'Escape') close(); }}>
           <div className={v.detailHead}>
             <div className={v.detailWho}>
               <StatusMark status={sel.status} />
               <div><b>{titleCase(sel.employee_name)}</b><span>{sel.title}</span></div>
             </div>
-            <button type="button" className={v.btn} onClick={() => setPicked(null)}>Cerrar</button>
+            <button type="button" className={v.btn} onClick={close}>Cerrar</button>
           </div>
           <dl className={v.facts}>
             <div><dt>Estado</dt><dd>{STATUS_LABEL[sel.status]}</dd></div>

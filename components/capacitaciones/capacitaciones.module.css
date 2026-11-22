@@ -39,6 +39,7 @@
 .notice { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; }
 .notice p { margin: 0; font-size: 14.5px; font-weight: 600; line-height: 1.45; }
 .err { margin: 0; padding: 10px 12px; border-radius: 14px; background: var(--st-miss-soft); color: var(--st-miss-ink); font-size: 13px; font-weight: 600; line-height: 1.45; }
+.listAlert { margin-bottom: 12px; }
 
 /* ── Marcas de estado (tabla y leyenda) ── */
 .mark {
@@ -146,6 +147,9 @@
 .setTop { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; margin-bottom: 6px; }
 .setTop h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: -.01em; }
 .setTop span { font-size: 12.5px; color: var(--muted); }
+/* Admin fijo a una empresa: ve los ajustes pero no los cambia (son de las dos empresas). */
+.readOnly { display: flex; align-items: center; gap: 9px; margin: 8px 0 6px; padding: 11px 14px; border-radius: 14px; background: var(--chip); color: var(--ink2); font-size: 13px; font-weight: 600; line-height: 1.45; }
+.readOnly::before { content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
 .setList { margin: 0; padding: 0; list-style: none; }
 .setHead, .setRow {
   display: grid; align-items: center; gap: 8px 14px;
@@ -175,10 +179,12 @@
 .tName b { display: block; font-size: 14.5px; font-weight: 650; letter-spacing: -.01em; overflow-wrap: anywhere; }
 .tName small { display: block; margin-top: 2px; font-size: 12px; color: var(--muted); }
 .on { color: var(--st-ok-ink); font-weight: 700; }
+.saving { color: var(--st-late-ink); font-weight: 700; }
 .paused .tName b { color: var(--ink2); }
 
 .switch { display: inline-grid; place-items: center; width: 52px; height: 44px; padding: 0; border: 0; border-radius: 14px; background: transparent; cursor: pointer; }
 .switch[aria-disabled="true"] { opacity: .5; cursor: progress; }
+.switch:disabled { opacity: .55; cursor: not-allowed; }
 .switch i { position: relative; display: block; width: 46px; height: 28px; border-radius: 999px; background: #D5D5DC; transition: background .2s; }
 .switch i::after {
   content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%;
@@ -201,8 +207,6 @@
 .num:disabled { opacity: .6; }
 .num[aria-invalid="true"] { border-color: var(--st-miss); box-shadow: 0 0 0 3px var(--st-miss-soft); }
 .unit { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
-.state { font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
-.stateOk { color: var(--st-ok-ink); }
 
 .iconBtn {
   display: inline-grid; place-items: center; width: 44px; height: 44px; padding: 0;

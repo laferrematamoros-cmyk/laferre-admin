@@ -18,6 +18,22 @@ export function tabFromSearch(search: string): CapTab {
 /** La dirección de una pestaña: "avance" va sin `?tab=`. */
 export const tabHref = (path: string, tab: CapTab) => (tab === 'avance' ? path : `${path}?tab=${tab}`);
 
+// ── Quién cambia los ajustes ──
+
+/**
+ * Las capacitaciones son UNA configuración para las dos empresas (como la firma de listas, app/ajustes/signer-actions.ts):
+ * verlas, cualquier administrador; cambiarlas, sólo uno que ve las dos empresas (own = null).
+ */
+export const SHARED_EDIT_ONLY = 'Sólo un administrador de las dos empresas puede cambiar las capacitaciones.';
+export const canEditShared = (own: string | null) => own === null;
+
+// ── Tope de filas ──
+
+/** La base nunca regresa más de 1,000 filas y no avisa: con 1,000 o más la tabla podría venir cortada sin que se note. */
+export const MATRIX_MAX_ROWS = 1000;
+export const matrixSizeError = (rows: number): string | null =>
+  rows >= MATRIX_MAX_ROWS ? 'La tabla tiene demasiadas filas para mostrarse; avísale a Claude.' : null;
+
 // ── Ajustes: plazo y tiempo mínimo ──
 
 /** Los mismos límites que el check de la base (supabase/011) y que revisa saveTraining. */
@@ -39,6 +55,26 @@ export function parseLimit(field: LimitField, raw: string): { ok: true; value: n
   const n = /^\d{1,4}$/.test(t) ? Number(t) : NaN;
   const error = limitError(field, n);
   return error ? { ok: false, error } : { ok: true, value: n };
+}
+
+// ── Guardados en curso por renglón ──
+
+/** Lo que se está guardando en cada renglón. Es una lista, no un solo valor: dos guardados del mismo renglón no se pisan. */
+export type BusyMap<W extends string> = Record<string, W[]>;
+
+export function addBusy<W extends string>(m: BusyMap<W>, id: string, what: W): BusyMap<W> {
+  return { ...m, [id]: [...(m[id] ?? []), what] };
+}
+
+/** Quita UNA vez `what` del renglón; si ya no queda nada, el renglón sale del mapa. */
+export function removeBusy<W extends string>(m: BusyMap<W>, id: string, what: W): BusyMap<W> {
+  const list = [...(m[id] ?? [])];
+  const i = list.indexOf(what);
+  if (i < 0) return m;
+  list.splice(i, 1);
+  if (list.length) return { ...m, [id]: list };
+  const { [id]: _gone, ...rest } = m;
+  return rest;
 }
 
 // ── Tabla de avance ──

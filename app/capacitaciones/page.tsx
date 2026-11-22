@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from 'react';
-import AdminShell from '@/components/AdminShell';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import AdminShell, { CAP_BADGE_EVENT } from '@/components/AdminShell';
 import Matrix from '@/components/capacitaciones/Matrix';
 import DoubtList from '@/components/capacitaciones/DoubtList';
 import TrainingSettings from '@/components/capacitaciones/TrainingSettings';
@@ -18,35 +18,48 @@ const TABS: { key: CapTab; label: string }[] = [
   { key: 'capacitar', label: 'Por capacitar' },
   { key: 'ajustes', label: 'Ajustes' },
 ];
+const tabId = (t: CapTab) => `cap-tab-${t}`;
+const focusTab = (t: CapTab) => requestAnimationFrame(() => document.getElementById(tabId(t))?.focus());
+
+interface PageData { companyId: string; trainings: TrainingConfig[]; rows: CapRow[]; canEdit: boolean }
 
 /** Capacitación: quién vio cada proceso (Avance), las dudas que esperan (Por capacitar) y Ajustes (supabase/011). */
 export default function CapacitacionesPage() {
   const { current: company, companies, loading: companyLoading } = useCompany();
-  const [data, setData] = useState<{ trainings: TrainingConfig[]; rows: CapRow[] } | null>(null);
+  const companyId = company?.id ?? null;
+  const [data, setData] = useState<PageData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<CapTab>('avance');
   const [flash, setFlash] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
+  // Cada carga lleva un número: si llega tarde una respuesta vieja (otra empresa, o una carga anterior), no pisa la nueva.
+  const seq = useRef(0);
 
   // La pestaña sale de ?tab= (la vista previa regresa a /capacitaciones?tab=ajustes).
   useEffect(() => { setTab(tabFromSearch(window.location.search)); }, []);
 
   const load = useCallback(async () => {
+    if (!companyId) return;
+    const n = ++seq.current;
     let r: LoadResult;
-    try { r = await loadTrainingAdmin(); }
+    try { r = await loadTrainingAdmin(companyId); }
     catch { r = { ok: false, error: 'No se pudo cargar. Revisa la conexión y vuelve a intentar.' }; }
+    if (n !== seq.current) return;
     setNow(new Date());
     if (!r.ok) { setError(r.error); return; }
     setError(null);
-    setData({ trainings: r.trainings, rows: r.rows });
-  }, []);
+    setData({ companyId, trainings: r.trainings, rows: r.rows, canEdit: r.canEdit });
+  }, [companyId]);
 
-  useEffect(() => { load(); }, [load]);
+  // Al cambiar de empresa en el selector se vuelve a cargar (la tabla es de una sola empresa).
+  useEffect(() => { setData(null); setError(null); setFlash(null); load(); }, [load]);
 
-  const rows = useMemo(() => (data && company ? data.rows.filter(r => r.company_id === company.id) : []), [data, company]);
+  // Sólo lo de la empresa que está escogida (mientras llega la otra, no se enseña la anterior).
+  const current = data && data.companyId === companyId ? data : null;
+  const rows = useMemo(() => current?.rows ?? [], [current]);
   const doubts = useMemo(() => openDoubts(rows), [rows]);
   const names = useMemo(() => Object.fromEntries(companies.map(c => [c.id, c.name])), [companies]);
-  const noneActive = !!data && !data.trainings.some(t => t.is_active);
+  const noneActive = !!current && !current.trainings.some(t => t.is_active);
 
   function choose(t: CapTab) {
     setTab(t);
@@ -61,21 +74,21 @@ export default function CapacitacionesPage() {
     const i = TABS.findIndex(x => x.key === tab);
     const j = e.key === 'Home' ? 0 : e.key === 'End' ? TABS.length - 1 : (i + (e.key === 'ArrowRight' ? 1 : -1) + TABS.length) % TABS.length;
     choose(TABS[j].key);
-    document.getElementById(`cap-tab-${TABS[j].key}`)?.focus();
+    document.getElementById(tabId(TABS[j].key))?.focus();
   }
 
   async function done(trainingId: string, employeeId: string) {
-    const row = data?.rows.find(r => r.training_id === trainingId && r.employee_id === employeeId);
+    const row = rows.find(r => r.training_id === trainingId && r.employee_id === employeeId);
     const r = await markTrained(trainingId, employeeId);
-    if (r.ok) {
-      setFlash(row ? `Listo. Le explicaste ${row.title} a ${titleCase(row.employee_name)}.` : 'Listo.');
-      await load();
-    }
+    if (r.ok) setFlash(row ? `Listo. Le explicaste ${row.title} a ${titleCase(row.employee_name)}.` : 'Listo.');
+    // También si falló (p. ej. "Esa duda ya no está abierta": alguien más la cerró): la lista y el numerito del menú se ponen al día.
+    await load();
+    window.dispatchEvent(new Event(CAP_BADGE_EVENT));
     return r;
   }
 
   async function save(id: string, patch: { is_active?: boolean; deadline_days?: number; min_seconds?: number }) {
-    const t = data?.trainings.find(x => x.id === id);
+    const t = current?.trainings.find(x => x.id === id);
     const r = await saveTraining(id, patch);
     if (r.ok) {
       if (t && patch.is_active === true) setFlash(`Activaste ${t.title}. El aviso les llega a los teléfonos en unos minutos (los avisos salen de 9:00 a 19:00).`);
@@ -92,7 +105,6 @@ export default function CapacitacionesPage() {
   }
 
   const fe = error ? friendlyLoadError(error) : null;
-  const needsCompany = tab !== 'ajustes' && !company;
 
   return (
     <AdminShell>
@@ -108,7 +120,7 @@ export default function CapacitacionesPage() {
         <div className={s.content}>
           <div className={v.tabs} role="tablist" aria-label="Secciones de Capacitación" onKeyDown={onTabKey}>
             {TABS.map(t => (
-              <button key={t.key} id={`cap-tab-${t.key}`} type="button" role="tab" className={v.tab}
+              <button key={t.key} id={tabId(t.key)} type="button" role="tab" className={v.tab}
                 aria-selected={tab === t.key} aria-controls="cap-panel" tabIndex={tab === t.key ? 0 : -1}
                 onClick={() => choose(t.key)}>
                 {t.label}
@@ -128,26 +140,26 @@ export default function CapacitacionesPage() {
             </div>
           )}
 
-          <div id="cap-panel" role="tabpanel" aria-labelledby={`cap-tab-${tab}`}>
-            {!data ? (
-              !error && <p className={s.loading}>Cargando…</p>
-            ) : needsCompany ? (
+          <div id="cap-panel" role="tabpanel" aria-labelledby={tabId(tab)}>
+            {!company ? (
               companyLoading ? <p className={s.loading}>Cargando…</p> : <p className={s.foot}>Escoge una empresa en el menú.</p>
+            ) : !current ? (
+              !error && <p className={s.loading}>Cargando…</p>
             ) : tab === 'avance' ? (
               noneActive ? (
                 <div className={`${s.card} ${v.notice}`}>
                   <p>Todavía no hay capacitaciones activas. Préndelas en Ajustes.</p>
-                  <button type="button" className={`${v.btn} ${v.dark}`} onClick={() => choose('ajustes')}>Ir a Ajustes</button>
+                  <button type="button" className={`${v.btn} ${v.dark}`} onClick={() => { choose('ajustes'); focusTab('ajustes'); }}>Ir a Ajustes</button>
                 </div>
               ) : rows.length === 0 ? (
-                <div className={v.empty}>No hay personas activas en {company?.name ?? 'esta empresa'}.</div>
+                <div className={v.empty}>No hay personas activas en {company.name}.</div>
               ) : (
                 <Matrix rows={rows} companyNames={names} now={now} />
               )
             ) : tab === 'capacitar' ? (
-              <DoubtList rows={doubts} now={now} onDone={done} />
+              <DoubtList rows={doubts} now={now} onDone={done} focusWhenEmpty={() => focusTab('capacitar')} />
             ) : (
-              <TrainingSettings trainings={data.trainings} onSave={save} onMove={move} />
+              <TrainingSettings trainings={current.trainings} canEdit={current.canEdit} onSave={save} onMove={move} />
             )}
           </div>
         </div>

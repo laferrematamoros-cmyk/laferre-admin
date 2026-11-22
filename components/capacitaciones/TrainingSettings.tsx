@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TrainingConfig } from '@/app/capacitaciones/actions';
-import { parseLimit, type LimitField } from '@/lib/capacitaciones/admin-view';
+import { addBusy, parseLimit, removeBusy, SHARED_EDIT_ONLY, type BusyMap, type LimitField } from '@/lib/capacitaciones/admin-view';
 import s from '@/components/panel/panel.module.css';
 import v from './capacitaciones.module.css';
 
@@ -29,9 +29,13 @@ const Arrow = ({ up }: { up: boolean }) => (
   </svg>
 );
 
-/** Ajustes: las 13 en su orden, con activa/pausa, plazo, tiempo mínimo, orden y vista previa. */
-export default function TrainingSettings({ trainings, onSave, onMove }: {
+/**
+ * Ajustes: las 13 en su orden, con activa/pausa, plazo, tiempo mínimo, orden y vista previa.
+ * Con `canEdit` en false (admin fijo a una empresa) todo se ve pero no se cambia; "Ver" sí funciona.
+ */
+export default function TrainingSettings({ trainings, canEdit, onSave, onMove }: {
   trainings: TrainingConfig[];
+  canEdit: boolean;
   onSave: (id: string, patch: Patch) => Promise<Result>;
   onMove: (id: string, dir: -1 | 1) => Promise<Result>;
 }) {
@@ -39,7 +43,8 @@ export default function TrainingSettings({ trainings, onSave, onMove }: {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   // Errores por renglón y por qué los causó; llave `${id}:${what}`.
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState<Record<string, What>>({});
+  // Lo que se está guardando por renglón (una lista: dos guardados del mismo renglón no se pisan).
+  const [busy, setBusy] = useState<BusyMap<What>>({});
   const [asking, setAsking] = useState<string | null>(null);
   const [moving, setMoving] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
@@ -55,13 +60,14 @@ export default function TrainingSettings({ trainings, onSave, onMove }: {
     [trainings],
   );
   const active = list.filter(t => t.is_active).length;
+  const isBusy = (id: string, what?: What) => (what ? !!busy[id]?.includes(what) : !!busy[id]?.length);
 
   async function run(id: string, what: What, fn: () => Promise<Result>): Promise<boolean> {
-    setBusy(b => ({ ...b, [id]: what }));
+    setBusy(b => addBusy(b, id, what));
     setErrors(e => without(e, `${id}:${what}`));
     let r: Result;
     try { r = await fn(); } catch { r = { ok: false, error: OFFLINE }; }
-    setBusy(b => without(b, id));
+    setBusy(b => removeBusy(b, id, what));
     if (!r.ok) { const msg = r.error; setErrors(e => ({ ...e, [`${id}:${what}`]: msg })); }
     return r.ok;
   }
@@ -75,7 +81,7 @@ export default function TrainingSettings({ trainings, onSave, onMove }: {
   const focusSwitch = (id: string) => requestAnimationFrame(() => document.getElementById(`cap-sw-${id}`)?.focus());
 
   function toggle(t: TrainingConfig) {
-    if (busy[t.id]) return;
+    if (!canEdit || isBusy(t.id, 'switch')) return; // mientras guarda se ve apagado y dice "guardando…"
     if (asking === t.id) { closeAsk(t.id); return; } // tocarlo otra vez es "Cancelar"
     if (t.is_active) { setAsking(t.id); return; } // pausar pide confirmar; prender no
     run(t.id, 'switch', () => onSave(t.id, { is_active: true }));
@@ -88,16 +94,19 @@ export default function TrainingSettings({ trainings, onSave, onMove }: {
   }
 
   async function pause(t: TrainingConfig) {
+    if (!canEdit || isBusy(t.id, 'switch')) return;
     if (await run(t.id, 'switch', () => onSave(t.id, { is_active: false }))) { setAsking(null); focusSwitch(t.id); }
   }
 
   async function commit(t: TrainingConfig, field: LimitField) {
     const k = `${t.id}:${field}`;
     const raw = drafts[k];
-    if (raw === undefined || busy[t.id]) return;
+    if (raw === undefined || !canEdit) return;
     const p = parseLimit(field, raw);
     if (!p.ok) { setErrors(e => ({ ...e, [k]: p.error })); return; }
     if (p.value === t[field]) { setDrafts(d => without(d, k)); setErrors(e => without(e, k)); return; }
+    // El campo está apagado mientras guarda, así que esto casi no pasa; si pasa, el borrador se queda y se avisa.
+    if (isBusy(t.id, field)) { setErrors(e => ({ ...e, [k]: 'Espera a que termine de guardar y vuelve a intentar.' })); return; }
     const value = p.value;
     if (await run(t.id, field, () => onSave(t.id, { [field]: value }))) {
       setDrafts(d => without(d, k));
@@ -106,6 +115,7 @@ export default function TrainingSettings({ trainings, onSave, onMove }: {
   }
 
   async function move(t: TrainingConfig, dir: -1 | 1) {
+    if (!canEdit || moving) return;
     setMoving(true);
     const ok = await run(t.id, 'move', () => onMove(t.id, dir));
     setMoving(false);
@@ -122,19 +132,20 @@ export default function TrainingSettings({ trainings, onSave, onMove }: {
         <h2>Las {list.length} capacitaciones</h2>
         <span>{active === 0 ? 'Ninguna activa' : `${active} de ${list.length} ${active === 1 ? 'activa' : 'activas'}`}</span>
       </div>
+      {!canEdit && <p className={v.readOnly}>{SHARED_EDIT_ONLY}</p>}
 
       <div className={v.setHead} aria-hidden>
         <span>Activa</span><span>Capacitación</span><span>Plazo</span><span>Tiempo mínimo</span><span>Orden</span>
       </div>
       <ol className={v.setList}>
         {list.map((t, i) => {
-          const rowBusy = busy[t.id];
+          const swBusy = isBusy(t.id, 'switch');
           const rowErrors = Object.entries(errors).filter(([k]) => k.startsWith(`${t.id}:`));
           return (
             <li key={t.id} className={`${v.setRow} ${t.is_active ? '' : v.paused}`}>
               <div className={v.aSw}>
                 <button type="button" id={`cap-sw-${t.id}`} role="switch" aria-checked={t.is_active} className={v.switch}
-                  aria-label={`Activa: ${t.title}`} aria-disabled={rowBusy ? true : undefined} onClick={() => toggle(t)}>
+                  aria-label={`Activa: ${t.title}`} disabled={!canEdit} aria-disabled={swBusy || undefined} onClick={() => toggle(t)}>
                   <i />
                 </button>
               </div>
@@ -145,7 +156,7 @@ export default function TrainingSettings({ trainings, onSave, onMove }: {
                   <b>{t.title}</b>
                   <small>
                     v{t.version} · {t.is_active ? <span className={v.on}>Activa</span> : 'En pausa'}
-                    {rowBusy === 'switch' && ' · guardando…'}
+                    {isBusy(t.id) && <span className={v.saving}> · Guardando…</span>}
                   </small>
                 </div>
               </div>
@@ -154,6 +165,7 @@ export default function TrainingSettings({ trainings, onSave, onMove }: {
                 const k = `${t.id}:${f.field}`;
                 const id = `cap-${f.field}-${t.id}`;
                 const err = errors[k];
+                const fieldBusy = isBusy(t.id, f.field);
                 return (
                   <div key={f.field} className={`${v.field} ${f.field === 'deadline_days' ? v.aPlazo : v.aTiempo}`}>
                     <label className={v.fLabel} htmlFor={id}>{f.label}</label>
@@ -164,8 +176,8 @@ export default function TrainingSettings({ trainings, onSave, onMove }: {
                         value={drafts[k] ?? String(t[f.field])}
                         aria-invalid={err ? true : undefined}
                         aria-describedby={err ? `${k}-err` : undefined}
-                        aria-busy={rowBusy === f.field || undefined}
-                        disabled={rowBusy === f.field}
+                        aria-busy={fieldBusy || undefined}
+                        disabled={!canEdit || fieldBusy}
                         onChange={e => { const val = e.target.value; setDrafts(d => ({ ...d, [k]: val })); setErrors(x => without(x, k)); }}
                         onBlur={() => commit(t, f.field)}
                         onKeyDown={e => {
@@ -182,9 +194,9 @@ export default function TrainingSettings({ trainings, onSave, onMove }: {
 
               <div className={v.aOrder}>
                 <button type="button" id={`cap-mv--1-${t.id}`} className={v.iconBtn} aria-label={`Subir ${t.title}`}
-                  disabled={moving || i === 0} onClick={() => move(t, -1)}><Arrow up /></button>
+                  disabled={!canEdit || moving || i === 0} onClick={() => move(t, -1)}><Arrow up /></button>
                 <button type="button" id={`cap-mv-1-${t.id}`} className={v.iconBtn} aria-label={`Bajar ${t.title}`}
-                  disabled={moving || i === list.length - 1} onClick={() => move(t, 1)}><Arrow up={false} /></button>
+                  disabled={!canEdit || moving || i === list.length - 1} onClick={() => move(t, 1)}><Arrow up={false} /></button>
               </div>
 
               <div className={v.aVer}>
@@ -194,13 +206,13 @@ export default function TrainingSettings({ trainings, onSave, onMove }: {
               <div className={v.aMsg}>
                 {asking === t.id && (
                   <div ref={askRef} tabIndex={-1} className={v.pauseAsk} role="group" aria-labelledby={`cap-pause-${t.id}`}
-                    onKeyDown={e => { if (e.key === 'Escape' && !rowBusy) closeAsk(t.id); }}>
+                    onKeyDown={e => { if (e.key === 'Escape' && !swBusy) closeAsk(t.id); }}>
                     <p id={`cap-pause-${t.id}`}>Si la pausas y la vuelves a prender, a todos los que no la han visto les llega otro aviso y su plazo empieza de nuevo.</p>
                     <div>
-                      <button type="button" className={`${v.btn} ${v.dark}`} disabled={!!rowBusy} onClick={() => pause(t)}>
-                        {rowBusy === 'switch' ? 'Pausando…' : 'Pausar'}
+                      <button type="button" className={`${v.btn} ${v.dark}`} disabled={swBusy} onClick={() => pause(t)}>
+                        {swBusy ? 'Pausando…' : 'Pausar'}
                       </button>
-                      <button type="button" className={v.btn} disabled={!!rowBusy} onClick={() => closeAsk(t.id)}>Cancelar</button>
+                      <button type="button" className={v.btn} disabled={swBusy} onClick={() => closeAsk(t.id)}>Cancelar</button>
                     </div>
                   </div>
                 )}

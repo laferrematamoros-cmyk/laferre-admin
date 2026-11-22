@@ -1,6 +1,46 @@
 import {
   tabFromSearch, tabHref, limitError, parseLimit, groupPeople, initials, friendlyLoadError, stamp, sinceLabel,
+  canEditShared, SHARED_EDIT_ONLY, matrixSizeError, MATRIX_MAX_ROWS, addBusy, removeBusy, type BusyMap,
 } from '../capacitaciones/admin-view';
+
+describe('quién cambia los ajustes', () => {
+  it('sólo un admin que ve las dos empresas (own = null)', () => {
+    expect(canEditShared(null)).toBe(true);
+    expect(canEditShared('c0000000-0000-4000-8000-000000000001')).toBe(false);
+    expect(canEditShared('')).toBe(false);
+    expect(SHARED_EDIT_ONLY).toBe('Sólo un administrador de las dos empresas puede cambiar las capacitaciones.');
+  });
+});
+
+describe('guardados en curso por renglón', () => {
+  it('dos guardados del mismo renglón no se pisan', () => {
+    let m: BusyMap<'switch' | 'deadline_days'> = {};
+    m = addBusy(m, 'r1', 'switch');
+    m = addBusy(m, 'r1', 'deadline_days');
+    m = addBusy(m, 'r2', 'switch');
+    expect(m).toEqual({ r1: ['switch', 'deadline_days'], r2: ['switch'] });
+    m = removeBusy(m, 'r1', 'switch'); // termina el primero: el segundo sigue
+    expect(m.r1).toEqual(['deadline_days']);
+    m = removeBusy(m, 'r1', 'switch'); // quitar lo que no está no cambia nada
+    expect(m.r1).toEqual(['deadline_days']);
+    m = removeBusy(m, 'r1', 'deadline_days');
+    expect(m).toEqual({ r2: ['switch'] });
+  });
+  it('el mismo guardado dos veces cuenta dos veces', () => {
+    const m = removeBusy(addBusy(addBusy({}, 'r', 'move'), 'r', 'move'), 'r', 'move');
+    expect(m).toEqual({ r: ['move'] });
+  });
+});
+
+describe('tope de filas de la tabla', () => {
+  it('con 1,000 filas puede venir cortada: error claro en vez de tabla incompleta', () => {
+    expect(MATRIX_MAX_ROWS).toBe(1000);
+    expect(matrixSizeError(0)).toBeNull();
+    expect(matrixSizeError(999)).toBeNull();
+    expect(matrixSizeError(1000)).toBe('La tabla tiene demasiadas filas para mostrarse; avísale a Claude.');
+    expect(matrixSizeError(1500)).not.toBeNull();
+  });
+});
 import type { MatrixPerson } from '../capacitaciones/status';
 
 describe('pestañas de Capacitación', () => {
