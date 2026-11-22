@@ -113,7 +113,7 @@ Entrada **"Capacitación"** en el menú, después de "Conoce", con numerito = pe
    - Arriba de cada columna, cuántos la terminaron; al final de cada fila, el avance de la persona.
    - En celular, la primera columna queda fija y la tabla se desliza de lado.
 2. **Por capacitar:** las dudas abiertas, de la más vieja a la más nueva. Cada una enseña quién, cuál, qué no entendió y desde cuándo, con el botón **"Ya lo capacité"** (pide confirmar).
-3. **Ajustes:** las 13 en su orden, cada una con:
+3. **Ajustes** (los cambia sólo un admin de las dos empresas): las 13 en su orden, cada una con:
    - activa / en pausa;
    - subir y bajar en el orden;
    - plazo en días (1 a 60);
@@ -185,12 +185,12 @@ training_notices                         -- avisos ya apartados
 | `cap_open(p_training, p_employee)` | anon | Revisa que la capacitación esté activa y el empleado activo; crea la sesión (origen `app`) con la versión actual y regresa `{ok, session, slug}`. Freno: con 20 aperturas o más de esa persona, en esa capacitación, versión y origen, en la última hora, no crea otra: regresa la más reciente de esas (`reused: true`). Nunca rechaza (nadie puede bloquear a otro) y nunca entrega una sesión de otro origen. |
 | `cap_open_panel(p_training, p_employee)` | service_role | Igual, con origen `panel` (la practicante). Desde el teléfono no se puede fingir ese origen. |
 | `cap_answer(p_session, p_answer, p_note)` | anon | Revisa: sesión existe y tiene menos de 12 h; capacitación activa y misma versión; empleado activo; para `understood`, que hayan pasado `min_seconds` desde `opened_at` (si no, `{ok:false, code:'too_soon', seconds_left}`); nota de hasta 500. Si ya está `trained` no cambia nada (`{ok:true, already:true}`). Si no, guarda la respuesta (la nota sólo con `doubt`) y marca la sesión contestada. |
-| `cap_matrix()` | service_role | `cap_rows()` completo, para la tabla de Avance y "Por capacitar". |
+| `cap_matrix(p_company)` | service_role | `cap_rows()` de UNA empresa, ordenado, para la tabla de Avance y "Por capacitar". Va por empresa porque la base nunca entrega más de 1,000 filas y una función no se puede paginar; si un día llegara a 1,000, el panel lo dice en vez de enseñar la tabla cortada. |
 | `cap_doubt_count(p_company)` | service_role | Cuántas dudas abiertas hay en esa empresa (numerito del menú, sin bajar la tabla completa). |
 | `cap_mark_trained(p_training, p_employee, p_by)` | service_role | Pasa de `doubt` a `trained` en la versión actual (`trained_at`, `trained_by`). Si no estaba en `doubt`, `{ok:false}`. |
 | `cap_claim_notices(p_now)` | service_role | Calcula los avisos "nueva" y "por vencer" que tocan, los inserta en `training_notices` con `on conflict do nothing` y regresa sólo los que sí se insertaron (empleado, nombre, empresa, capacitación, título, tipo). |
 
-Los ajustes (activar, orden, plazo, tiempo) se guardan con acciones del servidor con la llave de servicio, sólo con sesión de admin.
+Los ajustes (activar, orden, plazo, tiempo) se guardan con acciones del servidor con la llave de servicio. Como la lista es una sola para las dos empresas, **sólo un administrador que ve las dos empresas puede cambiarlos**; uno fijo a una empresa los ve sin poder moverlos (la misma regla que la firma de listas en Ajustes).
 
 **Sin semilla en el SQL:** las 13 filas las crea la sincronización del catálogo (siguiente sección), pausadas, con su orden y su tiempo mínimo inicial, la primera vez que corre el cron o se abre la página Capacitación. Así la lista vive en un solo lugar (el código).
 
