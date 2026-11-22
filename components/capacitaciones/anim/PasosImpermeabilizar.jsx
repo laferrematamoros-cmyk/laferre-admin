@@ -14,7 +14,8 @@ class PasosImpermeabilizar extends React.Component {
   impRoofRef = el => {
     if (!el || this.impIO || this.state.impStep >= 0) return;
     if (!window.IntersectionObserver) { this.impPlay(); return; }
-    this.impIO = new IntersectionObserver(es => { if (es[0].isIntersecting) { this.impIO.disconnect(); this.impPlay(); } }, { threshold: 0.45 });
+    // Capacitaciones: arranca al llegar a la parte de arriba de la pantalla (con threshold, las altas no arrancaban en celular).
+    this.impIO = new IntersectionObserver(es => { if (es[0].isIntersecting) { this.impIO.disconnect(); this.impPlay(); } }, { threshold: 0, rootMargin: '0px 0px -35% 0px' });
     this.impIO.observe(el);
   };
   impClear() { this.impT.forEach(clearTimeout); this.impT = []; }

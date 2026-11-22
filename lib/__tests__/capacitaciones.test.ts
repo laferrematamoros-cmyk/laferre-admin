@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CATALOG, catalogBySlug } from '../capacitaciones/catalog';
 import { dueLabel, summarize, buildMatrix, openDoubts, type CapRow } from '../capacitaciones/status';
@@ -19,6 +19,19 @@ describe('catálogo', () => {
     CATALOG.forEach(c => { expect(c.minSeconds).toBeGreaterThanOrEqual(5); expect(c.minSeconds).toBeLessThanOrEqual(600); });
     expect(catalogBySlug('fregadero')?.parts).toEqual(['InstalarFregadero']);
     expect(catalogBySlug('nada')).toBeNull();
+  });
+  // Con `threshold: 0.25` una animación más alta que 4 pantallas nunca llega al 25 % visible y no arranca
+  // (gas-estufa en un celular). Si se vuelven a copiar los archivos de la diseñadora, hay que volver a parcharlos.
+  it('cada animación arranca al llegar a la parte de arriba de la pantalla, sin threshold', () => {
+    const dir = join(process.cwd(), 'components/capacitaciones/anim');
+    const withIO = readdirSync(dir).filter(f => f.endsWith('.jsx'))
+      .map(f => ({ f, src: readFileSync(join(dir, f), 'utf8') }))
+      .filter(x => x.src.includes('new IntersectionObserver'));
+    expect(withIO.length).toBeGreaterThanOrEqual(14);
+    for (const { f, src } of withIO) {
+      expect([f, src.includes("rootMargin: '0px 0px -35% 0px'")]).toEqual([f, true]);
+      expect([f, /threshold: 0\./.test(src)]).toEqual([f, false]);
+    }
   });
 });
 

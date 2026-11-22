@@ -31,7 +31,8 @@ class BombaSistemasIncorrectos extends React.Component {
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { this.setState({ phs: FINAL.slice() }); return; }
     const el = this.rootRef.current;
     if (!el || !window.IntersectionObserver) { this.start(); return; }
-    this.io = new IntersectionObserver(es => { if (es[0].isIntersecting) { this.io.disconnect(); this.start(); } }, { threshold: 0.15 });
+    // Capacitaciones: arranca al llegar a la parte de arriba de la pantalla (con threshold, las altas no arrancaban en celular).
+    this.io = new IntersectionObserver(es => { if (es[0].isIntersecting) { this.io.disconnect(); this.start(); } }, { threshold: 0, rootMargin: '0px 0px -35% 0px' });
     this.io.observe(el);
   }
   componentWillUnmount() { this.T.forEach(clearTimeout); if (this.io) this.io.disconnect(); }

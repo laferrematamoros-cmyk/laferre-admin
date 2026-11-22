@@ -28,7 +28,8 @@ class InstalarBomba extends React.Component {
   componentDidMount() {
     const el = this.rootRef.current;
     if (!el || !window.IntersectionObserver) { this.play(); return; }
-    this.io = new IntersectionObserver(es => { if (es[0].isIntersecting) { this.io.disconnect(); this.play(); } }, { threshold: 0.25 });
+    // Capacitaciones: arranca al llegar a la parte de arriba de la pantalla (con threshold, las altas no arrancaban en celular).
+    this.io = new IntersectionObserver(es => { if (es[0].isIntersecting) { this.io.disconnect(); this.play(); } }, { threshold: 0, rootMargin: '0px 0px -35% 0px' });
     this.io.observe(el);
   }
   componentWillUnmount() { this.clear(); if (this.io) this.io.disconnect(); }

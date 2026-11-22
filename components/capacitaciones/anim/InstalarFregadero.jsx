@@ -28,7 +28,8 @@ class InstalarFregadero extends React.Component {
     const el = this.rootRef.current;
     if (el && window.ResizeObserver) { this.ro = new ResizeObserver(es => { const w = Math.round(es[0].contentRect.width); if (w && w !== this.state.w) this.setState({ w }); }); this.ro.observe(el); }
     if (!el || !window.IntersectionObserver) { this.play(); return; }
-    this.io = new IntersectionObserver(es => { if (es[0].isIntersecting) { this.io.disconnect(); this.play(); } }, { threshold: 0.25 });
+    // Capacitaciones: arranca al llegar a la parte de arriba de la pantalla (con threshold, las altas no arrancaban en celular).
+    this.io = new IntersectionObserver(es => { if (es[0].isIntersecting) { this.io.disconnect(); this.play(); } }, { threshold: 0, rootMargin: '0px 0px -35% 0px' });
     this.io.observe(el);
   }
   componentWillUnmount() { this.clear(); if (this.io) this.io.disconnect(); if (this.ro) this.ro.disconnect(); }

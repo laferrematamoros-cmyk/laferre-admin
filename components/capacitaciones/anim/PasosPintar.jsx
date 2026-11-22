@@ -15,7 +15,8 @@ class PasosPintar extends React.Component {
   pinWallRef = el => {
     if (!el || this.pinIO || this.state.pinStep >= 0) return;
     if (!window.IntersectionObserver) { this.pinPlay(); return; }
-    this.pinIO = new IntersectionObserver(es => { if (es[0].isIntersecting) { this.pinIO.disconnect(); this.pinPlay(); } }, { threshold: 0.45 });
+    // Capacitaciones: arranca al llegar a la parte de arriba de la pantalla (con threshold, las altas no arrancaban en celular).
+    this.pinIO = new IntersectionObserver(es => { if (es[0].isIntersecting) { this.pinIO.disconnect(); this.pinPlay(); } }, { threshold: 0, rootMargin: '0px 0px -35% 0px' });
     this.pinIO.observe(el);
   };
   pinClear() { this.pinT.forEach(clearTimeout); this.pinT = []; }
