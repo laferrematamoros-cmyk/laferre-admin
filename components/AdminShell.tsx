@@ -9,6 +9,11 @@ import { useSession } from '@/lib/session-context';
 import { logout } from '@/app/login/actions';
 import { inventoryPendingCount } from '@/app/inventario/actions';
 import { pendingSignCount } from '@/app/firmas/actions';
+import { pendingDoubtCount } from '@/app/capacitaciones/actions';
+import { myPendingCount } from '@/app/mis-capacitaciones/actions';
+
+/** Lo dispara la página de Capacitación al cerrar una duda, para que el numerito baje sin cambiar de página. */
+export const CAP_BADGE_EVENT = 'lf:cap-badge';
 
 const NAV = [
   { href: '/dashboard',   label: 'Dashboard',   icon: IconHome },
@@ -17,16 +22,18 @@ const NAV = [
   { href: '/equipo',      label: 'Equipo',      icon: IconUser },
   { href: '/urgente',     label: 'Urgente',     icon: IconAlert },
   { href: '/conoce',      label: 'Conoce',      icon: IconBook },
+  { href: '/capacitaciones', label: 'Capacitación', icon: IconCap },
   { href: '/inventario',  label: 'Inventario',  icon: IconBox },
   { href: '/firmas',      label: 'Por firmar',  icon: IconSign },
   { href: '/reportes',    label: 'Reportes y estadísticas',    icon: IconChart },
   { href: '/ajustes',     label: 'Ajustes',     icon: IconCog },
 ];
 
-// Menú del practicante: Dashboard, Mis actividades y Reportes.
+// Menú del practicante: Dashboard, Mis actividades, Mis capacitaciones y Reportes.
 const INTERN_NAV_ITEMS = [
   { href: '/dashboard',       label: 'Dashboard',               icon: IconHome },
   { href: '/mis-actividades', label: 'Mis actividades',         icon: IconTask },
+  { href: '/mis-capacitaciones', label: 'Mis capacitaciones',   icon: IconCap },
   { href: '/reportes',        label: 'Reportes y estadísticas', icon: IconChart },
 ];
 
@@ -87,6 +94,19 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     let alive = true;
     pendingSignCount(current.id).then(n => { if (alive) setToSign(n); }).catch(() => {});
     return () => { alive = false; };
+  }, [current, isIntern, path]);
+
+  // Numerito de Capacitación: dudas abiertas (admin) o por ver + atrasadas (practicante).
+  const [capBadge, setCapBadge] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    const refresh = () => {
+      const p = isIntern ? myPendingCount() : current ? pendingDoubtCount(current.id) : Promise.resolve(0);
+      p.then(n => { if (alive) setCapBadge(n); }).catch(() => {});
+    };
+    refresh();
+    window.addEventListener(CAP_BADGE_EVENT, refresh);
+    return () => { alive = false; window.removeEventListener(CAP_BADGE_EVENT, refresh); };
   }, [current, isIntern, path]);
 
   const accent = current?.color_primary ?? '#E11D2E';
@@ -184,6 +204,14 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                   {toSign}
                 </span>
               )}
+              {(href === '/capacitaciones' || href === '/mis-capacitaciones') && capBadge > 0 && (
+                <span
+                  aria-label={`${capBadge} pendientes`}
+                  style={{ marginLeft: 'auto', minWidth: 20, height: 20, padding: '0 6px', borderRadius: 10, background: accent, color: '#fff', fontSize: 11, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  {capBadge}
+                </span>
+              )}
               {href === '/inventario' && invPending > 0 && (
                 <span
                   aria-label={`${invPending} pendientes`}
@@ -242,6 +270,9 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 }
 
 /* ── Icons ── */
+function IconCap({ size = 16 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 2 9 2 12 0v-5"/></svg>;
+}
 function IconTask({ size = 16 }: { size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>;
 }
