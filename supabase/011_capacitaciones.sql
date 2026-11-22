@@ -235,15 +235,21 @@ begin
   return jsonb_build_object('ok', true, 'status', p_answer);
 end $$;
 
--- Panel (service_role): tabla de avance.
-create or replace function public.cap_matrix()
+-- Panel (service_role): tabla de avance de UNA empresa. Se pide por empresa porque Supabase nunca
+-- regresa más de 1,000 filas (y no avisa), y a una función no se le puede paginar con .range().
+-- Orden fijo: por persona y, dentro de cada persona, en el orden de las capacitaciones.
+-- Una copia anterior de este archivo tenía cap_matrix() sin parámetros: se quita.
+drop function if exists public.cap_matrix();
+create or replace function public.cap_matrix(p_company uuid)
 returns table (
   employee_id uuid, employee_name text, company_id uuid,
   training_id uuid, slug text, title text, sort_order int, version int,
   status text, deadline timestamptz, answered_at timestamptz, doubt_note text,
   trained_at timestamptz, trained_by text, views int)
 language sql stable security definer set search_path = public as $$
-  select * from cap_rows(now())
+  select * from cap_rows(now()) r
+   where r.company_id = p_company
+   order by r.employee_name, r.employee_id, r.sort_order, r.title, r.training_id
 $$;
 
 -- Panel (service_role): cuántas dudas esperan al Ing. en una empresa (el numerito del menú),
@@ -302,7 +308,7 @@ revoke all on function public.cap_open_as(uuid, uuid, text) from public, anon, a
 revoke all on function public.cap_open(uuid, uuid) from public;
 revoke all on function public.cap_open_panel(uuid, uuid) from public, anon, authenticated;
 revoke all on function public.cap_answer(uuid, text, text) from public;
-revoke all on function public.cap_matrix() from public, anon, authenticated;
+revoke all on function public.cap_matrix(uuid) from public, anon, authenticated;
 revoke all on function public.cap_doubt_count(uuid) from public, anon, authenticated;
 revoke all on function public.cap_mark_trained(uuid, uuid, text) from public, anon, authenticated;
 revoke all on function public.cap_claim_notices(timestamptz) from public, anon, authenticated;
@@ -311,7 +317,7 @@ grant execute on function public.cap_list(uuid) to anon, authenticated, service_
 grant execute on function public.cap_open(uuid, uuid) to anon, authenticated, service_role;
 grant execute on function public.cap_open_panel(uuid, uuid) to service_role;
 grant execute on function public.cap_answer(uuid, text, text) to anon, authenticated, service_role;
-grant execute on function public.cap_matrix() to service_role;
+grant execute on function public.cap_matrix(uuid) to service_role;
 grant execute on function public.cap_doubt_count(uuid) to service_role;
 grant execute on function public.cap_mark_trained(uuid, uuid, text) to service_role;
 grant execute on function public.cap_claim_notices(timestamptz) to service_role;

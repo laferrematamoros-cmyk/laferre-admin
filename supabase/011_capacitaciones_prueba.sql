@@ -265,7 +265,7 @@ begin
   begin perform 1 from trainings; exception when insufficient_privilege then got := 'bloqueado'; end;
   st := got;
   got := 'pudo';
-  begin perform * from cap_matrix(); exception when insufficient_privilege then got := 'bloqueado'; end;
+  begin perform * from cap_matrix(co); exception when insufficient_privilege then got := 'bloqueado'; end;
   st := st || ' / matrix ' || got;
   got := 'pudo';
   begin perform cap_mark_trained(prueba, nuevo, 'x'); exception when insufficient_privilege then got := 'bloqueado'; end;
@@ -348,6 +348,35 @@ begin
   n2 := cap_doubt_count(bfm) - base_bfm;
   res := res || E'\n' || case when ok1 and n = 3 and n2 = 1 then 'OK    ' else 'FALLA ' end
              || '18 cap_doubt_count: La Ferre ' || n || ' (esperadas 3), BFM ' || n2 || ' (esperada 1)';
+
+  -- 19. Tabla de avance por empresa (Supabase no regresa más de 1,000 filas: el panel la pide por empresa)
+  --     La Ferre: sólo gente de La Ferre, con los 4 de prueba activos (ni baja ni el de BFM)
+  select count(*) filter (where m.company_id is distinct from co),
+         count(distinct m.employee_id) filter (where m.employee_id in (antiguo, nuevo, ent, dud)),
+         count(*) filter (where m.employee_id in (baja, ajeno))
+    into n, n2, n3
+    from cap_matrix(co) m;
+  ok1 := n = 0 and n2 = 4 and n3 = 0;
+  st := 'La Ferre: ajenas ' || n || ', de prueba ' || n2 || ' de 4, baja o BFM ' || n3;
+  --     BFM: el de BFM en cada capacitación activa y nadie de La Ferre
+  select count(*) filter (where m.company_id is distinct from bfm),
+         count(*) filter (where m.employee_id = ajeno),
+         count(*) filter (where m.employee_id in (antiguo, nuevo, ent, dud))
+    into n, n2, n3
+    from cap_matrix(bfm) m;
+  ok2 := n = 0 and n2 = (select count(*) from trainings where is_active) and n3 = 0;
+  st := st || ' / BFM: ajenas ' || n || ', ajeno en ' || n2 || ', de La Ferre ' || n3;
+  --     llega en orden: persona, y dentro de cada persona el orden de las capacitaciones
+  ok3 := (select bool_and(m.ordinality = m.esperado) from (
+            select x.ordinality,
+                   row_number() over (order by x.employee_name, x.employee_id, x.sort_order, x.title, x.training_id) as esperado
+              from cap_matrix(co) with ordinality x) m);
+  --     sólo queda la de un parámetro
+  ok4 := (select count(*) = 1 and min(p.pronargs) = 1 from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+           where ns.nspname = 'public' and p.proname = 'cap_matrix');
+  res := res || E'\n' || case when ok1 and ok2 and ok3 and ok4 then 'OK    ' else 'FALLA ' end
+             || '19 cap_matrix por empresa: ' || st || ' / en orden ' || coalesce(ok3::text, 'no')
+             || ' / sólo cap_matrix(empresa) ' || coalesce(ok4::text, 'no');
 
   raise exception 'RESULTADOS (no se guardó nada):%', res;
 end $$;
