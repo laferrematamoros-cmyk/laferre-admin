@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { TrainingStatus } from '@/lib/capacitaciones/status';
+import { shortDay } from '@/lib/capacitaciones/format';
 import TrainingContent from './TrainingContent';
 import v from './viewer.module.css';
 
@@ -19,36 +20,23 @@ interface CapAnswer {
 interface Props {
   slug: string;
   title: string;
-  /** "Hola, Eddie" */
-  employeeName?: string;
+  /** Sólo el primer nombre, ya en tipo título ("Hola, Eddie"); lo arma el servidor (firstNameOf). */
+  firstName?: string;
   minSeconds: number;
   /** null = vista previa del admin (no se registra nada, sin botones). */
   token: string | null;
-  previous?: { status: TrainingStatus; answeredAt: string } | null;
+  /** `day` ("21 nov") conviene mandarlo del servidor (shortDay): si no viene, se escribe aquí. */
+  previous?: { status: TrainingStatus; answeredAt: string; day?: string } | null;
   /** Teléfono: laferre://capacitacion "Regresar a la app"; practicante: /mis-capacitaciones. */
   back: { href: string; label: string };
   /** Dentro del panel (practicante / vista previa): la barra se queda en su contenedor, no en toda la pantalla. */
   embedded?: boolean;
 }
 
-/** "EDDIE GARCÍA" → "Eddie". Local a propósito: notices.ts no debe entrar al paquete del navegador. */
-function firstName(full?: string): string {
-  const w = (full ?? '').trim().split(/\s+/)[0] ?? '';
-  return w ? w.charAt(0).toLocaleUpperCase('es-MX') + w.slice(1).toLocaleLowerCase('es-MX') : '';
-}
-
-/** "21 nov", con el día de Matamoros. */
-function dayMonth(iso: string): string {
-  const parts = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short', timeZone: 'America/Matamoros' })
-    .formatToParts(new Date(iso));
-  const get = (t: string) => parts.find(p => p.type === t)?.value ?? '';
-  return `${get('day')} ${get('month').replace('.', '')}`;
-}
-
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
-const PREVIOUS: Partial<Record<TrainingStatus, (answeredAt: string) => string>> = {
-  understood: at => `Ya la marcaste como entendida el ${dayMonth(at)}.`,
+const PREVIOUS: Partial<Record<TrainingStatus, (day: string) => string>> = {
+  understood: day => `Ya la marcaste como entendida el ${day}.`,
   doubt: () => 'Pediste que el Ing. te la explique.',
   trained: () => 'Ya te capacitó el Ing. en persona.',
 };
@@ -60,13 +48,13 @@ const DONE: Record<Done, string> = {
 };
 
 /** La página de una capacitación: las animaciones, la cuenta regresiva y "Entendí" / "Tengo dudas". */
-export default function TrainingViewer({ slug, title, employeeName, minSeconds, token, previous = null, back, embedded = false }: Props) {
-  const name = firstName(employeeName);
+export default function TrainingViewer({ slug, title, firstName: name = '', minSeconds, token, previous = null, back, embedded = false }: Props) {
   const preview = token === null;
   const canAnswer = !preview && previous?.status !== 'trained';
-  const prevText = previous ? PREVIOUS[previous.status]?.(previous.answeredAt) ?? null : null;
+  const prevText = previous ? PREVIOUS[previous.status]?.(previous.day ?? shortDay(previous.answeredAt)) ?? null : null;
 
   const rootRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
   const firstRef = useRef<HTMLButtonElement>(null);
   const doubtBtnRef = useRef<HTMLButtonElement>(null);
   const startRef = useRef(0);
@@ -79,7 +67,8 @@ export default function TrainingViewer({ slug, title, employeeName, minSeconds, 
   const [sheet, setSheet] = useState(false);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState<Answer | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  /** `tooSoon`: el aviso de "todavía no termina" se quita solo cuando la cuenta llega a 0. */
+  const [error, setError] = useState<{ msg: string; tooSoon?: boolean } | null>(null);
   const [done, setDone] = useState<Done | null>(null);
 
   // Cuenta regresiva desde que se abrió la página. "Volver a verla" no la reinicia.
@@ -97,6 +86,10 @@ export default function TrainingViewer({ slug, title, employeeName, minSeconds, 
     setLeft(Math.max(0, n));
   }
 
+  useEffect(() => {
+    if (left === 0) setError(e => (e?.tooSoon ? null : e));
+  }, [left]);
+
   // Con "quitar animaciones" casi todas se quedan en el último paso: se avisa que hay que tocar cada paso.
   useEffect(() => {
     setReduced(!!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
@@ -110,9 +103,19 @@ export default function TrainingViewer({ slug, title, employeeName, minSeconds, 
     return () => btn?.focus({ preventScroll: true });
   }, [sheet]);
 
+  // Escape cierra. Tab no sale de la hoja: la página y la barra quedan `inert`, y dentro del panel
+  // (donde el menú lateral sigue vivo) Tab da la vuelta del último control al primero.
   useEffect(() => {
     if (!sheet) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) setSheet(false); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !busy) { setSheet(false); return; }
+      if (e.key !== 'Tab' || !sheetRef.current) return;
+      const f = [...sheetRef.current.querySelectorAll<HTMLElement>('button:not(:disabled), textarea:not(:disabled)')];
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1], at = document.activeElement;
+      if (e.shiftKey && (at === first || !sheetRef.current.contains(at))) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && (at === last || !sheetRef.current.contains(at))) { e.preventDefault(); first.focus(); }
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [sheet, busy]);
@@ -141,10 +144,11 @@ export default function TrainingViewer({ slug, title, employeeName, minSeconds, 
       r = { data: null, error: e };
     }
     setBusy(null);
-    if (r.error) setError('No hay conexión. Intenta de nuevo.');
+    if (r.error) setError({ msg: 'No hay conexión. Intenta de nuevo.' });
     else if (!r.data?.ok) {
-      if (r.data?.code === 'too_soon' && typeof r.data.seconds_left === 'number') resync(r.data.seconds_left);
-      setError(r.data?.error ?? 'No se pudo guardar.');
+      const tooSoon = r.data?.code === 'too_soon' && typeof r.data.seconds_left === 'number';
+      if (tooSoon) resync(r.data!.seconds_left!);
+      setError({ msg: r.data?.error ?? 'No se pudo guardar.', tooSoon });
     } else {
       setSheet(false);
       setDone(r.data.status === 'trained' ? 'trained' : kind);
@@ -169,7 +173,7 @@ export default function TrainingViewer({ slug, title, employeeName, minSeconds, 
 
   return (
     <div ref={rootRef} className={`${rootCls} ${preview ? '' : v.withBar}`}>
-      <div className={v.wrap}>
+      <div className={v.wrap} inert={sheet}>
         {preview && (
           <div className={v.preview}>
             <span>
@@ -189,7 +193,8 @@ export default function TrainingViewer({ slug, title, employeeName, minSeconds, 
         </header>
 
         {prevText && (
-          <p className={`${v.notice} ${previous?.status === 'doubt' ? v.noticeDoubt : v.noticeOk}`}>{prevText}</p>
+          // Sin `day` del servidor, la fecha se escribe aquí y el navegador podría escribirla distinto.
+          <p className={`${v.notice} ${previous?.status === 'doubt' ? v.noticeDoubt : v.noticeOk}`} suppressHydrationWarning={!previous?.day}>{prevText}</p>
         )}
         {reduced && (
           <p className={`${v.notice} ${v.noticeInfo}`}>Tu teléfono tiene las animaciones apagadas: toca cada paso para verlo.</p>
@@ -199,9 +204,9 @@ export default function TrainingViewer({ slug, title, employeeName, minSeconds, 
       </div>
 
       {!preview && (
-        <div className={v.bar}>
+        <div className={v.bar} inert={sheet}>
           <div className={v.barIn}>
-            {error && !sheet && <p className={v.error} role="alert">{error}</p>}
+            {error && !sheet && <p className={v.error} role="alert">{error.msg}</p>}
             <div className={v.barBtns}>
               {canAnswer ? (
                 <>
@@ -226,7 +231,7 @@ export default function TrainingViewer({ slug, title, employeeName, minSeconds, 
       {sheet && (
         <>
           <div className={v.overlay} style={{ zIndex: 80 }} onClick={() => { if (!busy) setSheet(false); }} />
-          <div className={v.sheet} style={{ zIndex: 81 }} role="dialog" aria-modal="true" aria-labelledby={sheetTitleId}>
+          <div ref={sheetRef} className={v.sheet} style={{ zIndex: 81 }} role="dialog" aria-modal="true" aria-labelledby={sheetTitleId}>
             <div className={v.sheetHead}>
               <h2 id={sheetTitleId}>Tengo dudas</h2>
               <button type="button" className={v.x} onClick={() => setSheet(false)} disabled={!!busy} aria-label="Cerrar">✕</button>
@@ -245,7 +250,7 @@ export default function TrainingViewer({ slug, title, employeeName, minSeconds, 
               <textarea id={noteId} className={v.textarea} value={note} maxLength={500} rows={3}
                 placeholder="¿Qué no te quedó claro? (opcional)" onChange={e => setNote(e.target.value)} />
               <span className={v.count}>{note.length}/500</span>
-              {error && <p className={v.error} role="alert">{error}</p>}
+              {error && <p className={v.error} role="alert">{error.msg}</p>}
               <button type="button" className={`${v.btn} ${v.dark}`} disabled={!!busy} onClick={() => answer('doubt')}>
                 {busy === 'doubt' ? 'Guardando…' : 'Enviar'}
               </button>

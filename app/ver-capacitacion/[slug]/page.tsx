@@ -3,7 +3,8 @@ import { loadViewer } from '@/lib/capacitaciones/viewer';
 import TrainingViewer from '@/components/capacitaciones/TrainingViewer';
 
 // Pública: la abre el teléfono con ?s=<sesión> (cap_open). El middleware no la protege; la protege la sesión de 12 h.
-export const metadata: Metadata = { title: 'Capacitación', robots: { index: false, follow: false } };
+// no-referrer: la sesión va en la dirección y las animaciones enlazan al cotizador (otro sitio).
+export const metadata: Metadata = { title: 'Capacitación', robots: { index: false, follow: false }, referrer: 'no-referrer' };
 export const dynamic = 'force-dynamic';
 
 export default async function Page({ params, searchParams }: {
@@ -23,6 +24,6 @@ export default async function Page({ params, searchParams }: {
       </main>
     );
   }
-  return <TrainingViewer slug={v.slug} title={v.title} employeeName={v.employeeName} minSeconds={v.minSeconds}
+  return <TrainingViewer slug={v.slug} title={v.title} firstName={v.firstName} minSeconds={v.minSeconds}
     token={v.token} previous={v.previous} back={{ href: 'laferre://capacitacion', label: 'Regresar a la app' }} />;
 }
