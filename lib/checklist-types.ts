@@ -1,5 +1,6 @@
 // Tipos compartidos de la lista con firma (supabase/010) en el panel.
 import type { DutyOverride, Rotation } from './duty';
+import type { NotifyEntry } from './notify-scope';
 
 export interface ChecklistItem { id: string; area: string; label: string; days: number[]; needs_photo: boolean; sort: number; }
 
@@ -44,7 +45,10 @@ export type RunResult = { ok: true; run: SignRun } | { ok: false; error: string 
 export interface SignerInfo {
   name: string;
   hasPin: boolean;
-  emails: string[];
+  /** A qué correos llega el aviso y de qué empresa es cada uno (null = las dos). */
+  emails: NotifyEntry[];
+  /** Ya se corrió el SQL 012 (se puede escoger la empresa de cada correo). */
+  scopeReady: boolean;
   /** Hay cuenta de Gmail para mandar (CORREO_USUARIO y CORREO_CLAVE en Vercel). */
   mailReady: boolean;
   /** Firma con PIN bloqueada hasta esta hora (ISO), o null. */

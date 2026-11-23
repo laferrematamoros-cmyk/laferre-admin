@@ -3,19 +3,23 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getSigner, saveSigner, sendTestMail, setSignerPin } from '@/app/ajustes/signer-actions';
 import type { SignerInfo } from '@/lib/checklist-types';
+import type { NotifyEntry } from '@/lib/notify-scope';
+import { companyLabel, type CompanyOpt } from '@/components/ajustes/Usuarios';
 import { IconCheck, IconX } from '@/components/panel/icons';
 import s from '@/components/panel/panel.module.css';
 import a from '@/components/ajustes/aj.module.css';
 
 const hhmm = (iso: string) => new Date(iso).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Matamoros' });
 
-/** Ajustes → Firma de listas: nombre, PIN y a qué correos llega el aviso (supabase/010). */
-export default function Firma() {
+/** Ajustes → Firma de listas: nombre, PIN y a qué correos llega el aviso (supabase/010),
+ *  cada uno de las dos empresas o sólo de una (supabase/012). */
+export default function Firma({ companies }: { companies: CompanyOpt[] }) {
   const [info, setInfo] = useState<SignerInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState('');
-  const [emails, setEmails] = useState<string[]>([]);
+  const [emails, setEmails] = useState<NotifyEntry[]>([]);
   const [newEmail, setNewEmail] = useState('');
+  const [newCompany, setNewCompany] = useState('');
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pinOpen, setPinOpen] = useState(false);
   const [pin, setPin] = useState('');
@@ -36,17 +40,32 @@ export default function Firma() {
 
   const dirty = !!info && (name.trim() !== info.name || JSON.stringify(emails) !== JSON.stringify(info.emails));
 
-  function addEmail() {
+  const pendingEntry = (): NotifyEntry | null => {
     const e = newEmail.trim().toLowerCase();
-    if (!e) return;
-    if (!emails.includes(e)) setEmails([...emails, e]);
+    return e ? { email: e, companyId: newCompany || null } : null;
+  };
+
+  function addEmail() {
+    const p = pendingEntry();
+    if (!p) return;
+    if (!emails.some(x => x.email === p.email)) setEmails([...emails, p]);
     setNewEmail('');
   }
+
+  const setCompanyOf = (email: string, companyId: string) =>
+    setEmails(emails.map(x => (x.email === email ? { ...x, companyId: companyId || null } : x)));
+
+  const coName = (id: string | null) => {
+    if (!id) return 'Las dos empresas';
+    const c = companies.find(x => x.id === id);
+    return c ? companyLabel(c) : 'Otra empresa';
+  };
 
   async function save() {
     setMsg(null);
     setBusy('save');
-    const pending = newEmail.trim() ? [...emails, newEmail.trim().toLowerCase()] : emails;
+    const p = pendingEntry();
+    const pending = p && !emails.some(x => x.email === p.email) ? [...emails, p] : emails;
     const r = await saveSigner(name, pending);
     setBusy(null);
     if (!r.ok) { setMsg({ ok: false, text: r.error }); return; }
@@ -107,27 +126,46 @@ export default function Firma() {
             <span className={a.label}>A qué correos llega el aviso</span>
             {emails.length === 0 && <p className={a.hint}>Todavía ninguno.</p>}
             {emails.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              <div className={a.mailList}>
                 {emails.map(e => (
-                  <span key={e} className={a.chip}>
-                    {e}
+                  <div key={e.email} className={`${a.mailRow} ${ro ? a.ro : ''}`}>
+                    <span className={a.mailAddr}>{e.email}</span>
+                    {!ro && info.scopeReady ? (
+                      <select className={`${a.input} ${a.mailCo}`} value={e.companyId ?? ''} aria-label={`Avisos de qué empresa le llegan a ${e.email}`}
+                        onChange={ev => setCompanyOf(e.email, ev.target.value)}>
+                        <option value="">Las dos empresas</option>
+                        {companies.map(c => <option key={c.id} value={c.id}>Sólo {companyLabel(c)}</option>)}
+                      </select>
+                    ) : (
+                      <span className={`${a.chip} ${a.mailCo}`}>{coName(e.companyId)}</span>
+                    )}
                     {!ro && (
-                      <button type="button" aria-label={`Quitar ${e}`} onClick={() => setEmails(emails.filter(x => x !== e))}
-                        style={{ display: 'inline-flex', border: 0, background: 'none', padding: 0, cursor: 'pointer', color: 'inherit' }}>
-                        <IconX size={12} />
+                      <button type="button" className={a.mailX} aria-label={`Quitar ${e.email}`} onClick={() => setEmails(emails.filter(x => x.email !== e.email))}>
+                        <IconX size={14} />
                       </button>
                     )}
-                  </span>
+                  </div>
                 ))}
               </div>
             )}
             {!ro && (
-              <div className={a.pwRow}>
+              <div className={info.scopeReady ? a.mailAdd : a.pwRow}>
                 <input className={a.input} type="email" inputMode="email" value={newEmail} placeholder="correo@gmail.com" aria-label="Agregar correo"
                   onChange={e => setNewEmail(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addEmail(); }} />
+                {info.scopeReady && (
+                  <select className={a.input} value={newCompany} aria-label="De qué empresa le llegan los avisos" onChange={e => setNewCompany(e.target.value)}>
+                    <option value="">Las dos empresas</option>
+                    {companies.map(c => <option key={c.id} value={c.id}>Sólo {companyLabel(c)}</option>)}
+                  </select>
+                )}
                 <button type="button" className={a.btn} onClick={addEmail} disabled={!newEmail.trim()}>Agregar</button>
               </div>
             )}
+            <p className={a.hint}>
+              {info.scopeReady
+                ? 'A cada correo le llegan sólo los avisos de su empresa. "Las dos empresas" recibe todos, y también el aviso si el PIN se bloquea.'
+                : 'Para escoger de qué empresa le llegan los avisos a cada correo falta correr el SQL 012 en Supabase. Mientras, a todos les llegan los de las dos.'}
+            </p>
           </div>
 
           {!ro && (

@@ -85,7 +85,7 @@ export default function AjustesPage() {
             <Usuarios companies={companies} own={company ? ownCompany?.id ?? null : null} />
           )}
 
-          {role === 'admin' && <Firma />}
+          {role === 'admin' && <Firma companies={companies ?? []} />}
           {role === 'admin' && <Telefonos />}
         </div>
       </div>

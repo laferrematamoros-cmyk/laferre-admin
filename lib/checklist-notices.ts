@@ -2,6 +2,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { finishedMail, lockedMail, type MailMark } from './checklist-mail';
 import { sendMail } from './mailer';
+import { lockRecipients, parseNotify, recipientsFor, type NotifyEntry } from './notify-scope';
 
 // Avisos por correo de la lista con firma (supabase/010):
 // - "LIMPIEZA por firmar": lo pide la app al tocar "Terminé" (/api/listas/aviso) y, de respaldo,
@@ -12,9 +13,19 @@ import { sendMail } from './mailer';
 
 export const PANEL_URL = (process.env.PANEL_URL ?? 'https://laferre-admin.vercel.app').replace(/\/+$/, '');
 
-async function recipients(db: SupabaseClient): Promise<string[]> {
-  const { data } = await db.from('signer_settings').select('notify_emails').eq('id', true).maybeSingle();
-  return ((data?.notify_emails ?? []) as string[]);
+export type NotifyRead =
+  | { ok: true; entries: NotifyEntry[]; scopeReady: boolean }
+  | { ok: false; error: string };
+
+/** Los correos del aviso y de qué empresa es cada uno (Ajustes → Firma de listas). */
+export async function readNotify(db: SupabaseClient): Promise<NotifyRead> {
+  const r = await db.from('signer_settings').select('notify_emails, notify_scope').eq('id', true).maybeSingle();
+  if (!r.error) return { ok: true, entries: parseNotify(r.data?.notify_emails, r.data?.notify_scope), scopeReady: true };
+  if (r.error.code !== '42703') return { ok: false, error: r.error.message };
+  // Antes del SQL 012 no existe notify_scope: todos los correos son de las dos empresas.
+  const old = await db.from('signer_settings').select('notify_emails').eq('id', true).maybeSingle();
+  if (old.error) return { ok: false, error: old.error.message };
+  return { ok: true, entries: parseNotify(old.data?.notify_emails, null), scopeReady: false };
 }
 
 /** Manda el aviso de una lista terminada (una sola vez). Regresa una línea para el registro. */
@@ -22,17 +33,25 @@ export async function notifyRun(db: SupabaseClient, runId: string): Promise<stri
   const claim = await db.from('checklist_runs')
     .update({ notified_at: new Date().toISOString() })
     .eq('id', runId).eq('status', 'awaiting_signature').is('notified_at', null)
-    .select('id, activity_id, employee_id, scheduled_date, finished_at, was_late');
+    .select('id, activity_id, company_id, employee_id, scheduled_date, finished_at, was_late');
   if (claim.error) return `aviso ${runId}: ${claim.error.message}`;
   const run = claim.data?.[0];
   if (!run) return `aviso ${runId}: nada que avisar`;
 
-  const [a, e, m, to] = await Promise.all([
+  const [a, e, m, n] = await Promise.all([
     db.from('activities').select('title').eq('id', run.activity_id).maybeSingle(),
     db.from('employees').select('name').eq('id', run.employee_id).maybeSingle(),
     db.from('checklist_marks').select('area, label, state, reason, photo_path, sort').eq('run_id', runId).order('sort'),
-    recipients(db),
+    readNotify(db),
   ]);
+  if (!n.ok) {
+    await db.from('checklist_runs').update({ notified_at: null }).eq('id', runId).eq('status', 'awaiting_signature');
+    return `aviso ${runId}: ${n.error}`;
+  }
+  // Sólo a los de las dos empresas y a los de la empresa de esta lista. Si no hay nadie, se queda
+  // como avisada (sigue en "Por firmar"): reintentarla sólo estorbaría a las demás en el cron.
+  const to = recipientsFor(n.entries, run.company_id as string);
+  if (to.length === 0) return `aviso ${runId}: nadie a quién avisar de esa empresa`;
   const marks: MailMark[] = ((m.data ?? []) as { area: string; label: string; state: MailMark['state']; reason: string | null; photo_path: string | null }[])
     .map(x => ({ area: x.area, label: x.label, state: x.state, reason: x.reason, hasPhoto: !!x.photo_path }));
   const mail = finishedMail({
@@ -69,7 +88,8 @@ export async function runChecklistNotices(db: SupabaseClient, now = new Date()):
     const claim = await db.from('signer_settings').update({ lock_notified: true }).eq('id', true).eq('lock_notified', false).select('id');
     if (claim.data?.length) {
       const mail = lockedMail(`${PANEL_URL}/ajustes`, st.pin_disabled ? { disabled: true } : { minutes: 15 * Math.max(1, st.pin_lock_count) });
-      const r = await sendMail(await recipients(db), mail);
+      const n = await readNotify(db);
+      const r = await sendMail(n.ok ? lockRecipients(n.entries) : [], mail);
       if (!r.ok) await db.from('signer_settings').update({ lock_notified: false }).eq('id', true);
       log.push(`PIN bloqueado: ${r.ok ? 'avisado' : r.error}`);
     }
