@@ -87,6 +87,25 @@ export async function getRun(runId: string): Promise<RunResult> {
   return { ok: true, run };
 }
 
+/** La lista de una actividad en un día, para enseñar sus fotos en el detalle del Calendario
+ *  (la completion de una lista se crea al firmar, sin foto: las fotos viven en cada tarea).
+ *  `run: null` si esa actividad ese día no fue con lista. */
+export async function getRunFor(activityId: string, date: string): Promise<RunResult | { ok: true; run: null }> {
+  const a = await adminAccess();
+  if (!a.ok) return a;
+  if (!isUuid(activityId) || typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return { ok: false, error: 'No encontrada' };
+  }
+  const db = admin();
+  const { data, error } = await db.from('checklist_runs').select(RUN_COLS)
+    .eq('activity_id', activityId).eq('scheduled_date', date).maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  if (!data) return { ok: true, run: null };
+  if (!allows(a.own, data.company_id)) return { ok: false, error: 'No encontrada' };
+  const [run] = await hydrate(db, [data as RunRow]);
+  return { ok: true, run };
+}
+
 type Owned =
   | { ok: true; session: { name: string | null }; run: { id: string; company_id: string; employee_id: string; activity_id: string } }
   | { ok: false; error: string };

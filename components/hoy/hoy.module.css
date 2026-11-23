@@ -110,6 +110,15 @@
 .photo { display: block; width: 100%; max-height: 300px; object-fit: cover; border-radius: 16px; border: 1px solid var(--hair); }
 .noPhoto { display: grid; place-items: center; height: 110px; border-radius: 16px; background: var(--chip); font-size: 13px; color: var(--faint); }
 .note { margin: 0; padding: 12px 14px; border-radius: 14px; background: var(--chip); font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; }
+/* Fotos de una lista con firma (una por tarea) */
+.shotGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
+.shot { display: flex; flex-direction: column; gap: 5px; min-width: 0; color: inherit; text-decoration: none; }
+.shot img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 12px; border: 1px solid var(--hair); background: var(--chip); }
+.shot span { font-size: 11.5px; line-height: 1.3; color: var(--muted); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.shot:hover img { border-color: var(--accent); }
+.shot:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 12px; }
+.shotFoot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; margin-top: 12px; font-size: 12.5px; color: var(--muted); }
+.shotLink { font-weight: 600; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
 
 @keyframes spanIn { from { transform: scaleX(0); } }
 @keyframes fade { from { opacity: 0; } }
