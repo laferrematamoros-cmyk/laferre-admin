@@ -7,9 +7,9 @@ import { supabase, type Employee } from '@/lib/supabase';
 import { useCompany } from '@/lib/company-context';
 import { matchesWeekOfMonth } from '@/lib/reports';
 import { toRow, type ActivityValues } from '@/lib/activity-form';
-import ActivityForm from '@/components/actividades/ActivityForm';
+import ActivityForm, { type NewList } from '@/components/actividades/ActivityForm';
 import s from '@/components/panel/panel.module.css';
-import { createActivity } from '../actions';
+import { createActivity, createChecklistActivity } from '../actions';
 
 export default function NuevaActividadPage() {
   const router = useRouter();
@@ -22,9 +22,9 @@ export default function NuevaActividadPage() {
       .then(({ data }) => setEmployees(data ?? []));
   }, [company]);
 
-  async function save(v: ActivityValues) {
+  async function save(v: ActivityValues, list?: NewList) {
     if (!company) throw new Error('Escoge una empresa en el menú.');
-    const r = await createActivity({
+    const row = {
       ...toRow(v),
       // Si es mensual y no estamos en su semana, arranca apagada (el cron la prende en su semana).
       is_active: v.weekOfMonth == null ? true : matchesWeekOfMonth(v.weekOfMonth, new Date()),
@@ -33,7 +33,11 @@ export default function NuevaActividadPage() {
       evidence_note: false,
       evidence_signature: false,
       company_id: company.id,
-    });
+    };
+    // Con lista con firma, la actividad, sus tareas y el rol se guardan de un jalón y ya prendida.
+    const r = list
+      ? await createChecklistActivity(row, list.items, list.order, list.current)
+      : await createActivity(row);
     if (!r.ok) throw new Error(r.error);
     // Aviso a los teléfonos de la empresa (si falla, la actividad ya quedó creada).
     fetch('/api/push', {
