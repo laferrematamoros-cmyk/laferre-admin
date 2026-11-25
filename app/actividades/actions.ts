@@ -3,8 +3,9 @@
 import { supabaseAdmin as admin } from '@/lib/supabase';
 import { adminAccess, ownsRow, fail, OK, type Result as ActionResult } from '@/lib/admin-access';
 import { allows, pick } from '@/lib/access-rules';
-import { checkNewList } from '@/lib/checklist-config';
-import { insertListActivity } from '@/lib/checklist-create';
+import { checkList, checkNewList } from '@/lib/checklist-config';
+import { insertListActivity, syncItems } from '@/lib/checklist-create';
+import { mondayOf } from '@/lib/duty';
 import { shopClock } from '@/lib/my-day';
 
 // Con `export type Result = …`, no `export type { Result }`: en un archivo 'use server'
@@ -48,6 +49,47 @@ export async function createChecklistActivity(input: ActivityInput, items: unkno
   if ((data ?? []).length !== list.order.length) return fail('Alguien del rol no es de esta tienda o está dado de baja.');
   const r = await insertListActivity(db, { ...row, assigned_employee_ids: [] }, list.items, list.order, shopClock(new Date()).dateStr);
   return r.ok ? OK : fail(r.error);
+}
+
+/** Editar actividad en una sola pantalla (supabase/010 y 013). Con `list` la deja como lista con
+ *  firma: guarda las tareas, el rol (sólo si cambió: nueva versión desde hoy) y al final la actividad.
+ *  Sin `list` la deja Normal: apaga la lista y conserva sus tareas y su rol por si se vuelve a prender. */
+export async function updateActivityWithList(
+  id: string, input: ActivityInput,
+  list: { items: unknown; order: unknown; current: unknown; rotChanged: boolean } | null,
+): Promise<Result> {
+  const a = await adminAccess();
+  if (!a.ok) return a;
+  const o = await ownsRow('activities', id, a.own);
+  if (!o.ok) return o;
+  const db = admin();
+  if (list) {
+    const chk = checkList(list.items, list.order, list.current);
+    if (!chk.ok) return fail(chk.error);
+    const act = await db.from('activities').select('company_id').eq('id', id).single();
+    if (act.error) return fail(act.error.message);
+    if (list.rotChanged === true) {
+      const { data, error } = await db.from('employees').select('id')
+        .in('id', chk.order).eq('company_id', act.data.company_id).eq('is_active', true);
+      if (error) return fail(error.message);
+      if ((data ?? []).length !== chk.order.length) return fail('Alguien del rol no es de esta tienda o está dado de baja.');
+    } else {
+      const rots = await db.from('activity_rotations').select('id', { count: 'exact', head: true }).eq('activity_id', id);
+      if (rots.error) return fail(rots.error.message);
+      if (!rots.count) return fail('Falta el rol: agrega a quién le toca.');
+    }
+    const s = await syncItems(db, id, chk.items);
+    if (!s.ok) return fail(s.error);
+    if (list.rotChanged === true) {
+      const t = shopClock(new Date()).dateStr;
+      const r = await db.from('activity_rotations').insert({ activity_id: id, employee_ids: chk.order, anchor_week: mondayOf(t), valid_from: t });
+      if (r.error) return fail(`Se guardaron las tareas, pero no el rol: ${r.error.message}`);
+    }
+  }
+  const { error } = await db.from('activities')
+    .update({ ...pick(input, EDITABLE), ...(list ? { assigned_employee_ids: [] } : {}), checklist_enabled: !!list }).eq('id', id);
+  if (error) return fail(list ? `Se guardaron las tareas y el rol, pero no la actividad: ${error.message}` : error.message);
+  return OK;
 }
 
 export async function updateActivity(id: string, input: ActivityInput): Promise<Result> {

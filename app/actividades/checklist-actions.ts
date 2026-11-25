@@ -46,7 +46,8 @@ export async function getChecklistConfig(activityId: string): Promise<ConfigResu
   const t = today();
   const [act, items, rots, ovs] = await Promise.all([
     db.from('activities').select('checklist_enabled').eq('id', activityId).single(),
-    db.from('checklist_items').select('id, area, label, days, needs_photo, sort')
+    // '*': photo_count sólo existe después de supabase/013; sin él cuenta como 1.
+    db.from('checklist_items').select('*')
       .eq('activity_id', activityId).is('archived_at', null).order('sort').order('created_at'),
     db.from('activity_rotations').select('employee_ids, anchor_week, valid_from, created_at')
       .eq('activity_id', activityId).order('valid_from').order('created_at'),
@@ -59,7 +60,8 @@ export async function getChecklistConfig(activityId: string): Promise<ConfigResu
     ok: true,
     config: {
       enabled: !!act.data?.checklist_enabled,
-      items: (items.data ?? []) as ChecklistItem[],
+      items: ((items.data ?? []) as (Omit<ChecklistItem, 'photo_count'> & { photo_count?: number })[])
+        .map(i => ({ id: i.id, area: i.area, label: i.label, days: i.days, needs_photo: i.needs_photo, photo_count: i.photo_count ?? 1, sort: i.sort })),
       rotations: (rots.data ?? []) as Rotation[],
       overrides: (ovs.data ?? []) as (DutyOverride & { id: string })[],
       today: t,

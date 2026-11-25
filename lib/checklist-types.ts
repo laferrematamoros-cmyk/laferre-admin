@@ -2,7 +2,8 @@
 import type { DutyOverride, Rotation } from './duty';
 import type { NotifyEntry } from './notify-scope';
 
-export interface ChecklistItem { id: string; area: string; label: string; days: number[]; needs_photo: boolean; sort: number; }
+/** photo_count: cuántas fotos pide (supabase/013; antes de correrlo, 1). */
+export interface ChecklistItem { id: string; area: string; label: string; days: number[]; needs_photo: boolean; photo_count: number; sort: number; }
 
 export interface ChecklistConfig {
   enabled: boolean;
