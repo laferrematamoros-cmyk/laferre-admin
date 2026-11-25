@@ -98,13 +98,20 @@ export default function SignDialog({ run, onClose, onSign, onReturn }: {
                         {m.label}
                         {m.state === 'skipped' && <span className={v.reason}>No se pudo: {m.reason}</span>}
                         {m.state === 'pending' && <span className={v.gone}>Sin palomear</span>}
-                        {m.hadPhoto && !m.photoUrl && <span className={v.gone}>Foto borrada (más de 21 días)</span>}
+                        {m.hadPhoto && m.photoUrls.length === 0 && <span className={v.gone}>Foto borrada (más de 21 días)</span>}
                       </span>
-                      {m.photoUrl && safeHttps(m.photoUrl) && !returning ? (
-                        <button type="button" className={v.thumb} onClick={() => setViewer({ url: m.photoUrl!, label: m.label })} aria-label={`Ver foto: ${m.label}`}>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={m.photoUrl} alt={m.label} loading="lazy" />
-                        </button>
+                      {!returning && m.photoUrls.some(u => safeHttps(u)) ? (
+                        <span className={v.thumbs}>
+                          {m.photoUrls.filter(u => safeHttps(u)).map((url, i, all) => {
+                            const label = all.length > 1 ? `${m.label} · ${i + 1} de ${all.length}` : m.label;
+                            return (
+                              <button key={url} type="button" className={v.thumb} onClick={() => setViewer({ url, label })} aria-label={`Ver foto: ${label}`}>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={url} alt={label} loading="lazy" />
+                              </button>
+                            );
+                          })}
+                        </span>
                       ) : <span />}
                     </>
                   );

@@ -22,8 +22,9 @@ export type MarkState = 'pending' | 'done' | 'skipped';
 export interface SignMark {
   item_id: string; area: string; label: string; needs_photo: boolean; sort: number;
   state: MarkState; reason: string | null;
-  /** Enlace firmado de 1 h; null si no hay foto o ya se borró (más de 21 días). */
-  photoUrl: string | null;
+  /** Enlaces firmados de 1 h, uno por foto (supabase/013: una tarea puede pedir varias).
+   *  Vacío si no hay foto o ya se borraron (más de 21 días). */
+  photoUrls: string[];
   hadPhoto: boolean;
 }
 export interface SignRun {

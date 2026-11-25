@@ -75,7 +75,7 @@ export default function FirmasPage() {
             <div className={v.list}>
               {runs.map(r => {
                 const skipped = r.marks.filter(m => m.state === 'skipped').length;
-                const photos = r.marks.filter(m => m.photoUrl).length;
+                const photos = r.marks.reduce((n, m) => n + m.photoUrls.length, 0);
                 return (
                   <button key={r.id} type="button" className={v.item} onClick={() => { setFlash(null); setOpen(r); }}>
                     <div className={v.itemTop}>

@@ -23,7 +23,7 @@ function ListEvidence({ run }: { run: SignRun }) {
       {shots.length > 0 ? (
         <div className={h.shotGrid}>
           {shots.map(s => (
-            <a key={s.itemId} href={s.url} target="_blank" rel="noopener noreferrer" className={h.shot}>
+            <a key={s.url} href={s.url} target="_blank" rel="noopener noreferrer" className={h.shot}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={s.url} alt={s.label} loading="lazy" />
               <span>{s.label}</span>

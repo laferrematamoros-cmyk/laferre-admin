@@ -17,9 +17,9 @@ export function listShots(run: Pick<SignRun, 'marks'>): ListShots {
   const shots: ListShot[] = [];
   let gone = 0;
   for (const m of run.marks) {
-    const url = safeHttps(m.photoUrl);
-    if (url) shots.push({ itemId: m.item_id, label: m.label, url });
-    else if (m.hadPhoto) gone++;
+    const urls = m.photoUrls.map(u => safeHttps(u)).filter((u): u is string => !!u);
+    urls.forEach((url, i) => shots.push({ itemId: m.item_id, label: urls.length > 1 ? `${m.label} · ${i + 1} de ${urls.length}` : m.label, url }));
+    if (urls.length === 0 && m.hadPhoto) gone++;
   }
   return {
     shots,

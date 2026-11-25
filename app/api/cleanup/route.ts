@@ -15,7 +15,8 @@ async function cleanChecklistPhotos(supabase: SupabaseClient): Promise<number> {
   if (error || !Array.isArray(data) || data.length === 0) return 0;
   const names = data as string[];
   const { data: removed } = await supabase.storage.from('listas').remove(names);
-  await supabase.from('checklist_marks').update({ photo_path: null }).in('photo_path', names);
+  // Las fotos de una tarea se toman juntas: al irse la primera (photo_path) se van todas (photo_paths, supabase/013).
+  await supabase.from('checklist_marks').update({ photo_path: null, photo_paths: null }).in('photo_path', names);
   return removed?.length ?? 0;
 }
 

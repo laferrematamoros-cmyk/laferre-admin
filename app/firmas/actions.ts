@@ -29,13 +29,16 @@ async function hydrate(db: SupabaseClient, rows: RunRow[]): Promise<SignRun[]> {
   const [acts, emps, marks] = await Promise.all([
     db.from('activities').select('id, title').in('id', [...new Set(rows.map(r => r.activity_id))]),
     db.from('employees').select('id, name').in('id', [...new Set(rows.map(r => r.employee_id))]),
-    db.from('checklist_marks').select('run_id, item_id, area, label, needs_photo, sort, state, reason, photo_path')
+    // '*': photo_paths (varias fotos) sólo existe después de supabase/013; sin él se usa photo_path.
+    db.from('checklist_marks').select('*')
       .in('run_id', rows.map(r => r.id)).order('sort'),
   ]);
   const title = new Map((acts.data ?? []).map(a => [a.id as string, a.title as string]));
   const name = new Map((emps.data ?? []).map(e => [e.id as string, e.name as string]));
-  const markRows = (marks.data ?? []) as (Omit<SignMark, 'photoUrl' | 'hadPhoto'> & { run_id: string; photo_path: string | null })[];
-  const paths = [...new Set(markRows.map(m => m.photo_path).filter((p): p is string => !!p))];
+  const markRows = (marks.data ?? []) as (Omit<SignMark, 'photoUrls' | 'hadPhoto'> & { run_id: string; photo_path: string | null; photo_paths?: string[] | null })[];
+  const shotsOf = (m: { photo_path: string | null; photo_paths?: string[] | null }) =>
+    (m.photo_paths?.length ? m.photo_paths : m.photo_path ? [m.photo_path] : []);
+  const paths = [...new Set(markRows.flatMap(shotsOf))];
   const signed = new Map<string, string>();
   if (paths.length) {
     const { data: urls } = await db.storage.from(BUCKET).createSignedUrls(paths, 3600);
@@ -55,7 +58,7 @@ async function hydrate(db: SupabaseClient, rows: RunRow[]): Promise<SignRun[]> {
     signedVia: r.signed_via,
     marks: markRows.filter(m => m.run_id === r.id).map(m => ({
       item_id: m.item_id, area: m.area, label: m.label, needs_photo: m.needs_photo, sort: m.sort, state: m.state, reason: m.reason,
-      photoUrl: m.photo_path ? signed.get(m.photo_path) ?? null : null,
+      photoUrls: shotsOf(m).map(p => signed.get(p)).filter((u): u is string => !!u),
       hadPhoto: m.needs_photo && m.state === 'done',
     })),
   }));
