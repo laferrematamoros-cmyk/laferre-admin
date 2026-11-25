@@ -67,7 +67,7 @@
   .side { position: static; }
 }
 @media (max-width: 767px) {
-  .bar .btn { flex: 1; }
+  .bar .btn { flex: 1; white-space: nowrap; padding: 0 14px; }
   .dayBtn { min-height: 44px; font-size: 12px; }
   .timeInput { padding: 10px 10px; font-size: 16px; }
 }
