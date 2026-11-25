@@ -1,4 +1,4 @@
-import { cleanItems, rotateTo, overrideSpan } from '../checklist-config';
+import { checkNewList, cleanItems, rotateTo, overrideSpan } from '../checklist-config';
 
 const ok = { area: ' Baño ', label: ' Limpiar retrete ', days: [6, 2, 4, 2], needs_photo: true };
 
@@ -41,5 +41,42 @@ describe('overrideSpan', () => {
   it('semana: de lunes a domingo; día: ese día', () => {
     expect(overrideSpan('week', '2026-11-26')).toEqual({ from: '2026-11-23', to: '2026-11-29' });
     expect(overrideSpan('day', '2026-11-26')).toEqual({ from: '2026-11-26', to: '2026-11-26' });
+  });
+});
+
+describe('checkNewList', () => {
+  const A = '11111111-1111-4111-8111-111111111111';
+  const B = '22222222-2222-4222-8222-222222222222';
+  const C = '33333333-3333-4333-8333-333333333333';
+  const task = { area: 'Bodega 1', label: 'Barrer', days: [1, 2], needs_photo: true };
+
+  it('regresa las tareas limpias y el rol con la de esta semana primero', () => {
+    expect(checkNewList([task], [A, B, C], B)).toEqual({
+      ok: true,
+      items: [{ area: 'Bodega 1', label: 'Barrer', days: [1, 2], needs_photo: true }],
+      order: [B, C, A],
+    });
+  });
+
+  it('pide al menos una tarea', () => {
+    expect(checkNewList([], [A], A)).toEqual({ ok: false, error: 'Agrega al menos una tarea.' });
+  });
+
+  it('usa los mismos errores de las tareas que la pantalla de la lista', () => {
+    expect(checkNewList([{ ...task, label: ' ' }], [A], A)).toEqual({ ok: false, error: 'La tarea 1 no tiene nombre.' });
+  });
+
+  it('pide al menos una persona en el rol', () => {
+    expect(checkNewList([task], [], null)).toEqual({ ok: false, error: 'Agrega al menos una persona al rol.' });
+  });
+
+  it('rechaza un rol con repetidos o ids raros', () => {
+    expect(checkNewList([task], [A, A], A)).toEqual({ ok: false, error: 'Rol no válido.' });
+    expect(checkNewList([task], ['x'], 'x')).toEqual({ ok: false, error: 'Rol no válido.' });
+  });
+
+  it('pide a quién le toca esta semana, y que esté en el rol', () => {
+    expect(checkNewList([task], [A, B], null)).toEqual({ ok: false, error: 'Elige a quién le toca esta semana.' });
+    expect(checkNewList([task], [A, B], C)).toEqual({ ok: false, error: 'Elige a quién le toca esta semana.' });
   });
 });

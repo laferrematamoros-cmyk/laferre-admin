@@ -46,3 +46,20 @@ export function overrideSpan(kind: 'week' | 'day', date: string): { from: string
   const from = mondayOf(date);
   return { from, to: addDays(from, 6) };
 }
+
+export const MAX_ROTATION = 20;
+
+/** Para crear de un jalón una actividad con lista: al menos una tarea, el rol y quién empieza esta semana.
+ *  Regresa el rol ya girado (la de esta semana primero), como lo guarda activity_rotations. */
+export function checkNewList(items: unknown, order: unknown, current: unknown):
+  { ok: true; items: ItemInput[]; order: string[] } | { ok: false; error: string } {
+  const c = cleanItems(items);
+  if (!c.ok) return c;
+  if (c.items.length === 0) return { ok: false, error: 'Agrega al menos una tarea.' };
+  if (!Array.isArray(order) || order.length === 0) return { ok: false, error: 'Agrega al menos una persona al rol.' };
+  if (order.length > MAX_ROTATION || !order.every(isUuid) || new Set(order).size !== order.length) {
+    return { ok: false, error: 'Rol no válido.' };
+  }
+  if (typeof current !== 'string' || !order.includes(current)) return { ok: false, error: 'Elige a quién le toca esta semana.' };
+  return { ok: true, items: c.items.map(({ id: _id, ...x }) => x), order: rotateTo(order, current) };
+}
