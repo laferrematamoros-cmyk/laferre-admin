@@ -1,7 +1,7 @@
 // Reglas puras para configurar una lista con firma (supabase/010): validar las tareas,
 // acomodar el rol y calcular los cambios. Las usan app/actividades/checklist-actions.ts y el editor.
 import { isUuid } from './access-rules';
-import { mondayOf } from './duty';
+import { dutyOn, mondayOf, type Rotation } from './duty';
 
 /** photo_count: cuántas fotos pide la tarea cuando needs_photo (supabase/013); sin foto queda en 1. */
 export interface ItemInput { id?: string; area: string; label: string; days: number[]; needs_photo: boolean; photo_count: number; }
@@ -77,4 +77,20 @@ export function checkList(items: unknown, order: unknown, current: unknown): Lis
   }
   if (typeof current !== 'string' || !order.includes(current)) return { ok: false, error: 'Elige a quién le toca esta semana.' };
   return { ok: true, items: c.items, order: rotateTo(order, current) };
+}
+
+/** La versión del rol vigente hoy (o la más nueva si ninguna ha empezado). */
+export function currentRotation(rots: Rotation[], today: string): Rotation | null {
+  const started = rots.filter(r => r.valid_from <= today);
+  const pool = started.length ? started : rots;
+  return [...pool].sort((a, b) => b.valid_from.localeCompare(a.valid_from) || b.created_at.localeCompare(a.created_at))[0] ?? null;
+}
+
+/** Para editar el rol: el orden con el de esta semana primero (sin contar cambios de un día o semana). */
+export function rolNow(rots: Rotation[], today: string): { order: string[]; current: string | null } {
+  const rot = currentRotation(rots, today);
+  if (!rot) return { order: [], current: null };
+  const now = dutyOn([rot], [], today);
+  const order = now ? rotateTo(rot.employee_ids, now) : [...rot.employee_ids];
+  return { order, current: order[0] ?? null };
 }

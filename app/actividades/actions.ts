@@ -92,16 +92,6 @@ export async function updateActivityWithList(
   return OK;
 }
 
-export async function updateActivity(id: string, input: ActivityInput): Promise<Result> {
-  const a = await adminAccess();
-  if (!a.ok) return a;
-  const o = await ownsRow('activities', id, a.own);
-  if (!o.ok) return o;
-  const { error } = await admin().from('activities').update(pick(input, EDITABLE)).eq('id', id);
-  if (error) return fail(error.message);
-  return OK;
-}
-
 /** Pausar / reanudar. Guarda cada pausa con su inicio y su fin para que Reportes
  *  sólo deje fuera esos días (supabase/005). */
 export async function setActivityActive(id: string, isActive: boolean): Promise<Result> {

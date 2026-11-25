@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { Employee } from '@/lib/supabase';
 import { EMPTY_VALUES, REMINDERS, summaryText, validate, type ActivityValues } from '@/lib/activity-form';
 import { joinEs } from '@/lib/report-insights';
-import { checkNewList, type ItemInput } from '@/lib/checklist-config';
+import { checkList, rotateTo, type ItemInput } from '@/lib/checklist-config';
 import { IconCamera, IconUsers } from '@/components/panel/icons';
 import s from '@/components/panel/panel.module.css';
 import f from './form.module.css';
@@ -12,8 +12,12 @@ import c from './checklist.module.css';
 import ChecklistTasks, { type TaskDraft } from './ChecklistTasks';
 import RotationPicker from './RotationPicker';
 
-/** Lo que trae "Crear actividad" cuando se escogió Lista con firma (supabase/010). */
-export interface NewList { items: ItemInput[]; order: string[]; current: string; }
+/** Lo que trae Crear o Guardar cuando se escogió Lista con firma (supabase/010). rotChanged: el rol
+ *  es distinto del guardado (al crear, siempre). Las tareas que ya existen traen su id. */
+export interface NewList { items: ItemInput[]; order: string[]; current: string; rotChanged: boolean; }
+
+/** Al editar: cómo está guardada la lista (aunque esté apagada, sus tareas y su rol se conservan). */
+export interface InitialList { enabled: boolean; tasks: TaskDraft[]; order: string[]; current: string | null; }
 
 const WEEK = [1, 2, 3, 4, 5, 6, 0];
 const SHORT = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -32,11 +36,14 @@ const initials = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map(w
 const toggle = (list: string[] | number[], x: string | number) =>
   (list as (string | number)[]).includes(x) ? (list as (string | number)[]).filter(y => y !== x) : [...list, x];
 
-/** Formulario único para crear y editar una actividad. Al crear se puede escoger Lista con firma
- *  y armar ahí mismo sus tareas y su rol (se guardan de un jalón). */
-export default function ActivityForm({ mode, initial = EMPTY_VALUES, employees, onSubmit, onCancel }: {
+/** Formulario único para crear y editar una actividad. Se escoge si es Normal o Lista con firma y,
+ *  con lista, ahí mismo se arman sus tareas y su rol: un solo botón guarda todo. `rolExtra` va debajo
+ *  del rol (al editar: quién la hace las próximas semanas y los cambios). */
+export default function ActivityForm({ mode, initial = EMPTY_VALUES, initialList, rolExtra, employees, onSubmit, onCancel }: {
   mode: 'create' | 'edit';
   initial?: ActivityValues;
+  initialList?: InitialList;
+  rolExtra?: ReactNode;
   employees: Pick<Employee, 'id' | 'name'>[];
   onSubmit: (v: ActivityValues, list?: NewList) => Promise<void>;
   onCancel: () => void;
@@ -45,13 +52,13 @@ export default function ActivityForm({ mode, initial = EMPTY_VALUES, employees, 
   const [tried, setTried] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [kind, setKind] = useState<'normal' | 'lista'>('normal');
-  const [tasks, setTasks] = useState<TaskDraft[]>([]);
-  const [order, setOrder] = useState<string[]>([]);
-  const [current, setCurrent] = useState<string | null>(null);
+  const [kind, setKind] = useState<'normal' | 'lista'>(initialList?.enabled ? 'lista' : 'normal');
+  const [tasks, setTasks] = useState<TaskDraft[]>(initialList?.tasks ?? []);
+  const [order, setOrder] = useState<string[]>(initialList?.order ?? []);
+  const [current, setCurrent] = useState<string | null>(initialList?.current ?? null);
   const [listError, setListError] = useState<string | null>(null);
   const set = <K extends keyof ActivityValues>(k: K, val: ActivityValues[K]) => setV(p => ({ ...p, [k]: val }));
-  const isList = mode === 'create' && kind === 'lista';
+  const isList = kind === 'lista';
   const whoNow = current ? employees.find(e => e.id === current)?.name ?? null : null;
 
   const errs = tried ? validate(v) : {};
@@ -70,9 +77,13 @@ export default function ActivityForm({ mode, initial = EMPTY_VALUES, employees, 
     }
     let list: NewList | undefined;
     if (isList) {
-      const chk = checkNewList(tasks.map(({ key: _k, id: _i, ...x }) => x), order, current);
+      const chk = checkList(tasks.map(({ key: _k, ...x }) => x), order, current);
       if (!chk.ok) { setListError(chk.error); return; }
-      list = { items: chk.items, order, current: current as string };
+      // El rol cambió si es distinto del guardado (mismo círculo y misma persona esta semana = igual).
+      const saved = initialList?.order ?? [];
+      const rotChanged = mode === 'create' || saved.length === 0
+        || JSON.stringify(chk.order) !== JSON.stringify(rotateTo(saved, initialList?.current ?? saved[0]));
+      list = { items: chk.items, order, current: current as string, rotChanged };
     }
     setSaving(true);
     setSaveError(null);
@@ -88,21 +99,22 @@ export default function ActivityForm({ mode, initial = EMPTY_VALUES, employees, 
     <>
       <div className={f.wrap}>
         <div className={f.col}>
-          {mode === 'create' && (
-            <section className={s.card}>
-              <h2 className={f.sectionTitle}>¿Cómo se marca?</h2>
-              <div className={f.kinds} role="group" aria-label="Cómo se marca">
-                <button type="button" className={f.kind} aria-pressed={kind === 'normal'} onClick={() => { setKind('normal'); setListError(null); }}>
-                  <b>Normal</b>
-                  <small>Se marca una vez, con o sin foto.</small>
-                </button>
-                <button type="button" className={f.kind} aria-pressed={kind === 'lista'} onClick={() => setKind('lista')}>
-                  <b>Lista con firma</b>
-                  <small>Varias tareas con foto, y tú la firmas.</small>
-                </button>
-              </div>
-            </section>
-          )}
+          <section className={s.card}>
+            <h2 className={f.sectionTitle}>¿Cómo se marca?</h2>
+            <div className={f.kinds} role="group" aria-label="Cómo se marca">
+              <button type="button" className={f.kind} aria-pressed={kind === 'normal'} onClick={() => { setKind('normal'); setListError(null); }}>
+                <b>Normal</b>
+                <small>Se marca una vez, con o sin foto.</small>
+              </button>
+              <button type="button" className={f.kind} aria-pressed={kind === 'lista'} onClick={() => setKind('lista')}>
+                <b>Lista con firma</b>
+                <small>Varias tareas con foto, y tú la firmas.</small>
+              </button>
+            </div>
+            {mode === 'edit' && initialList?.enabled && !isList && (
+              <p className={f.hint} style={{ marginTop: 10 }}>Al guardar se apaga la lista. Sus tareas y su rol se quedan guardados por si la vuelves a prender.</p>
+            )}
+          </section>
 
           <section className={s.card}>
             <h2 className={f.sectionTitle}>Qué hay que hacer</h2>
@@ -199,6 +211,7 @@ export default function ActivityForm({ mode, initial = EMPTY_VALUES, employees, 
                     employees={employees} order={order} current={current}
                     onChange={(o, cur) => { setOrder(o); setCurrent(cur); setListError(null); }}
                   />
+                  {rolExtra}
                 </div>
               </section>
             </>

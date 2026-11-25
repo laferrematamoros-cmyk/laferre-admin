@@ -93,7 +93,7 @@ export default function BitacoraPage() {
             <div className={s.sub}>Lo que se hizo cada día, quién lo hizo y tu firma.</div>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            <Link href={`/actividades/${id}/lista`} className={s.btn}>Lista y rol</Link>
+            <Link href={`/actividades/${id}`} className={s.btn}>Editar actividad</Link>
             <button type="button" className={`${s.btn} ${s.btnPrimary}`} onClick={pdf} disabled={loading || !bit || pdfBusy}>
               <IconDownload size={15} /> {pdfBusy ? 'Armando…' : 'Descargar PDF'}
             </button>

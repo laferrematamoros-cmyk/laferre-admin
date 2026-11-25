@@ -9,9 +9,13 @@ const WEEK = [1, 2, 3, 4, 5, 6, 0];
 const LETTER = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
 const DAY_NAME = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 const MON_SAT = [1, 2, 3, 4, 5, 6];
+/** 0 = sin foto; 1 a 6 = cuántas fotos pide (supabase/013). */
+const PHOTO_OPTIONS = [0, 1, 2, 3, 4, 5, 6];
+const photoText = (n: number) => (n === 0 ? 'Sin foto' : n === 1 ? '1 foto' : `${n} fotos`);
 
-/** Una tarea en edición: `key` es para React; `id` sólo si ya está guardada. */
-export interface TaskDraft { key: string; id?: string; area: string; label: string; days: number[]; needs_photo: boolean; }
+/** Una tarea en edición: `key` es para React; `id` sólo si ya está guardada.
+ *  photo_count: cuántas fotos pide cuando needs_photo (sin foto queda en 1). */
+export interface TaskDraft { key: string; id?: string; area: string; label: string; days: number[]; needs_photo: boolean; photo_count: number; }
 
 let seq = 0;
 export const newKey = () => `n${++seq}`;
@@ -40,7 +44,7 @@ export default function ChecklistTasks({ draft, onChange, defaultDays }: {
   const [newArea, setNewArea] = useState('');
   const areas = [...new Set(draft.map(d => d.area))];
   const startDays = () => (defaultDays.length ? [...defaultDays].sort((a, b) => a - b) : [...MON_SAT]);
-  const blank = (area: string): TaskDraft => ({ key: newKey(), area, label: '', days: startDays(), needs_photo: false });
+  const blank = (area: string): TaskDraft => ({ key: newKey(), area, label: '', days: startDays(), needs_photo: false, photo_count: 1 });
 
   const patch = (key: string, p: Partial<TaskDraft>) => onChange(draft.map(d => (d.key === key ? { ...d, ...p } : d)));
   const move = (key: string, dir: -1 | 1) => {
@@ -92,13 +96,15 @@ export default function ChecklistTasks({ draft, onChange, defaultDays }: {
                   ))}
                 </div>
                 <div className={c.tools}>
-                  <button
-                    type="button" className={`${c.mini} ${c.photo}`} aria-pressed={d.needs_photo}
-                    aria-label="Pide foto" title={d.needs_photo ? 'Pide foto' : 'No pide foto'}
-                    onClick={() => patch(d.key, { needs_photo: !d.needs_photo })}
-                  >
+                  <label className={`${c.photoPick} ${d.needs_photo ? c.photoOn : ''}`}>
                     <IconCamera size={15} />
-                  </button>
+                    <select
+                      aria-label={`Fotos de ${d.label || 'la tarea'}`} value={d.needs_photo ? d.photo_count : 0}
+                      onChange={e => { const n = Number(e.target.value); patch(d.key, { needs_photo: n > 0, photo_count: n > 0 ? n : 1 }); }}
+                    >
+                      {PHOTO_OPTIONS.map(n => <option key={n} value={n}>{photoText(n)}</option>)}
+                    </select>
+                  </label>
                   <button type="button" className={c.mini} aria-label="Subir" disabled={idx === 0} onClick={() => move(d.key, -1)}><IconCaretUp size={14} /></button>
                   <button type="button" className={c.mini} aria-label="Bajar" disabled={idx === rows.length - 1} onClick={() => move(d.key, 1)}><IconCaretDown size={14} /></button>
                   <button type="button" className={c.mini} aria-label="Quitar" onClick={() => onChange(draft.filter(x => x.key !== d.key))}><IconX size={14} /></button>

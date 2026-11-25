@@ -1,4 +1,4 @@
-import { checkList, checkNewList, cleanItems, rotateTo, overrideSpan } from '../checklist-config';
+import { checkList, checkNewList, cleanItems, rolNow, rotateTo, overrideSpan } from '../checklist-config';
 
 const ok = { area: ' Baño ', label: ' Limpiar retrete ', days: [6, 2, 4, 2], needs_photo: true };
 
@@ -98,5 +98,21 @@ describe('checkList', () => {
   it('checkNewList quita los ids (es una lista nueva)', () => {
     const r = checkNewList([{ id: T, area: 'Unidad 1', label: 'Llantas', days: [1], needs_photo: true }], [A], A);
     expect(r.ok && r.items[0]).toEqual({ area: 'Unidad 1', label: 'Llantas', days: [1], needs_photo: true, photo_count: 1 });
+  });
+});
+
+describe('rolNow', () => {
+  const rot = (ids: string[], anchor: string, from: string, created = '2026-11-01T00:00:00Z') =>
+    ({ employee_ids: ids, anchor_week: anchor, valid_from: from, created_at: created });
+  it('sin rol: nadie', () => {
+    expect(rolNow([], '2026-11-25')).toEqual({ order: [], current: null });
+  });
+  it('el de esta semana primero, sin cambiar el círculo', () => {
+    // Anclado el lunes 16: E esa semana, L la del 23 (la de hoy), Y la del 30.
+    expect(rolNow([rot(['E', 'L', 'Y'], '2026-11-16', '2026-11-16')], '2026-11-25')).toEqual({ order: ['L', 'Y', 'E'], current: 'L' });
+  });
+  it('usa la versión vigente hoy, no una que empieza después', () => {
+    const r = rolNow([rot(['E', 'L'], '2026-11-23', '2026-11-20'), rot(['Y'], '2026-11-30', '2026-11-30')], '2026-11-25');
+    expect(r).toEqual({ order: ['E', 'L'], current: 'E' });
   });
 });

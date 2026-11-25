@@ -3,8 +3,8 @@
 import { supabaseAdmin as admin } from '@/lib/supabase';
 import { adminAccess, ownsRow, fail, OK, type Result as ActionResult } from '@/lib/admin-access';
 import { isUuid } from '@/lib/access-rules';
-import { cleanItems, overrideSpan, rotateTo } from '@/lib/checklist-config';
-import { mondayOf, type DutyOverride, type Rotation } from '@/lib/duty';
+import { overrideSpan } from '@/lib/checklist-config';
+import type { DutyOverride, Rotation } from '@/lib/duty';
 import { shopClock } from '@/lib/my-day';
 import type { ChecklistItem, ConfigResult } from '@/lib/checklist-types';
 
@@ -12,7 +12,8 @@ import type { ChecklistItem, ConfigResult } from '@/lib/checklist-types';
 // la compilación de producción lo vuelve un export real y el archivo truena al cargar.
 export type Result = ActionResult;
 
-// Lista con firma (supabase/010): tareas, rol semanal y cambios de una actividad.
+// Lista con firma (supabase/010): leer tareas y rol, y los cambios de una semana o un día.
+// Guardar tareas y rol va junto con la actividad (app/actividades/actions.ts → updateActivityWithList).
 // Todas piden administrador y sólo tocan actividades de la empresa de la sesión.
 
 async function guard(activityId: unknown) {
@@ -67,72 +68,6 @@ export async function getChecklistConfig(activityId: string): Promise<ConfigResu
       today: t,
     },
   };
-}
-
-export async function setChecklistEnabled(activityId: string, on: boolean): Promise<Result> {
-  const g = await guard(activityId);
-  if (!g.ok) return g;
-  const db = admin();
-  if (on === true) {
-    const [items, rots] = await Promise.all([
-      db.from('checklist_items').select('id', { count: 'exact', head: true }).eq('activity_id', activityId).is('archived_at', null),
-      db.from('activity_rotations').select('id', { count: 'exact', head: true }).eq('activity_id', activityId),
-    ]);
-    if (items.error || rots.error) return fail((items.error ?? rots.error)!.message);
-    if (!items.count || !rots.count) return fail('Antes de prenderla agrega tareas y el rol.');
-  }
-  const { error } = await db.from('activities').update({ checklist_enabled: on === true }).eq('id', activityId);
-  if (error) return fail(error.message);
-  return OK;
-}
-
-/** Guarda la lista completa: actualiza las que vienen con id, agrega las nuevas y archiva las que ya no vienen. */
-export async function saveChecklistItems(activityId: string, items: unknown): Promise<Result> {
-  const g = await guard(activityId);
-  if (!g.ok) return g;
-  const c = cleanItems(items);
-  if (!c.ok) return fail(c.error);
-  const db = admin();
-  const { data: existing, error } = await db.from('checklist_items').select('id').eq('activity_id', activityId).is('archived_at', null);
-  if (error) return fail(error.message);
-  const have = new Set((existing ?? []).map(r => r.id as string));
-  if (c.items.some(i => i.id && !have.has(i.id))) return fail('Una tarea ya no existe. Recarga la página.');
-
-  const keep = new Set(c.items.filter(i => i.id).map(i => i.id!));
-  for (const [i, it] of c.items.entries()) {
-    if (!it.id) continue;
-    const r = await db.from('checklist_items')
-      .update({ area: it.area, label: it.label, days: it.days, needs_photo: it.needs_photo, sort: (i + 1) * 10 }).eq('id', it.id);
-    if (r.error) return fail(r.error.message);
-  }
-  const fresh = c.items.map((it, i) => ({ it, sort: (i + 1) * 10 })).filter(x => !x.it.id)
-    .map(x => ({ activity_id: activityId, area: x.it.area, label: x.it.label, days: x.it.days, needs_photo: x.it.needs_photo, sort: x.sort }));
-  if (fresh.length) {
-    const r = await db.from('checklist_items').insert(fresh);
-    if (r.error) return fail(r.error.message);
-  }
-  const gone = [...have].filter(id => !keep.has(id));
-  if (gone.length) {
-    const r = await db.from('checklist_items').update({ archived_at: new Date().toISOString() }).in('id', gone);
-    if (r.error) return fail(r.error.message);
-  }
-  return OK;
-}
-
-/** Nueva versión del rol desde hoy: el orden de `employeeIds` y a quién le toca esta semana. */
-export async function saveRotation(activityId: string, employeeIds: string[], currentId: string): Promise<Result> {
-  const g = await guard(activityId);
-  if (!g.ok) return g;
-  if (!Array.isArray(employeeIds) || employeeIds.length === 0) return fail('Agrega al menos una persona al rol.');
-  if (employeeIds.length > 20 || !employeeIds.every(isUuid) || new Set(employeeIds).size !== employeeIds.length) return fail('Rol no válido.');
-  if (!employeeIds.includes(currentId)) return fail('Elige a quién le toca esta semana.');
-  if (!(await sameCompany(activityId, employeeIds))) return fail('Alguien del rol no es de esta tienda o está dado de baja.');
-  const t = today();
-  const { error } = await admin().from('activity_rotations').insert({
-    activity_id: activityId, employee_ids: rotateTo(employeeIds, currentId), anchor_week: mondayOf(t), valid_from: t,
-  });
-  if (error) return fail(error.message);
-  return OK;
 }
 
 /** "Cambiar esta semana" (lun–dom) o "Cambiar un día". Nunca hacia atrás: el pasado no se reescribe. */
