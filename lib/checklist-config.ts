@@ -3,9 +3,11 @@
 import { isUuid } from './access-rules';
 import { mondayOf } from './duty';
 
-export interface ItemInput { id?: string; area: string; label: string; days: number[]; needs_photo: boolean; }
+/** photo_count: cuántas fotos pide la tarea cuando needs_photo (supabase/013); sin foto queda en 1. */
+export interface ItemInput { id?: string; area: string; label: string; days: number[]; needs_photo: boolean; photo_count: number; }
 
 export const MAX_ITEMS = 60;
+export const MAX_PHOTOS = 6;
 
 export function cleanItems(input: unknown): { ok: true; items: ItemInput[] } | { ok: false; error: string } {
   if (!Array.isArray(input)) return { ok: false, error: 'Lista no válida.' };
@@ -24,7 +26,12 @@ export function cleanItems(input: unknown): { ok: true; items: ItemInput[] } | {
     const days = [...new Set((Array.isArray(x.days) ? x.days : []).filter((d): d is number => Number.isInteger(d) && d >= 0 && d <= 6))]
       .sort((a, b) => a - b);
     if (days.length === 0) return { ok: false, error: `"${label}" no tiene ningún día.` };
-    items.push({ ...(isUuid(x.id) ? { id: x.id } : {}), area, label, days, needs_photo: x.needs_photo === true });
+    const count = x.photo_count === undefined || x.photo_count === null ? 1 : x.photo_count;
+    if (typeof count !== 'number' || !Number.isInteger(count) || count < 1 || count > MAX_PHOTOS) {
+      return { ok: false, error: `"${label}" pide un número de fotos no válido (de 1 a ${MAX_PHOTOS}).` };
+    }
+    const needs = x.needs_photo === true;
+    items.push({ ...(isUuid(x.id) ? { id: x.id } : {}), area, label, days, needs_photo: needs, photo_count: needs ? count : 1 });
   }
   return { ok: true, items };
 }
@@ -49,10 +56,18 @@ export function overrideSpan(kind: 'week' | 'day', date: string): { from: string
 
 export const MAX_ROTATION = 20;
 
-/** Para crear de un jalón una actividad con lista: al menos una tarea, el rol y quién empieza esta semana.
- *  Regresa el rol ya girado (la de esta semana primero), como lo guarda activity_rotations. */
-export function checkNewList(items: unknown, order: unknown, current: unknown):
-  { ok: true; items: ItemInput[]; order: string[] } | { ok: false; error: string } {
+type ListCheck = { ok: true; items: ItemInput[]; order: string[] } | { ok: false; error: string };
+
+/** Para crear de un jalón una actividad con lista: como checkList, pero sin ids (todas son nuevas). */
+export function checkNewList(items: unknown, order: unknown, current: unknown): ListCheck {
+  const r = checkList(items, order, current);
+  return r.ok ? { ...r, items: r.items.map(({ id: _id, ...x }) => x) } : r;
+}
+
+/** Una lista lista para guardar: al menos una tarea, el rol y quién empieza esta semana.
+ *  Conserva el id de las tareas que ya existen. Regresa el rol ya girado (la de esta semana
+ *  primero), como lo guarda activity_rotations. */
+export function checkList(items: unknown, order: unknown, current: unknown): ListCheck {
   const c = cleanItems(items);
   if (!c.ok) return c;
   if (c.items.length === 0) return { ok: false, error: 'Agrega al menos una tarea.' };
@@ -61,5 +76,5 @@ export function checkNewList(items: unknown, order: unknown, current: unknown):
     return { ok: false, error: 'Rol no válido.' };
   }
   if (typeof current !== 'string' || !order.includes(current)) return { ok: false, error: 'Elige a quién le toca esta semana.' };
-  return { ok: true, items: c.items.map(({ id: _id, ...x }) => x), order: rotateTo(order, current) };
+  return { ok: true, items: c.items, order: rotateTo(order, current) };
 }

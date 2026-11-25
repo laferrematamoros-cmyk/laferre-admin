@@ -1,11 +1,18 @@
-import { checkNewList, cleanItems, rotateTo, overrideSpan } from '../checklist-config';
+import { checkList, checkNewList, cleanItems, rotateTo, overrideSpan } from '../checklist-config';
 
 const ok = { area: ' Baño ', label: ' Limpiar retrete ', days: [6, 2, 4, 2], needs_photo: true };
 
 describe('cleanItems', () => {
   it('limpia espacios, ordena y quita días repetidos', () => {
     const r = cleanItems([ok]);
-    expect(r).toEqual({ ok: true, items: [{ area: 'Baño', label: 'Limpiar retrete', days: [2, 4, 6], needs_photo: true }] });
+    expect(r).toEqual({ ok: true, items: [{ area: 'Baño', label: 'Limpiar retrete', days: [2, 4, 6], needs_photo: true, photo_count: 1 }] });
+  });
+  it('cuántas fotos pide: de 1 a 6; sin foto queda en 1', () => {
+    const r = cleanItems([{ ...ok, photo_count: 4 }, { ...ok, needs_photo: false, photo_count: 4 }]);
+    expect(r.ok && r.items.map(i => i.photo_count)).toEqual([4, 1]);
+    expect(cleanItems([{ ...ok, photo_count: 7 }])).toEqual({ ok: false, error: '"Limpiar retrete" pide un número de fotos no válido (de 1 a 6).' });
+    expect(cleanItems([{ ...ok, photo_count: 0 }])).toEqual({ ok: false, error: '"Limpiar retrete" pide un número de fotos no válido (de 1 a 6).' });
+    expect(cleanItems([{ ...ok, photo_count: 2.5 }]).ok).toBe(false);
   });
   it('conserva el id si es válido', () => {
     const id = '0ddf2629-36b8-4aa1-b769-39d45740bb43';
@@ -53,7 +60,7 @@ describe('checkNewList', () => {
   it('regresa las tareas limpias y el rol con la de esta semana primero', () => {
     expect(checkNewList([task], [A, B, C], B)).toEqual({
       ok: true,
-      items: [{ area: 'Bodega 1', label: 'Barrer', days: [1, 2], needs_photo: true }],
+      items: [{ area: 'Bodega 1', label: 'Barrer', days: [1, 2], needs_photo: true, photo_count: 1 }],
       order: [B, C, A],
     });
   });
@@ -78,5 +85,18 @@ describe('checkNewList', () => {
   it('pide a quién le toca esta semana, y que esté en el rol', () => {
     expect(checkNewList([task], [A, B], null)).toEqual({ ok: false, error: 'Elige a quién le toca esta semana.' });
     expect(checkNewList([task], [A, B], C)).toEqual({ ok: false, error: 'Elige a quién le toca esta semana.' });
+  });
+});
+
+describe('checkList', () => {
+  const A = '11111111-1111-4111-8111-111111111111';
+  const T = '44444444-4444-4444-8444-444444444444';
+  it('al editar conserva el id de las tareas que ya existen', () => {
+    const r = checkList([{ id: T, area: 'Unidad 1', label: 'Llantas', days: [1], needs_photo: true, photo_count: 4 }], [A], A);
+    expect(r).toEqual({ ok: true, order: [A], items: [{ id: T, area: 'Unidad 1', label: 'Llantas', days: [1], needs_photo: true, photo_count: 4 }] });
+  });
+  it('checkNewList quita los ids (es una lista nueva)', () => {
+    const r = checkNewList([{ id: T, area: 'Unidad 1', label: 'Llantas', days: [1], needs_photo: true }], [A], A);
+    expect(r.ok && r.items[0]).toEqual({ area: 'Unidad 1', label: 'Llantas', days: [1], needs_photo: true, photo_count: 1 });
   });
 });
