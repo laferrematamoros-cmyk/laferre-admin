@@ -3,6 +3,9 @@
 import { supabaseAdmin as admin } from '@/lib/supabase';
 import { adminAccess, ownsRow, fail, OK, type Result as ActionResult } from '@/lib/admin-access';
 import { allows, pick } from '@/lib/access-rules';
+import { checkNewList } from '@/lib/checklist-config';
+import { insertListActivity } from '@/lib/checklist-create';
+import { shopClock } from '@/lib/my-day';
 
 // Con `export type Result = …`, no `export type { Result }`: en un archivo 'use server'
 // la compilación de producción lo vuelve un export real y el archivo truena al cargar.
@@ -28,6 +31,23 @@ export async function createActivity(input: ActivityInput): Promise<Result> {
   const { error } = await admin().from('activities').insert(row);
   if (error) return fail(error.message);
   return OK;
+}
+
+/** Nueva actividad con lista con firma, de un jalón: actividad + tareas + rol, ya prendida. */
+export async function createChecklistActivity(input: ActivityInput, items: unknown, order: unknown, current: unknown): Promise<Result> {
+  const a = await adminAccess();
+  if (!a.ok) return a;
+  const row = pick(input, ON_CREATE);
+  if (!allows(a.own, row.company_id) || row.company_id === null) return fail('Empresa no permitida');
+  const list = checkNewList(items, order, current);
+  if (!list.ok) return fail(list.error);
+  const db = admin();
+  const { data, error } = await db.from('employees').select('id')
+    .in('id', list.order).eq('company_id', row.company_id as string).eq('is_active', true);
+  if (error) return fail(error.message);
+  if ((data ?? []).length !== list.order.length) return fail('Alguien del rol no es de esta tienda o está dado de baja.');
+  const r = await insertListActivity(db, { ...row, assigned_employee_ids: [] }, list.items, list.order, shopClock(new Date()).dateStr);
+  return r.ok ? OK : fail(r.error);
 }
 
 export async function updateActivity(id: string, input: ActivityInput): Promise<Result> {
