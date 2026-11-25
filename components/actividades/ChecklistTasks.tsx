@@ -113,7 +113,7 @@ export default function ChecklistTasks({ draft, onChange, defaultDays }: {
       })}
       <div className={c.newArea}>
         <input
-          className={f.input} value={newArea} maxLength={60} placeholder="Nueva área (ej. Bodega)" aria-label="Nueva área"
+          className={f.input} value={newArea} maxLength={60} placeholder="Ej. Bodega 1" aria-label="Nueva área"
           onChange={e => setNewArea(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addArea(); }}
         />
         <button type="button" className={f.btn} onClick={addArea} disabled={!newArea.trim()}>Agregar área</button>
