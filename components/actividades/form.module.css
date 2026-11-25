@@ -74,3 +74,12 @@
 @media (prefers-reduced-motion: reduce) {
   .switch, .switch::after, .input, .textarea { transition: none; }
 }
+
+/* Crear: ¿cómo se marca? */
+.kinds { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.kind { display: flex; flex-direction: column; gap: 3px; min-height: 64px; padding: 12px 14px; border: 1px solid var(--btn-line); border-radius: 16px; background: #fff; color: var(--ink); text-align: left; cursor: pointer; }
+.kind b { font-size: 14px; font-weight: 700; }
+.kind small { font-size: 12.5px; line-height: 1.35; color: var(--muted); }
+.kind[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+.kind[aria-pressed="true"] small { color: rgba(255, 255, 255, .78); }
+.kind:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

@@ -4,9 +4,16 @@ import { useState } from 'react';
 import type { Employee } from '@/lib/supabase';
 import { EMPTY_VALUES, REMINDERS, summaryText, validate, type ActivityValues } from '@/lib/activity-form';
 import { joinEs } from '@/lib/report-insights';
+import { checkNewList, type ItemInput } from '@/lib/checklist-config';
 import { IconCamera, IconUsers } from '@/components/panel/icons';
 import s from '@/components/panel/panel.module.css';
 import f from './form.module.css';
+import c from './checklist.module.css';
+import ChecklistTasks, { type TaskDraft } from './ChecklistTasks';
+import RotationPicker from './RotationPicker';
+
+/** Lo que trae "Crear actividad" cuando se escogió Lista con firma (supabase/010). */
+export interface NewList { items: ItemInput[]; order: string[]; current: string; }
 
 const WEEK = [1, 2, 3, 4, 5, 6, 0];
 const SHORT = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -25,19 +32,27 @@ const initials = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map(w
 const toggle = (list: string[] | number[], x: string | number) =>
   (list as (string | number)[]).includes(x) ? (list as (string | number)[]).filter(y => y !== x) : [...list, x];
 
-/** Formulario único para crear y editar una actividad. */
+/** Formulario único para crear y editar una actividad. Al crear se puede escoger Lista con firma
+ *  y armar ahí mismo sus tareas y su rol (se guardan de un jalón). */
 export default function ActivityForm({ mode, initial = EMPTY_VALUES, employees, onSubmit, onCancel }: {
   mode: 'create' | 'edit';
   initial?: ActivityValues;
   employees: Pick<Employee, 'id' | 'name'>[];
-  onSubmit: (v: ActivityValues) => Promise<void>;
+  onSubmit: (v: ActivityValues, list?: NewList) => Promise<void>;
   onCancel: () => void;
 }) {
   const [v, setV] = useState<ActivityValues>(initial);
   const [tried, setTried] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [kind, setKind] = useState<'normal' | 'lista'>('normal');
+  const [tasks, setTasks] = useState<TaskDraft[]>([]);
+  const [order, setOrder] = useState<string[]>([]);
+  const [current, setCurrent] = useState<string | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
   const set = <K extends keyof ActivityValues>(k: K, val: ActivityValues[K]) => setV(p => ({ ...p, [k]: val }));
+  const isList = mode === 'create' && kind === 'lista';
+  const whoNow = current ? employees.find(e => e.id === current)?.name ?? null : null;
 
   const errs = tried ? validate(v) : {};
   const reminders = REMINDERS.includes(v.reminder) ? REMINDERS : [...REMINDERS, v.reminder].sort((a, b) => a - b);
@@ -46,16 +61,23 @@ export default function ActivityForm({ mode, initial = EMPTY_VALUES, employees, 
 
   async function submit() {
     setTried(true);
+    setListError(null);
     const e = validate(v);
     const first = (['title', 'limit', 'days'] as const).find(k => e[k]);
     if (first) {
       document.getElementById(`f-${first}`)?.focus();
       return;
     }
+    let list: NewList | undefined;
+    if (isList) {
+      const chk = checkNewList(tasks.map(({ key: _k, id: _i, ...x }) => x), order, current);
+      if (!chk.ok) { setListError(chk.error); return; }
+      list = { items: chk.items, order, current: current as string };
+    }
     setSaving(true);
     setSaveError(null);
     try {
-      await onSubmit(v);
+      await onSubmit(isList ? { ...v, assigned: [] } : v, list);
     } catch (err) {
       setSaveError(`No se pudo guardar: ${err instanceof Error ? err.message : 'error desconocido'}`);
       setSaving(false);
@@ -66,6 +88,22 @@ export default function ActivityForm({ mode, initial = EMPTY_VALUES, employees, 
     <>
       <div className={f.wrap}>
         <div className={f.col}>
+          {mode === 'create' && (
+            <section className={s.card}>
+              <h2 className={f.sectionTitle}>¿Cómo se marca?</h2>
+              <div className={f.kinds} role="group" aria-label="Cómo se marca">
+                <button type="button" className={f.kind} aria-pressed={kind === 'normal'} onClick={() => { setKind('normal'); setListError(null); }}>
+                  <b>Normal</b>
+                  <small>Se marca una vez, con o sin foto.</small>
+                </button>
+                <button type="button" className={f.kind} aria-pressed={kind === 'lista'} onClick={() => setKind('lista')}>
+                  <b>Lista con firma</b>
+                  <small>Varias tareas con foto, y tú la firmas.</small>
+                </button>
+              </div>
+            </section>
+          )}
+
           <section className={s.card}>
             <h2 className={f.sectionTitle}>Qué hay que hacer</h2>
             <p className={f.sectionHint}>Así aparece en el teléfono del empleado.</p>
@@ -143,6 +181,28 @@ export default function ActivityForm({ mode, initial = EMPTY_VALUES, employees, 
             </div>
           </section>
 
+          {isList ? (
+            <>
+              <section className={s.card}>
+                <h2 className={f.sectionTitle}>Tareas</h2>
+                <p className={f.sectionHint}>
+                  Escribe un área (ej. Bodega 1 o Unidad 1) y agrégale sus tareas. Las que tienen <span className={c.icon}><IconCamera size={13} /></span> piden foto.
+                  Cada día el teléfono enseña sólo las tareas de ese día.
+                </p>
+                <ChecklistTasks draft={tasks} onChange={d => { setTasks(d); setListError(null); }} defaultDays={v.days} />
+              </section>
+              <section className={s.card}>
+                <h2 className={f.sectionTitle}>Rol semanal</h2>
+                <p className={f.sectionHint}>Cada semana (lunes a sábado) le toca a una persona, en este orden, y vuelve a empezar.</p>
+                <div className={f.fields}>
+                  <RotationPicker
+                    employees={employees} order={order} current={current}
+                    onChange={(o, cur) => { setOrder(o); setCurrent(cur); setListError(null); }}
+                  />
+                </div>
+              </section>
+            </>
+          ) : (
           <section className={s.card}>
             <h2 className={f.sectionTitle}>Quién</h2>
             <p className={f.sectionHint}>
@@ -167,17 +227,20 @@ export default function ActivityForm({ mode, initial = EMPTY_VALUES, employees, 
               </p>
             )}
           </section>
+          )}
 
           <section className={s.card}>
             <h2 className={f.sectionTitle}>Al terminar y avisos</h2>
             <div className={f.fields}>
-              <button type="button" className={f.switchRow} role="switch" aria-checked={v.photo} onClick={() => set('photo', !v.photo)}>
-                <span>
-                  <b>Pedir foto de evidencia</b>
-                  <small>{v.photo ? 'El empleado toma una foto para marcarla como hecha.' : 'Basta con que confirme que la hizo.'}</small>
-                </span>
-                <span className={`${f.switch} ${v.photo ? f.switchOn : ''}`} aria-hidden />
-              </button>
+              {!isList && (
+                <button type="button" className={f.switchRow} role="switch" aria-checked={v.photo} onClick={() => set('photo', !v.photo)}>
+                  <span>
+                    <b>Pedir foto de evidencia</b>
+                    <small>{v.photo ? 'El empleado toma una foto para marcarla como hecha.' : 'Basta con que confirme que la hizo.'}</small>
+                  </span>
+                  <span className={`${f.switch} ${v.photo ? f.switchOn : ''}`} aria-hidden />
+                </button>
+              )}
               <button type="button" className={f.switchRow} role="switch" aria-checked={v.optional} onClick={() => set('optional', !v.optional)}>
                 <span>
                   <b>Actividad opcional</b>
@@ -207,8 +270,17 @@ export default function ActivityForm({ mode, initial = EMPTY_VALUES, employees, 
                 <span className={f.phoneTitle}>{v.title.trim() || 'Nombre de la actividad'}</span>
                 {v.description.trim() && <span className={f.phoneDesc}>{v.description}</span>}
                 <span className={f.phoneMeta}>
-                  <span className={f.tag}>{v.assigned.length ? (names.length ? joinEs(names) : 'Asignada') : 'General'}</span>
-                  {v.photo && <span className={f.tag}><IconCamera size={12} />Foto</span>}
+                  {isList ? (
+                    <>
+                      <span className={f.tag}>{whoNow ? `Esta semana: ${whoNow}` : 'Sin rol'}</span>
+                      <span className={f.tag}><IconCamera size={12} />Lista · {tasks.length} {tasks.length === 1 ? 'tarea' : 'tareas'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className={f.tag}>{v.assigned.length ? (names.length ? joinEs(names) : 'Asignada') : 'General'}</span>
+                      {v.photo && <span className={f.tag}><IconCamera size={12} />Foto</span>}
+                    </>
+                  )}
                 </span>
               </div>
             </div>
@@ -226,6 +298,7 @@ export default function ActivityForm({ mode, initial = EMPTY_VALUES, employees, 
       <div className={f.bar}>
         {saveError && <p className={f.barMsg} role="alert">{saveError}</p>}
         {tried && Object.keys(errs).length > 0 && !saveError && <p className={f.barMsg} role="alert">Revisa lo que está marcado en rojo.</p>}
+        {listError && !saveError && Object.keys(errs).length === 0 && <p className={f.barMsg} role="alert">{listError}</p>}
         <button type="button" className={f.btn} onClick={onCancel} disabled={saving}>Cancelar</button>
         <button type="button" className={`${f.btn} ${f.primary}`} onClick={submit} disabled={saving}>
           {saving ? 'Guardando…' : mode === 'create' ? 'Crear actividad' : 'Guardar cambios'}
