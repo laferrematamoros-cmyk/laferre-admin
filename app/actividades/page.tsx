@@ -6,6 +6,8 @@ import AdminShell from '@/components/AdminShell';
 import { supabase } from '@/lib/supabase';
 import { useCompany } from '@/lib/company-context';
 import { loadActivities, type LiveActivity } from '@/lib/load-activities';
+import { dutyOn } from '@/lib/duty';
+import { shopClock } from '@/lib/my-day';
 import { archiveActivity, restoreActivity, setActivityActive, type Result } from './actions';
 import { IconBell, IconCamera, IconChevronDown, IconPlus, IconUsers } from '@/components/panel/icons';
 import s from '@/components/panel/panel.module.css';
@@ -45,6 +47,8 @@ export default function ActividadesPage() {
   const { current: company } = useCompany();
   const [list, setList] = useState<LiveActivity[] | null>(null);
   const [names, setNames] = useState<Map<string, string>>(new Map());
+  const [taskCount, setTaskCount] = useState<Map<string, number>>(new Map());
+  const today = shopClock(new Date()).dateStr;
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
@@ -53,16 +57,24 @@ export default function ActividadesPage() {
   const load = useCallback(async () => {
     if (!company) return;
     try {
+      // Con el día de hoy: a las de lista les trae su rol y sus cambios (para decir a quién le toca).
       const [acts, emps] = await Promise.all([
-        loadActivities(supabase, company.id),
+        loadActivities(supabase, company.id, { from: today, to: today }),
         supabase.from('employees').select('id, name, is_active').eq('company_id', company.id),
       ]);
+      const listIds = acts.filter(x => x.checklist_enabled).map(x => x.id);
+      const items = listIds.length
+        ? await supabase.from('checklist_items').select('activity_id').is('archived_at', null).in('activity_id', listIds)
+        : { data: [] as { activity_id: string }[] };
+      const counts = new Map<string, number>();
+      for (const r of (items.data ?? []) as { activity_id: string }[]) counts.set(r.activity_id, (counts.get(r.activity_id) ?? 0) + 1);
+      setTaskCount(counts);
       setList(acts);
       setNames(new Map((emps.data ?? []).map((e: { id: string; name: string; is_active: boolean }) => [e.id, e.is_active ? e.name : `${e.name} (baja)`])));
     } catch (e) {
       setError(friendly(e));
     }
-  }, [company]);
+  }, [company, today]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -120,6 +132,9 @@ export default function ActividadesPage() {
               {live.map(x => {
                 const who = x.assigned_employee_ids.length ? x.assigned_employee_ids.map(id => names.get(id) ?? 'Empleado borrado').join(', ') : null;
                 const ev = evidenceText(x);
+                // Lista con firma: la hace el de turno del rol (no "General") y pide fotos por tarea.
+                const duty = x.checklist_enabled ? dutyOn(x.rotations, x.overrides, today) : null;
+                const tasks = taskCount.get(x.id) ?? 0;
                 const paused = isPaused(x);
                 return (
                   <article key={x.id} className={`${s.card} ${a.item} ${paused ? a.paused : ''}`}>
@@ -139,11 +154,15 @@ export default function ActividadesPage() {
                           ))}
                         </span>
                         {isMonthly(x) && <span className={`${a.chip} ${a.chipMonth}`}>{monthText(x.week_of_month!)}</span>}
-                        {who
+                        {x.checklist_enabled
+                          ? <span className={a.chip}><IconUsers size={13} />{duty ? `Esta semana: ${names.get(duty) ?? 'Empleado borrado'}` : 'Sin rol'}</span>
+                          : who
                           ? <span className={a.chip}><IconUsers size={13} />{who}</span>
                           : <span className={`${a.chip} ${a.chipGeneral}`}>General</span>}
                         {x.reminder_minutes ? <span className={a.chip}><IconBell size={13} />Avisa cada {x.reminder_minutes} min</span> : null}
-                        {ev && <span className={a.chip}><IconCamera size={13} />{ev}</span>}
+                        {x.checklist_enabled
+                          ? <span className={a.chip}><IconCamera size={13} />Lista · {tasks} {tasks === 1 ? 'tarea' : 'tareas'}</span>
+                          : ev && <span className={a.chip}><IconCamera size={13} />{ev}</span>}
                       </div>
                     </div>
                     <div className={a.actions}>
