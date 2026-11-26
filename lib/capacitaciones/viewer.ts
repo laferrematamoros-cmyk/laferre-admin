@@ -1,14 +1,25 @@
 import 'server-only';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '@/lib/supabase';
 import { isUuid } from '@/lib/access-rules';
 import { catalogBySlug } from './catalog';
 import { firstNameOf, shortDay } from './format';
 import type { TrainingStatus } from './status';
+import { medalCount } from './medals';
+
+export type MedalTally = { earned: number; total: number } | null;
+
+/** Cuántas medallas lleva (antes de contestar) para el festejo. Si no se puede leer, null: sólo sale la medalla. */
+export async function medalsOf(db: SupabaseClient, employeeId: string): Promise<MedalTally> {
+  const { data, error } = await db.rpc('cap_list', { p_employee: employeeId });
+  if (error || !Array.isArray(data)) return null;
+  return medalCount(data as { status: TrainingStatus }[]);
+}
 
 /** Lo que necesita la página. Del empleado sólo va el primer nombre: la página es pública. */
 export type ViewerInfo =
   | { ok: true; token: string; slug: string; title: string; firstName: string; minSeconds: number;
-      previous: { status: TrainingStatus; answeredAt: string; day: string } | null }
+      previous: { status: TrainingStatus; answeredAt: string; day: string } | null; medals: MedalTally }
   | { ok: false; error: string };
 
 const BAD = 'Este enlace ya no sirve. Ábrela otra vez desde la app.';
@@ -23,11 +34,12 @@ export async function loadViewer(slug: string, token: string | undefined): Promi
     .select('training_id, employee_id, version, opened_at').eq('id', token).maybeSingle();
   if (error) return { ok: false, error: DOWN };
   if (!s || Date.now() - new Date(s.opened_at as string).getTime() > MAX_AGE_MS) return { ok: false, error: BAD };
-  const [t, e, p] = await Promise.all([
+  const [t, e, p, medals] = await Promise.all([
     db.from('trainings').select('slug, title, is_active, version, min_seconds').eq('id', s.training_id).maybeSingle(),
     db.from('employees').select('name, is_active').eq('id', s.employee_id).maybeSingle(),
     db.from('training_progress').select('status, answered_at')
       .eq('training_id', s.training_id).eq('employee_id', s.employee_id).eq('version', s.version).maybeSingle(),
+    medalsOf(db, s.employee_id as string),
   ]);
   if (t.error || e.error || p.error) return { ok: false, error: DOWN };
   if (!t.data || t.data.slug !== slug || !e.data?.is_active) return { ok: false, error: BAD };
@@ -40,5 +52,6 @@ export async function loadViewer(slug: string, token: string | undefined): Promi
     previous: p.data
       ? { status: p.data.status as TrainingStatus, answeredAt: p.data.answered_at as string, day: shortDay(p.data.answered_at as string) }
       : null,
+    medals,
   };
 }

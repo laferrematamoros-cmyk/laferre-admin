@@ -1,12 +1,15 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase';
-import type { TrainingStatus } from '@/lib/capacitaciones/status';
+import { isDone, type TrainingStatus } from '@/lib/capacitaciones/status';
 import { shortDay } from '@/lib/capacitaciones/format';
 import { medalLine } from '@/lib/capacitaciones/medals';
+import { celebrate, countText, LEVEL_LABEL } from '@/lib/capacitaciones/levels';
+import { themeOf } from '@/lib/capacitaciones/themes';
 import TrainingContent from './TrainingContent';
 import Medal from './Medal';
+import LevelBadge from './LevelBadge';
 import v from './viewer.module.css';
 import md from './medals.module.css';
 
@@ -34,7 +37,16 @@ interface Props {
   back: { href: string; label: string };
   /** Dentro del panel (practicante / vista previa): la barra se queda en su contenedor, no en toda la pantalla. */
   embedded?: boolean;
+  /** Cuántas medallas llevaba al abrir (lo arma el servidor): para "ya llevas 9 de 20" y "¡Subiste a Oro!". */
+  medals?: { earned: number; total: number } | null;
 }
+
+// Confeti del festejo: posición, retraso, color y giro de cada papelito.
+const CONFETTI: [number, number, string, number][] = [
+  [4, 0, '#DB011C', 540], [14, .5, '#F4B731', -420], [24, .2, '#3B8DF0', 600], [33, .8, '#2EB67D', -560],
+  [42, .35, '#EC6A73', 480], [51, 1, '#F28C38', -500], [60, .15, '#8E6CEF', 620], [69, .65, '#F4B731', -460],
+  [78, .3, '#DB011C', 520], [87, .9, '#3B8DF0', -600], [95, .45, '#2EB67D', 440], [10, 1.2, '#F28C38', -520],
+];
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
@@ -51,7 +63,7 @@ const DONE: Record<Done, string> = {
 };
 
 /** La página de una capacitación: las animaciones, la cuenta regresiva y "Entendí" / "Tengo dudas". */
-export default function TrainingViewer({ slug, title, firstName: name = '', minSeconds, token, previous = null, back, embedded = false }: Props) {
+export default function TrainingViewer({ slug, title, firstName: name = '', minSeconds, token, previous = null, back, embedded = false, medals = null }: Props) {
   const preview = token === null;
   const canAnswer = !preview && previous?.status !== 'trained';
   const prevText = previous ? PREVIOUS[previous.status]?.(previous.day ?? shortDay(previous.answeredAt)) ?? null : null;
@@ -154,23 +166,42 @@ export default function TrainingViewer({ slug, title, firstName: name = '', minS
       setError({ msg: r.data?.error ?? 'No se pudo guardar.', tooSoon });
     } else {
       setSheet(false);
-      setDone(r.data.status === 'trained' ? 'trained' : kind);
+      const finished: Done = r.data.status === 'trained' ? 'trained' : kind;
+      // Medalla: el teléfono vibra (sólo donde el navegador lo permite; en iPhone no hace nada).
+      if (finished !== 'doubt') try { navigator.vibrate?.([60, 40, 120]); } catch { /* sin vibración */ }
+      setDone(finished);
     }
   }
 
   const rootCls = `${v.root} ${embedded ? v.embedded : v.standalone}`;
 
   if (done) {
-    // Entendida o en persona: llega la medalla. Con dudas, la ✓ y el texto de siempre.
+    // Entendida o en persona: llega la medalla de su tema con rayos y confeti. Con dudas, la ✓ y el texto de siempre.
     const medal = medalLine(done, title);
+    const after = medal ? celebrate(medals, previous ? isDone(previous.status) : false) : null;
     return (
       <div ref={rootRef} className={rootCls}>
         <div className={v.final}>
-          {medal
-            ? <div className={md.pop}><Medal earned size={96} /></div>
-            : <div className={v.check} aria-hidden>✓</div>}
+          {medal ? (
+            <div className={md.party}>
+              <div className={md.rays} aria-hidden />
+              <div className={md.confetti} aria-hidden>
+                {CONFETTI.map(([x, d, c, r], i) => (
+                  <i key={i} style={{ left: `${x}%`, background: c, '--d': `${d}s`, '--r': `${r}deg` } as CSSProperties} />
+                ))}
+              </div>
+              <div className={md.pop}><Medal theme={themeOf(slug)} earned size={110} /></div>
+            </div>
+          ) : <div className={v.check} aria-hidden>✓</div>}
           <h1 className={v.finalTitle}>{name ? `¡Listo, ${name}!` : '¡Listo!'}</h1>
           <p className={v.finalText}>{medal ?? DONE[done]}</p>
+          {after && <p className={md.count}>{countText(after.earned, after.total)}</p>}
+          {after?.levelUp && (
+            <div className={md.levelUp}>
+              <LevelBadge level={after.levelUp} size={38} />
+              <b>¡Subiste a {LEVEL_LABEL[after.levelUp]}!</b>
+            </div>
+          )}
           <a className={`${v.btn} ${v.dark} ${v.big}`} href={back.href}>{back.label}</a>
           {back.href.startsWith('laferre://') && <p className={v.closeTab}>o cierra esta pestaña</p>}
         </div>

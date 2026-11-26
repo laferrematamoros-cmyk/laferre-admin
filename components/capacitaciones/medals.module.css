@@ -1,5 +1,19 @@
-/* Medallas de capacitación: vitrina y festejo. */
+/* Medallas de capacitación: nivel, vitrina y festejo.
+   Las animaciones NO se apagan con "reducir movimiento" a propósito: el dueño tiene las animaciones de
+   Windows apagadas y quiere verlas (memoria animaciones-reducir-movimiento). */
 
+/* ── Nivel ── */
+.level { display: flex; flex-direction: column; gap: 10px; }
+.levelTop { display: flex; align-items: center; gap: 12px; }
+.levelTop svg { flex: none; }
+.levelText { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.levelText b { font-size: 20px; font-weight: 700; letter-spacing: -.02em; color: var(--ink); }
+.levelText span { font-size: 13px; color: var(--muted); }
+.track { position: relative; height: 10px; border-radius: 999px; background: var(--track, #ECEEF1); overflow: hidden; }
+.track i { display: block; height: 100%; border-radius: 999px; transition: width .6s ease; }
+.tick { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: rgba(255, 255, 255, .9); }
+
+/* ── Vitrina ── */
 .shelf {
   display: flex; gap: 6px; margin: 2px -4px 0; padding: 4px 4px 6px; list-style: none;
   overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: thin;
@@ -13,26 +27,64 @@
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere;
 }
 .missing .name { color: var(--muted); font-weight: 500; }
-
-/* Festejo de la pantalla final. A propósito NO se apaga con "reducir movimiento": el dueño tiene
-   las animaciones de Windows apagadas y quiere ver la medalla llegar (memoria animaciones-reducir-movimiento). */
-.pop { position: relative; display: grid; place-items: center; width: 132px; height: 132px; }
-.pop::before {
-  content: ""; position: absolute; inset: 0; border-radius: 50%;
-  background: radial-gradient(circle, rgba(244, 183, 49, .45), rgba(244, 183, 49, 0) 68%);
-  animation: glow 1.1s ease-out .45s 2 both;
+.plain { display: block; line-height: 0; }
+/* Destello que cruza el disco de las ganadas, por turnos (--d). El disco ocupa del 33 % al 96 % del alto. */
+.shine { position: relative; display: block; line-height: 0; }
+.shine::after {
+  content: ""; position: absolute; left: 13%; width: 74%; top: 34%; height: 62%; border-radius: 50%; pointer-events: none;
+  background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, .85) 50%, transparent 62%) no-repeat;
+  background-size: 300% 100%; background-position: 150% 0;
+  animation: sweep 4.4s ease-in-out var(--d, 0s) infinite;
 }
-.pop > svg { position: relative; transform-origin: 50% 15%; animation: medalIn .75s cubic-bezier(.3, 1.45, .5, 1) both; }
+@keyframes sweep { 0%, 70% { background-position: 150% 0; } 100% { background-position: -50% 0; } }
+
+/* Medalla chica en un renglón de "Listas". */
+.rowMedal { flex: none; display: block; }
+
+/* ── Festejo ── */
+.party { position: relative; width: 220px; height: 190px; display: grid; place-items: center; }
+.rays {
+  /* min(…, 94vw): en un teléfono angosto los rayos no se salen de la pantalla. */
+  --size: min(340px, 94vw);
+  position: absolute; left: 50%; top: 50%; width: var(--size); height: var(--size);
+  margin: calc(var(--size) / -2) 0 0 calc(var(--size) / -2); border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, rgba(244, 183, 49, .28) 0 9deg, transparent 9deg 24deg);
+  -webkit-mask-image: radial-gradient(circle, #000 30%, transparent 68%); mask-image: radial-gradient(circle, #000 30%, transparent 68%);
+  animation: spin 12s linear infinite, raysIn .6s ease-out both;
+  pointer-events: none;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes raysIn { from { opacity: 0; } to { opacity: 1; } }
+.pop { position: relative; display: grid; place-items: center; }
+.pop::before {
+  content: ""; position: absolute; inset: -18px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(244, 183, 49, .55), rgba(244, 183, 49, 0) 68%);
+  animation: glow 1.1s ease-out .45s 3 both;
+}
+.pop > svg { position: relative; transform-origin: 50% 15%; animation: medalIn .8s cubic-bezier(.3, 1.45, .5, 1) both; filter: drop-shadow(0 8px 14px rgba(0, 0, 0, .18)); }
 @keyframes medalIn {
   0% { transform: scale(.3) rotate(-25deg); opacity: 0; }
-  60% { transform: scale(1.12) rotate(8deg); opacity: 1; }
+  60% { transform: scale(1.14) rotate(8deg); opacity: 1; }
   100% { transform: none; opacity: 1; }
 }
 @keyframes glow {
   0% { transform: scale(.55); opacity: 0; }
   40% { opacity: 1; }
-  100% { transform: scale(1.3); opacity: 0; }
+  100% { transform: scale(1.35); opacity: 0; }
 }
-
-/* Medalla chica en un renglón de "Listas". */
-.rowMedal { flex: none; display: block; }
+.confetti { position: absolute; inset: -30px -40px auto; height: 0; pointer-events: none; }
+.confetti i {
+  position: absolute; top: 0; width: 8px; height: 12px; border-radius: 2px; opacity: 0;
+  animation: fall 2.4s cubic-bezier(.3, .6, .6, 1) var(--d, 0s) 3 both;
+}
+@keyframes fall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(300px) rotate(var(--r, 540deg)); opacity: 0; }
+}
+.count { margin: -4px 0 4px; font-size: 14px; font-weight: 600; color: var(--muted); }
+.levelUp {
+  display: flex; align-items: center; gap: 10px; padding: 10px 16px 10px 10px; border-radius: 999px;
+  background: #FFF6DC; box-shadow: inset 0 0 0 1.5px #F4B731; animation: levelIn .6s cubic-bezier(.3, 1.45, .5, 1) 1s both;
+}
+.levelUp b { font-size: 16px; font-weight: 700; color: #141414; }
+@keyframes levelIn { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }

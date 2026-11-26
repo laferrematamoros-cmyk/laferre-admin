@@ -3,10 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildMatrix, dueLabel, isOpen, summarize, STATUS_LABEL, type CapRow, type TrainingStatus } from '@/lib/capacitaciones/status';
 import { hasMedal } from '@/lib/capacitaciones/medals';
+import { themeOf, type ThemeKey } from '@/lib/capacitaciones/themes';
+import { levelFor, LEVEL_LABEL } from '@/lib/capacitaciones/levels';
 import { groupPeople, stamp } from '@/lib/capacitaciones/admin-view';
 import { titleCase } from '@/lib/checklist-mail';
 import s from '@/components/panel/panel.module.css';
 import Medal from './Medal';
+import LevelBadge from './LevelBadge';
 import v from './capacitaciones.module.css';
 
 // Entendida y En persona llevan la misma medalla: en la leyenda van juntas. La ficha de la celda dice cuál fue.
@@ -23,8 +26,8 @@ const MARK: Record<TrainingStatus, string> = {
 };
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
-export function StatusMark({ status }: { status: TrainingStatus }) {
-  if (hasMedal(status)) return <span className={`${v.mark} ${v.m_medal}`} aria-hidden><Medal earned size={26} /></span>;
+export function StatusMark({ status, theme = 'general' }: { status: TrainingStatus; theme?: ThemeKey }) {
+  if (hasMedal(status)) return <span className={`${v.mark} ${v.m_medal}`} aria-hidden><Medal theme={theme} earned size={26} /></span>;
   return <span className={`${v.mark} ${MARK[status]}`} aria-hidden>{SYMBOL[status]}</span>;
 }
 
@@ -119,15 +122,24 @@ export default function Matrix({ rows, companyNames = {}, now = new Date() }: {
                             <button type="button" id={cellId(p.id, t.id)} className={v.cell} aria-expanded={on} aria-controls={on ? 'cap-detail' : undefined}
                               aria-label={`${name} · ${t.title}: ${STATUS_LABEL[r.status]}`}
                               onClick={() => setPicked(on ? null : { e: p.id, t: t.id })}>
-                              <StatusMark status={r.status} />
+                              <StatusMark status={r.status} theme={themeOf(t.slug)} />
                             </button>
                           ) : <><span className={v.none} aria-hidden>—</span><span className={v.sr}>No aplica</span></>}
                         </td>
                       );
                     })}
                     <td className={v.total}>
-                      <span className={v.medals} aria-hidden><Medal earned={p.done > 0} size={16} />{p.done}<small>/{p.total}</small></span>
-                      <span className={v.sr}>{p.done} de {p.total} medallas</span>
+                      {(() => {
+                        const lv = levelFor(p.done, p.total).current;
+                        return (
+                          <>
+                            <span className={v.medals} aria-hidden title={lv ? `Nivel ${LEVEL_LABEL[lv]}` : 'Sin nivel todavía'}>
+                              <LevelBadge level={lv} size={20} />{p.done}<small>/{p.total}</small>
+                            </span>
+                            <span className={v.sr}>{p.done} de {p.total} medallas{lv ? `, nivel ${LEVEL_LABEL[lv]}` : ''}</span>
+                          </>
+                        );
+                      })()}
                     </td>
                   </tr>
                 );
@@ -146,7 +158,7 @@ export default function Matrix({ rows, companyNames = {}, now = new Date() }: {
           onKeyDown={e => { if (e.key === 'Escape') close(); }}>
           <div className={v.detailHead}>
             <div className={v.detailWho}>
-              <StatusMark status={sel.status} />
+              <StatusMark status={sel.status} theme={themeOf(sel.slug)} />
               <div><b>{titleCase(sel.employee_name)}</b><span>{sel.title}</span></div>
             </div>
             <button type="button" className={v.btn} onClick={close}>Cerrar</button>

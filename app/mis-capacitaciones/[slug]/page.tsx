@@ -35,7 +35,7 @@ export default function MiCapacitacionPage() {
             </div>
           ) : (
             <TrainingViewer slug={slug} title={r.title} firstName={r.firstName} minSeconds={r.minSeconds} token={r.token}
-              previous={r.previous} embedded back={{ href: '/mis-capacitaciones', label: 'Volver a mis capacitaciones' }} />
+              previous={r.previous} medals={r.medals} embedded back={{ href: '/mis-capacitaciones', label: 'Volver a mis capacitaciones' }} />
           )}
       </div>
     </AdminShell>

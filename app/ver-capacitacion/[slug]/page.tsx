@@ -25,5 +25,5 @@ export default async function Page({ params, searchParams }: {
     );
   }
   return <TrainingViewer slug={v.slug} title={v.title} firstName={v.firstName} minSeconds={v.minSeconds}
-    token={v.token} previous={v.previous} back={{ href: 'laferre://capacitacion', label: 'Regresar a la app' }} />;
+    token={v.token} previous={v.previous} medals={v.medals} back={{ href: 'laferre://capacitacion', label: 'Regresar a la app' }} />;
 }
