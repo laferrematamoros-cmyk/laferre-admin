@@ -4,9 +4,13 @@ import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import type { MyTraining } from '@/app/mis-capacitaciones/actions';
 import { groupMine, mineLine } from '@/lib/capacitaciones/my-view';
-import { STATUS_LABEL, isDone, type TrainingStatus } from '@/lib/capacitaciones/status';
+import { STATUS_LABEL, type TrainingStatus } from '@/lib/capacitaciones/status';
+import { hasMedal, medalCount } from '@/lib/capacitaciones/medals';
 import s from '@/components/panel/panel.module.css';
+import Medal from './Medal';
+import MedalShelf from './MedalShelf';
 import m from './mis.module.css';
+import md from './medals.module.css';
 
 const TONE: Record<TrainingStatus, { edge: string; bg: string; ink: string }> = {
   overdue:    { edge: 'var(--st-miss)', bg: 'var(--st-miss-soft)', ink: 'var(--st-miss-ink)' },
@@ -31,6 +35,7 @@ export default function MyTrainingList({ items, now }: { items: MyTraining[]; no
     const t = TONE[i.status];
     return (
       <Link key={i.id} href={`/mis-capacitaciones/${i.slug}`} className={m.row} style={{ '--edge': t.edge } as CSSProperties}>
+        {hasMedal(i.status) && <Medal earned size={28} className={md.rowMedal} />}
         <span className={m.rowMain}>
           <span className={m.rowTitle}>{i.title}</span>
           <span className={m.rowSub}>{mineLine(i, now)}</span>
@@ -47,17 +52,18 @@ export default function MyTrainingList({ items, now }: { items: MyTraining[]; no
     </section>
   );
 
-  const done = items.filter(i => isDone(i.status)).length;
+  const { earned } = medalCount(items);
   return (
     <>
       <section className={`${s.card} ${m.hero}`}>
-        <div className={m.count}><b>{done}</b> de {total} listas</div>
-        <div className={m.bar} role="img" aria-label={`${done} de ${total} listas`}>
+        <div className={m.count}><b>{earned}</b> de {total} medallas</div>
+        <div className={m.bar} role="img" aria-label={`${earned} de ${total} medallas`}>
           {counts.map(x => <i key={x.k} style={{ width: `${(x.n / total) * 100}%`, background: TONE[x.k].edge }} />)}
         </div>
         <div className={m.legend}>
           {counts.map(x => <span key={x.k}><i style={{ background: TONE[x.k].edge }} />{x.n} {COUNT[x.k][x.n === 1 ? 0 : 1]}</span>)}
         </div>
+        <MedalShelf items={items} />
       </section>
       {block('Por ver', g.open)}
       {block('Con dudas', g.doubt)}

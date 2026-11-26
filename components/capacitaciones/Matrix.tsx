@@ -2,12 +2,20 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildMatrix, dueLabel, isOpen, summarize, STATUS_LABEL, type CapRow, type TrainingStatus } from '@/lib/capacitaciones/status';
+import { hasMedal } from '@/lib/capacitaciones/medals';
 import { groupPeople, stamp } from '@/lib/capacitaciones/admin-view';
 import { titleCase } from '@/lib/checklist-mail';
 import s from '@/components/panel/panel.module.css';
+import Medal from './Medal';
 import v from './capacitaciones.module.css';
 
-const STATUSES: TrainingStatus[] = ['pending', 'overdue', 'understood', 'doubt', 'trained'];
+// Entendida y En persona llevan la misma medalla: en la leyenda van juntas. La ficha de la celda dice cuál fue.
+const LEGEND: { status: TrainingStatus; label: string }[] = [
+  { status: 'pending', label: STATUS_LABEL.pending },
+  { status: 'overdue', label: STATUS_LABEL.overdue },
+  { status: 'doubt', label: STATUS_LABEL.doubt },
+  { status: 'understood', label: 'Con medalla (entendida o en persona)' },
+];
 // "Por ver" es un punto dibujado con CSS: el carácter '·' sale cuadrado o chueco según la letra del sistema.
 const SYMBOL: Record<TrainingStatus, string> = { pending: '', overdue: '!', understood: '✓', doubt: '?', trained: '✓' };
 const MARK: Record<TrainingStatus, string> = {
@@ -16,6 +24,7 @@ const MARK: Record<TrainingStatus, string> = {
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 export function StatusMark({ status }: { status: TrainingStatus }) {
+  if (hasMedal(status)) return <span className={`${v.mark} ${v.m_medal}`} aria-hidden><Medal earned size={26} /></span>;
   return <span className={`${v.mark} ${MARK[status]}`} aria-hidden>{SYMBOL[status]}</span>;
 }
 
@@ -60,7 +69,7 @@ export default function Matrix({ rows, companyNames = {}, now = new Date() }: {
       <div className={v.headRow}>
         <h2>Avance por persona</h2>
         <div className={v.chips}>
-          <span className={`${v.chip} ${v.cOk}`}><b>{sum.done}</b> de {sum.total} terminadas</span>
+          <span className={`${v.chip} ${v.cOk}`}><b>{sum.done}</b> de {sum.total} medallas</span>
           {sum.doubts > 0 && <span className={`${v.chip} ${v.cLate}`}><b>{sum.doubts}</b> con dudas</span>}
           {sum.overdue > 0 && <span className={`${v.chip} ${v.cMiss}`}><b>{sum.overdue}</b> {sum.overdue === 1 ? 'atrasada' : 'atrasadas'}</span>}
           {pendingOnly > 0 && <span className={v.chip}><b>{pendingOnly}</b> por ver</span>}
@@ -68,7 +77,7 @@ export default function Matrix({ rows, companyNames = {}, now = new Date() }: {
       </div>
 
       <ul className={v.legend} aria-label="Qué significa cada marca">
-        {STATUSES.map(st => <li key={st}><StatusMark status={st} />{STATUS_LABEL[st]}</li>)}
+        {LEGEND.map(x => <li key={x.status}><StatusMark status={x.status} />{x.label}</li>)}
       </ul>
 
       <div className={v.scroller} onKeyDown={e => { if (e.key === 'Escape') setPicked(null); }}>
@@ -85,7 +94,7 @@ export default function Matrix({ rows, companyNames = {}, now = new Date() }: {
                   </span>
                 </th>
               ))}
-              <th scope="col" className={v.total}>Avance</th>
+              <th scope="col" className={v.total}>Medallas</th>
             </tr>
           </thead>
           {groups.map(g => (
@@ -117,8 +126,8 @@ export default function Matrix({ rows, companyNames = {}, now = new Date() }: {
                       );
                     })}
                     <td className={v.total}>
-                      <span aria-hidden>{p.done}<small>/{p.total}</small></span>
-                      <span className={v.sr}>{p.done} de {p.total} terminadas</span>
+                      <span className={v.medals} aria-hidden><Medal earned={p.done > 0} size={16} />{p.done}<small>/{p.total}</small></span>
+                      <span className={v.sr}>{p.done} de {p.total} medallas</span>
                     </td>
                   </tr>
                 );

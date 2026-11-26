@@ -59,6 +59,10 @@
 .legend li { display: inline-flex; align-items: center; gap: 8px; }
 .legend .mark { width: 24px; height: 24px; border-radius: 8px; font-size: 13px; }
 .legend .m_trained { box-shadow: inset 0 0 0 2px var(--st-ok-ink); }
+/* Entendida o en persona: la medalla, sin cuadro. */
+.m_medal { background: transparent; }
+.legend .m_medal svg { width: 20px; height: 24px; }
+.medals { display: inline-flex; align-items: center; gap: 5px; }
 
 /* ── Avance: resumen ── */
 .headRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; margin-bottom: 14px; }

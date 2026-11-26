@@ -4,8 +4,11 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { TrainingStatus } from '@/lib/capacitaciones/status';
 import { shortDay } from '@/lib/capacitaciones/format';
+import { medalLine } from '@/lib/capacitaciones/medals';
 import TrainingContent from './TrainingContent';
+import Medal from './Medal';
 import v from './viewer.module.css';
+import md from './medals.module.css';
 
 type Answer = 'understood' | 'doubt';
 type Done = Answer | 'trained';
@@ -158,12 +161,16 @@ export default function TrainingViewer({ slug, title, firstName: name = '', minS
   const rootCls = `${v.root} ${embedded ? v.embedded : v.standalone}`;
 
   if (done) {
+    // Entendida o en persona: llega la medalla. Con dudas, la ✓ y el texto de siempre.
+    const medal = medalLine(done, title);
     return (
       <div ref={rootRef} className={rootCls}>
         <div className={v.final}>
-          <div className={v.check} aria-hidden>✓</div>
+          {medal
+            ? <div className={md.pop}><Medal earned size={96} /></div>
+            : <div className={v.check} aria-hidden>✓</div>}
           <h1 className={v.finalTitle}>{name ? `¡Listo, ${name}!` : '¡Listo!'}</h1>
-          <p className={v.finalText}>{DONE[done]}</p>
+          <p className={v.finalText}>{medal ?? DONE[done]}</p>
           <a className={`${v.btn} ${v.dark} ${v.big}`} href={back.href}>{back.label}</a>
           {back.href.startsWith('laferre://') && <p className={v.closeTab}>o cierra esta pestaña</p>}
         </div>
