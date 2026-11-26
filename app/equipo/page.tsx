@@ -8,7 +8,7 @@ import { loadActivities, type LiveActivity } from '@/lib/load-activities';
 import { IconBell, IconList, IconPlus } from '@/components/panel/icons';
 import s from '@/components/panel/panel.module.css';
 import q from '@/components/equipo/eq.module.css';
-import { createEmployee, deleteEmployee, setEmployeeActive, updateEmployee, type Result } from './actions';
+import { createEmployee, deleteEmployee, loadFullNames, setEmployeeActive, setFullName, updateEmployee, type Result } from './actions';
 
 type EmpType = 'empleado' | 'practicante';
 type Emp = Employee & { emp_type?: EmpType | null; push_token?: string | null };
@@ -36,6 +36,8 @@ export default function EquipoPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ emp: Emp | null } | null>(null);
+  // Nombre completo (para vincular con RH): tabla cerrada, se lee por el servidor.
+  const [fullNames, setFullNames] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     if (!company) return;
@@ -47,6 +49,8 @@ export default function EquipoPage() {
       if (e.error) throw new Error(e.error.message);
       setEmps((e.data ?? []) as Emp[]);
       setActs(a);
+      const fn = await loadFullNames(company.id);
+      if (fn.ok) setFullNames(fn.names);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el equipo.');
     }
@@ -104,6 +108,9 @@ export default function EquipoPage() {
                           <div className={q.name}><b>{e.name}</b><span>{e.role}</span></div>
                         </div>
                         <div className={q.facts}>
+                          {fullNames[e.id]
+                            ? <span className={q.chip} title="Nombre completo (para RH)">{fullNames[e.id]}</span>
+                            : <span className={`${q.chip} ${q.chipWarn}`} title="La app se lo pide al abrir; o ponlo tú en Editar">Sin nombre completo</span>}
                           <span className={`${q.chip} ${e.emp_type === 'practicante' ? q.chipPrac : ''}`}>{e.emp_type === 'practicante' ? 'Practicante' : 'Empleado'}</span>
                           {e.push_token
                             ? <span className={`${q.chip} ${q.chipOk}`}><IconBell size={13} />Recibe avisos</span>
@@ -166,6 +173,7 @@ export default function EquipoPage() {
         {dialog && company && (
           <EmployeeDialog
             emp={dialog.emp}
+            fullName={dialog.emp ? fullNames[dialog.emp.id] ?? '' : ''}
             companyId={company.id}
             onClose={() => setDialog(null)}
             onSaved={async () => { setDialog(null); await load(); }}
@@ -176,9 +184,10 @@ export default function EquipoPage() {
   );
 }
 
-function EmployeeDialog({ emp, companyId, onClose, onSaved }: {
-  emp: Emp | null; companyId: string; onClose: () => void; onSaved: () => Promise<void>;
+function EmployeeDialog({ emp, fullName, companyId, onClose, onSaved }: {
+  emp: Emp | null; fullName: string; companyId: string; onClose: () => void; onSaved: () => Promise<void>;
 }) {
+  const [full, setFull] = useState(fullName);
   const [form, setForm] = useState<FormState>(
     emp ? { name: emp.name, role: emp.role, color: emp.color, empType: emp.emp_type ?? 'empleado' } : EMPTY,
   );
@@ -205,6 +214,10 @@ function EmployeeDialog({ emp, companyId, onClose, onSaved }: {
     const payload = { name: form.name.trim(), role: form.role.trim(), color: form.color, emp_type: form.empType, initials: initials(form.name) };
     const r = emp ? await updateEmployee(emp.id, payload) : await createEmployee(payload, companyId);
     if (!r.ok) { setErr(`No se pudo guardar: ${r.error}`); setSaving(false); return; }
+    if (emp && full.trim() !== fullName.trim()) {
+      const f = await setFullName(emp.id, full);
+      if (!f.ok) { setErr(`Se guardó lo demás, pero no el nombre completo: ${f.error}`); setSaving(false); return; }
+    }
     await onSaved();
   }
 
@@ -236,6 +249,13 @@ function EmployeeDialog({ emp, companyId, onClose, onSaved }: {
             <input id="e-role" className={`${q.input} ${tried && missing.role ? q.invalid : ''}`} value={form.role} maxLength={60}
               placeholder="Ej. Vendedor, almacenista" onChange={e => setForm(f => ({ ...f, role: e.target.value }))} />
           </div>
+          {emp && (
+            <div className={q.field}>
+              <label className={q.label} htmlFor="e-full">Nombre completo (para RH)</label>
+              <input id="e-full" className={q.input} value={full} maxLength={120} placeholder="Nombre y apellidos"
+                onChange={e => setFull(e.target.value)} />
+            </div>
+          )}
           {tried && (missing.name || missing.role) && <p className={q.err}>Escribe {missing.name && missing.role ? 'el nombre y el puesto' : missing.name ? 'el nombre' : 'el puesto'}.</p>}
           <div className={q.field}>
             <span className={q.label}>Tipo</span>
