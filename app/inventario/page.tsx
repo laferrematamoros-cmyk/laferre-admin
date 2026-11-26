@@ -6,6 +6,10 @@ import { useCompany } from '@/lib/company-context';
 import type { InventoryData, InvSection } from '@/lib/inventory-types';
 import { roundStatus } from '@/lib/inventory-schedule';
 import LetterGrid from '@/components/inventario/LetterGrid';
+import StoreMap, { MAP_LEGEND, SHELF_LOOK } from '@/components/inventario/StoreMap';
+import { tileState } from '@/components/inventario/labels';
+import { hasLayout } from '@/lib/store-layout';
+import mm from '@/components/inventario/storemap.module.css';
 import SectionDialog from '@/components/inventario/SectionDialog';
 import PendingList from '@/components/inventario/PendingList';
 import HistoryList from '@/components/inventario/HistoryList';
@@ -98,8 +102,23 @@ export default function InventarioPage() {
 
               {tab === 'ronda' && (
                 round
-                  ? <LetterGrid sections={data.sections} people={data.people} perPerson={data.perPerson}
-                      late={st === 'late'} onPick={x => setPicked(x.id)} />
+                  ? (
+                    <div className={v.block}>
+                      <LetterGrid sections={data.sections} people={data.people} perPerson={data.perPerson}
+                        late={st === 'late'} onPick={x => setPicked(x.id)} />
+                      {company && hasLayout(company.slug) && (
+                        <section className={`${s.card} ${mm.card}`}>
+                          <div className={v.headRow}><h2>Plano de la tienda</h2><span className={v.small}>Pica una letra para ver su detalle</span></div>
+                          <StoreMap label="Plano de la tienda con el avance de cada letra"
+                            statuses={Object.fromEntries(data.sections.map(x => [x.code.trim().toUpperCase(), tileState(x, st === 'late')]))}
+                            onPick={code => { const x = data.sections.find(y => y.code.trim().toUpperCase() === code); if (x) setPicked(x.id); }} />
+                          <div className={mm.legend}>
+                            {MAP_LEGEND.map(l => <span key={l.state}><i style={{ background: SHELF_LOOK[l.state].fill, borderColor: SHELF_LOOK[l.state].stroke }} />{l.label}</span>)}
+                          </div>
+                        </section>
+                      )}
+                    </div>
+                  )
                   : <div className={c.empty}>No hay inventarios todavía. En Configuración pones cada cuándo, el plazo y las letras.</div>
               )}
               {tab === 'pendientes' && (
