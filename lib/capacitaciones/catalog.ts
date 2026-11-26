@@ -26,6 +26,13 @@ export const CATALOG: CatalogEntry[] = [
   { slug: 'cortinas',             title: 'Mantenimiento de cortinas',   version: 1, minSeconds: 30, parts: ['MantenimientoCortina'] },
   { slug: 'impermeabilizar',      title: 'Impermeabilizar un techo',    version: 1, minSeconds: 50, parts: ['CalculadoraYTipsImpermeabilizante', 'PasosImpermeabilizar', 'ProductosImpermeabilizante'] },
   { slug: 'pintar-pared',         title: 'Pintar una pared',            version: 1, minSeconds: 20, parts: ['PasosPintar'] },
+  { slug: 'tuberias',             title: 'Conoce las tuberías',          version: 1, minSeconds: 60, parts: ['ConoceTuberias'] },
+  { slug: 'tuberia-cortada',      title: 'Tubería cortada',              version: 1, minSeconds: 30, parts: ['TuberiaCortada'] },
+  { slug: 'medir-manguera',       title: 'Cómo medir manguera',          version: 1, minSeconds: 45, parts: ['MedirManguera'] },
+  { slug: 'manguera-nivel',       title: 'Cómo medir manguera de nivel', version: 1, minSeconds: 45, parts: ['MedirMangueraNivel'] },
+  { slug: 'poliducto',            title: 'Cómo medir poliducto',         version: 1, minSeconds: 35, parts: ['MedirPoliducto'] },
+  { slug: 'llamadas',             title: 'Recepción de llamadas',        version: 1, minSeconds: 45, parts: ['RecepcionLlamadas'] },
+  { slug: 'facturacion',          title: 'Proceso de facturación',       version: 1, minSeconds: 45, parts: ['ProcesoFacturacion'] },
 ];
 
 export function catalogBySlug(slug: string): CatalogEntry | null {

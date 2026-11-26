@@ -23,4 +23,11 @@ export const PARTS: Record<string, ComponentType> = {
   PasosImpermeabilizar:     load(() => import('./anim/PasosImpermeabilizar')),
   ProductosImpermeabilizante: load(() => import('./anim/ProductosImpermeabilizante')),
   PasosPintar:              load(() => import('./anim/PasosPintar')),
+  ConoceTuberias:           load(() => import('./anim/ConoceTuberias')),
+  TuberiaCortada:           load(() => import('./anim/TuberiaCortada')),
+  MedirManguera:            load(() => import('./anim/MedirManguera')),
+  MedirMangueraNivel:       load(() => import('./anim/MedirMangueraNivel')),
+  MedirPoliducto:           load(() => import('./anim/MedirPoliducto')),
+  RecepcionLlamadas:        load(() => import('./anim/RecepcionLlamadas')),
+  ProcesoFacturacion:       load(() => import('./anim/ProcesoFacturacion')),
 };

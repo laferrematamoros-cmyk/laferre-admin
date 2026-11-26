@@ -22,7 +22,7 @@ async function editor(): Promise<Access> {
   return canEditShared(a.own) ? a : { ok: false, error: SHARED_EDIT_ONLY };
 }
 
-/** Todo lo de la página: ajustes de las 13 y la tabla de UNA empresa (la del selector, si este admin puede verla). */
+/** Todo lo de la página: ajustes de todas y la tabla de UNA empresa (la del selector, si este admin puede verla). */
 export async function loadTrainingAdmin(companyId: string): Promise<LoadResult> {
   const a = await adminAccess();
   if (!a.ok) return a;

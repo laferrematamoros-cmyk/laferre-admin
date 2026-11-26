@@ -30,7 +30,7 @@ const Arrow = ({ up }: { up: boolean }) => (
 );
 
 /**
- * Ajustes: las 13 en su orden, con activa/pausa, plazo, tiempo mínimo, orden y vista previa.
+ * Ajustes: todas en su orden, con activa/pausa, plazo, tiempo mínimo, orden y vista previa.
  * Con `canEdit` en false (admin fijo a una empresa) todo se ve pero no se cambia; "Ver" sí funciona.
  */
 export default function TrainingSettings({ trainings, canEdit, onSave, onMove }: {

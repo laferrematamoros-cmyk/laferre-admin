@@ -6,14 +6,27 @@ import { groupClaims, flattenClaimRows, noticeText, inNoticeHours, type NoticeCl
 import { catalogSyncPlan } from '../capacitaciones/sync';
 
 describe('catálogo', () => {
-  it('13 capacitaciones con slug único', () => {
-    expect(CATALOG).toHaveLength(13);
-    expect(new Set(CATALOG.map(c => c.slug)).size).toBe(13);
+  it('20 capacitaciones con slug único', () => {
+    expect(CATALOG).toHaveLength(20);
+    expect(new Set(CATALOG.map(c => c.slug)).size).toBe(20);
     CATALOG.forEach(c => expect(c.slug).toMatch(/^[a-z0-9-]{1,40}$/));
+    CATALOG.forEach(c => expect(c.title.trim().length).toBeLessThanOrEqual(80));
   });
-  it('cada parte existe en components/capacitaciones/anim', () => {
-    for (const c of CATALOG) for (const p of c.parts)
+  it('cada parte existe en components/capacitaciones/anim y está en registry.tsx', () => {
+    const registry = readFileSync(join(process.cwd(), 'components/capacitaciones/registry.tsx'), 'utf8');
+    for (const c of CATALOG) for (const p of c.parts) {
       expect(existsSync(join(process.cwd(), 'components/capacitaciones/anim', `${p}.jsx`))).toBe(true);
+      expect([p, registry.includes(`import('./anim/${p}')`)]).toEqual([p, true]);
+    }
+  });
+  // "Reducir movimiento" con `svg *` a secas apagaba TODAS las animaciones SVG de la página, no sólo las suyas.
+  it('cada animación es de cliente y su regla de reducir movimiento se queda en su propia raíz', () => {
+    const dir = join(process.cwd(), 'components/capacitaciones/anim');
+    for (const f of readdirSync(dir).filter(x => x.endsWith('.jsx'))) {
+      const src = readFileSync(join(dir, f), 'utf8');
+      expect([f, /^["']use client["'];/.test(src)]).toEqual([f, true]);
+      expect([f, /[{};]svg \*/.test(src)]).toEqual([f, false]);
+    }
   });
   it('tiempos dentro de lo que acepta la base', () => {
     CATALOG.forEach(c => { expect(c.minSeconds).toBeGreaterThanOrEqual(5); expect(c.minSeconds).toBeLessThanOrEqual(600); });
@@ -27,7 +40,7 @@ describe('catálogo', () => {
     const withIO = readdirSync(dir).filter(f => f.endsWith('.jsx'))
       .map(f => ({ f, src: readFileSync(join(dir, f), 'utf8') }))
       .filter(x => x.src.includes('new IntersectionObserver'));
-    expect(withIO.length).toBeGreaterThanOrEqual(14);
+    expect(withIO.length).toBeGreaterThanOrEqual(21);
     for (const { f, src } of withIO) {
       expect([f, src.includes("rootMargin: '0px 0px -35% 0px'")]).toEqual([f, true]);
       expect([f, /threshold: 0\./.test(src)]).toEqual([f, false]);
