@@ -4,6 +4,7 @@ import { CATALOG, catalogBySlug } from '../capacitaciones/catalog';
 import { dueLabel, summarize, buildMatrix, openDoubts, type CapRow } from '../capacitaciones/status';
 import { groupClaims, flattenClaimRows, noticeText, inNoticeHours, type NoticeClaim } from '../capacitaciones/notices';
 import { catalogSyncPlan } from '../capacitaciones/sync';
+import { THEMES, themeOf } from '../capacitaciones/themes';
 
 describe('catálogo', () => {
   it('20 capacitaciones con slug único', () => {
@@ -11,6 +12,12 @@ describe('catálogo', () => {
     expect(new Set(CATALOG.map(c => c.slug)).size).toBe(20);
     CATALOG.forEach(c => expect(c.slug).toMatch(/^[a-z0-9-]{1,40}$/));
     CATALOG.forEach(c => expect(c.title.trim().length).toBeLessThanOrEqual(80));
+  });
+  it('cada capacitación tiene su tema (no el de respaldo)', () => {
+    for (const c of CATALOG) expect([c.slug, c.theme in THEMES && c.theme !== 'general']).toEqual([c.slug, true]);
+    expect(themeOf('tuberia-cortada')).toBe('bodega');
+    expect(themeOf('llamadas')).toBe('atencion');
+    expect(themeOf('nada')).toBe('general');
   });
   it('cada parte existe en components/capacitaciones/anim y está en registry.tsx', () => {
     const registry = readFileSync(join(process.cwd(), 'components/capacitaciones/registry.tsx'), 'utf8');
@@ -50,23 +57,30 @@ describe('catálogo', () => {
 
 describe('catalogSyncPlan', () => {
   const cat = [
-    { slug: 'a', title: 'A', version: 1, minSeconds: 30, parts: ['X'] },
-    { slug: 'b', title: 'B nueva', version: 2, minSeconds: 40, parts: ['Y'] },
-    { slug: 'c', title: 'C', version: 1, minSeconds: 20, parts: ['Z'] },
+    { slug: 'a', title: 'A', version: 1, minSeconds: 30, parts: ['X'], theme: 'plomeria' as const },
+    { slug: 'b', title: 'B nueva', version: 2, minSeconds: 40, parts: ['Y'], theme: 'pintura' as const },
+    { slug: 'c', title: 'C', version: 1, minSeconds: 20, parts: ['Z'], theme: 'bodega' as const },
   ];
   it('base vacía: todas pausadas en el orden del catálogo', () => {
     const p = catalogSyncPlan(cat, []);
-    expect(p.inserts.map(i => [i.slug, i.sort_order, i.is_active, i.min_seconds])).toEqual([['a', 1, false, 30], ['b', 2, false, 40], ['c', 3, false, 20]]);
+    expect(p.inserts.map(i => [i.slug, i.sort_order, i.is_active, i.min_seconds, i.theme])).toEqual([['a', 1, false, 30, 'plomeria'], ['b', 2, false, 40, 'pintura'], ['c', 3, false, 20, 'bodega']]);
     expect(p.updates).toEqual([]);
   });
   it('sube versión y título; nunca baja; las nuevas van al final', () => {
     const rows = [
-      { id: '1', slug: 'a', title: 'A', version: 3, sort_order: 5 },
-      { id: '2', slug: 'b', title: 'B', version: 1, sort_order: 2 },
+      { id: '1', slug: 'a', title: 'A', version: 3, sort_order: 5, theme: 'plomeria' },
+      { id: '2', slug: 'b', title: 'B', version: 1, sort_order: 2, theme: 'pintura' },
     ];
     const p = catalogSyncPlan(cat, rows);
     expect(p.updates).toEqual([{ id: '2', title: 'B nueva', version: 2 }]);
     expect(p.inserts.map(i => [i.slug, i.sort_order])).toEqual([['c', 6]]);
+  });
+  it('pone o corrige el tema (las filas de antes de la 014 vienen sin tema)', () => {
+    const p = catalogSyncPlan(cat.slice(0, 2), [
+      { id: '1', slug: 'a', title: 'A', version: 1, sort_order: 1, theme: null },
+      { id: '2', slug: 'b', title: 'B nueva', version: 2, sort_order: 2, theme: 'bodega' },
+    ]);
+    expect(p.updates).toEqual([{ id: '1', theme: 'plomeria' }, { id: '2', theme: 'pintura' }]);
   });
 });
 

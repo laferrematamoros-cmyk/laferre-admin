@@ -46,7 +46,7 @@ describe('syncCatalog', () => {
 
   it('una versión mayor se actualiza con .lt("version", v)', async () => {
     const c = CATALOG[0];
-    const rows = CATALOG.map((e, i) => ({ id: `id${i}`, slug: e.slug, title: e.title, version: e === c ? 0 : e.version, sort_order: i + 1 }));
+    const rows = CATALOG.map((e, i) => ({ id: `id${i}`, slug: e.slug, title: e.title, version: e === c ? 0 : e.version, sort_order: i + 1, theme: e.theme }));
     const { db, calls } = fakeDb({ tables: { trainings: { data: rows } } });
     const log = await syncCatalog(db);
     const lt = calls.find(x => x.op === 'lt')!;
@@ -64,7 +64,7 @@ describe('syncCatalog', () => {
 
 describe('runTrainingTick', () => {
   beforeEach(() => (pushExpo as jest.Mock).mockClear());
-  const synced = CATALOG.map((e, i) => ({ id: `id${i}`, slug: e.slug, title: e.title, version: e.version, sort_order: i + 1 }));
+  const synced = CATALOG.map((e, i) => ({ id: `id${i}`, slug: e.slug, title: e.title, version: e.version, sort_order: i + 1, theme: e.theme }));
 
   it('fuera de 9 a 19 h no pide avisos', async () => {
     const { db, rpc } = fakeDb({ tables: { trainings: { data: synced } } });

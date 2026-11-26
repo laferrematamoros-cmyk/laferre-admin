@@ -7,9 +7,9 @@ import { groupClaims, flattenClaimRows, noticeText, inNoticeHours, type NoticeCl
 import { personTargets, type DeviceRow, type EmployeeTokenRow } from '../push-targets';
 import { pushExpo } from '../expo-push';
 
-/** Deja `trainings` igual que el catálogo: altas pausadas, títulos y versiones (sólo hacia arriba). */
+/** Deja `trainings` igual que el catálogo: altas pausadas, títulos, temas y versiones (sólo hacia arriba). Pide la 014 (columna theme). */
 export async function syncCatalog(db: SupabaseClient): Promise<string[]> {
-  const { data, error } = await db.from('trainings').select('id, slug, title, version, sort_order');
+  const { data, error } = await db.from('trainings').select('id, slug, title, version, sort_order, theme');
   if (error) return [`catálogo: ${error.message}`];
   const plan = catalogSyncPlan(CATALOG, (data ?? []) as DbTraining[]);
   const log: string[] = [];
