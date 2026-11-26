@@ -1,0 +1,25 @@
+/* Tarjeta "Bitácoras" de Reportes. Colores de estado de app/globals.css. */
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.row {
+  display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 11px 14px;
+  border-radius: 14px; border: 1px solid var(--hair, #ECECEF); background: #fff; color: inherit; text-decoration: none;
+  transition: background .12s, border-color .12s;
+}
+.row:hover { background: #FAFAFB; border-color: #DCDCE0; }
+.row:focus-visible { outline: 2px solid var(--accent, #E11D2E); outline-offset: 2px; }
+.dot { width: 9px; height: 9px; flex: none; border-radius: 50%; }
+.dotOk { background: var(--st-ok); box-shadow: 0 0 0 4px var(--st-ok-soft); }
+.dotWarn { background: var(--st-late); box-shadow: 0 0 0 4px var(--st-late-soft); }
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.main b { font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.ok { background: var(--st-ok-soft); color: var(--st-ok-ink); }
+.warn { background: var(--st-late-soft); color: var(--st-late-ink); }
+.muted { background: #F1F1F4; color: #5C5C63; }
+.go { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 600; color: var(--muted, #6B6B72); }
+.empty { margin: 0; font-size: 13px; color: var(--muted, #6B6B72); }
+
+@media (max-width: 640px) {
+  .go { font-size: 0; gap: 0; } /* en el celular sólo la flecha */
+}

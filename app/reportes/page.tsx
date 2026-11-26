@@ -22,8 +22,13 @@ import MissedCard from '@/components/reportes/MissedCard';
 import OptionalCard from '@/components/reportes/OptionalCard';
 import DailyChart from '@/components/reportes/DailyChart';
 import TrendChart from '@/components/reportes/TrendChart';
-import { IconBars, IconDownload, IconTrend } from '@/components/panel/icons';
+import BitacorasCard from '@/components/reportes/BitacorasCard';
+import { bitacoraSummary, bitacorasPeek, validWeek, type BitSummary, type SumActivity, type SumMark, type SumRun } from '@/lib/bitacora-summary';
+import { IconBars, IconCheck, IconDownload, IconTrend } from '@/components/panel/icons';
 import s from '@/components/panel/panel.module.css';
+
+/** El día de hoy en Matamoros (AAAA-MM-DD). */
+const shopToday = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Matamoros' });
 
 interface Loaded {
   key: string;
@@ -46,6 +51,53 @@ export default function ReportesPage() {
 
   const { from, to } = reportRange(weekStart);
   const key = `${company?.id ?? ''}|${from}`;
+
+  // Al regresar de una bitácora (?semana=AAAA-MM-DD) se abre esa semana.
+  useEffect(() => {
+    const w = validWeek(new URLSearchParams(window.location.search).get('semana'), toDateStr(currentMonday()));
+    if (w) setWeekStart(new Date(`${w}T00:00:00`));
+  }, []);
+
+  // Bitácoras de las listas con firma (sólo admin): resumen de lunes a sábado de la semana elegida.
+  const [bits, setBits] = useState<{ key: string; rows: BitSummary[] | null; error: string | null }>({ key: '', rows: null, error: null });
+  useEffect(() => {
+    if (!company || !isAdmin) return;
+    let alive = true;
+    const wk = toDateStr(weekStart);
+    const sat = toDateStr(new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 5));
+    (async () => {
+      const runs = await supabase.from('checklist_runs').select('id, activity_id, scheduled_date, status')
+        .eq('company_id', company.id).gte('scheduled_date', wk).lte('scheduled_date', sat);
+      if (runs.error) { if (alive) setBits({ key, rows: null, error: runs.error.message }); return; }
+      const runRows = (runs.data ?? []) as SumRun[];
+      const runActs = [...new Set(runRows.map(r => r.activity_id))];
+      const none = { data: [] as never[], error: null };
+      const [on, extra, marks] = await Promise.all([
+        supabase.from('activities').select('id, title, days_of_week')
+          .eq('company_id', company.id).eq('checklist_enabled', true).is('archived_at', null),
+        // Las que se apagaron después pero sí tuvieron listas esa semana.
+        runActs.length ? supabase.from('activities').select('id, title, days_of_week').in('id', runActs) : Promise.resolve(none),
+        runRows.length ? supabase.from('checklist_marks').select('run_id').in('run_id', runRows.map(r => r.id)).eq('state', 'skipped') : Promise.resolve(none),
+      ]);
+      const err = on.error ?? extra.error ?? marks.error;
+      if (!alive) return;
+      if (err) { setBits({ key, rows: null, error: err.message }); return; }
+      const acts = new Map<string, SumActivity>();
+      for (const a of [...(on.data ?? []), ...(extra.data ?? [])] as SumActivity[]) acts.set(a.id, a);
+      // Cada lista cuenta desde que empezó su rol (una creada el miércoles no debe el lunes).
+      if (acts.size) {
+        const rot = await supabase.from('activity_rotations').select('activity_id, valid_from').in('activity_id', [...acts.keys()]);
+        if (!alive) return;
+        if (rot.error) { setBits({ key, rows: null, error: rot.error.message }); return; }
+        for (const r of (rot.data ?? []) as { activity_id: string; valid_from: string }[]) {
+          const a = acts.get(r.activity_id);
+          if (a && (!a.start || r.valid_from < a.start)) a.start = r.valid_from;
+        }
+      }
+      setBits({ key, rows: bitacoraSummary([...acts.values()], runRows, (marks.data ?? []) as SumMark[], wk, shopToday()), error: null });
+    })();
+    return () => { alive = false; };
+  }, [company, isAdmin, key, weekStart]);
 
   useEffect(() => {
     if (!company) return;
@@ -167,6 +219,14 @@ export default function ReportesPage() {
                 <MissedCard missed={shown.missed} hasDue={shown.due > 0} today={toDateStr(data!.loadedAt)} />
                 <OptionalCard rows={shown.optional} />
                 <div className={s.divider}>Más detalle</div>
+                {isAdmin && bits.key === key && (
+                  <FoldCard storageKey="lf_rep_open_bitacoras" icon={<IconCheck />} title="Bitácoras"
+                    peek={bits.error ? 'No se pudieron cargar' : bitacorasPeek(bits.rows ?? [])}>
+                    {bits.error
+                      ? <div className={s.error}>No se pudieron cargar las bitácoras ({bits.error}).</div>
+                      : <BitacorasCard rows={bits.rows ?? []} week={toDateStr(weekStart)} />}
+                  </FoldCard>
+                )}
                 <FoldCard storageKey="lf_rep_open_daily" icon={<IconBars />} title="Día por día" peek={dailyPeek(shown)}>
                   <DailyChart key={weekKey} days={shown.days} />
                 </FoldCard>

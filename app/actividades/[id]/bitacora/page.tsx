@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import AdminShell from '@/components/AdminShell';
 import { supabase } from '@/lib/supabase';
 import { useCompany } from '@/lib/company-context';
 import { mondayOf } from '@/lib/duty';
 import { buildBitacora, type BitItem, type BitMark, type BitRun } from '@/lib/bitacora';
+import { validWeek } from '@/lib/bitacora-summary';
 import { downloadBitacoraPdf } from '@/lib/bitacora-pdf';
 import { IconCamera, IconDownload, IconLeft, IconRight } from '@/components/panel/icons';
 import s from '@/components/panel/panel.module.css';
@@ -30,8 +31,11 @@ interface Loaded { key: string; title: string; items: BitItem[]; runs: BitRun[];
 /** Bitácora semanal de una lista con firma (supabase/010): la hoja de papel, ya llena, con PDF. */
 export default function BitacoraPage() {
   const { id } = useParams<{ id: string }>();
+  const search = useSearchParams();
+  // Desde Reportes llega con ?semana=AAAA-MM-DD&desde=reportes: abre esa semana y ofrece regresar.
+  const fromReports = search.get('desde') === 'reportes';
   const { current: company } = useCompany();
-  const [week, setWeek] = useState(() => mondayOf(todayShop()));
+  const [week, setWeek] = useState(() => validWeek(search.get('semana'), mondayOf(todayShop())) ?? mondayOf(todayShop()));
   const [data, setData] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pdfBusy, setPdfBusy] = useState(false);
@@ -93,6 +97,7 @@ export default function BitacoraPage() {
             <div className={s.sub}>Lo que se hizo cada día, quién lo hizo y tu firma.</div>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {fromReports && <Link href={`/reportes?semana=${week}`} className={s.btn}><IconLeft size={15} /> Reportes</Link>}
             <Link href={`/actividades/${id}`} className={s.btn}>Editar actividad</Link>
             <button type="button" className={`${s.btn} ${s.btnPrimary}`} onClick={pdf} disabled={loading || !bit || pdfBusy}>
               <IconDownload size={15} /> {pdfBusy ? 'Armando…' : 'Descargar PDF'}
